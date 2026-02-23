@@ -80,6 +80,7 @@ def test_consistency(request, record, other_outputs):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason,
+        suite="consistency",
     )
 
     assert metric.is_successful(), metric.reason

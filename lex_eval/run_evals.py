@@ -5,16 +5,29 @@ Run LexChat evaluations using pytest + DeepEval.
 This script wraps pytest so the full evaluation suite can be launched
 from the command line with sensible defaults and optional filters.
 
+Each suite writes results to its own JSON file under reports/:
+  - groundedness_results.json
+  - consistency_results.json
+  - tool_usage_results.json
+
+By default, existing results are preserved: if a (question, LLM) pair
+already has 1+ results in the suite's JSON file, the test is skipped.
+Use ``--overwrite`` to force re-running all tests and replacing existing
+results.
+
 Examples
 --------
-Run everything (tool usage + consistency — groundedness needs an LLM key):
+Run everything (skipping already-completed tests):
     python lex_eval/run_evals.py
-
-Run only tool-usage checks (fast, no LLM judge needed):
-    python lex_eval/run_evals.py --suite tool_usage
 
 Run only groundedness (requires OPENAI_API_KEY):
     python lex_eval/run_evals.py --suite groundedness
+
+Force re-run (overwrite existing results):
+    python lex_eval/run_evals.py --suite groundedness --overwrite
+
+Run only tool-usage checks (fast, no LLM judge needed):
+    python lex_eval/run_evals.py --suite tool_usage
 
 Run only consistency:
     python lex_eval/run_evals.py --suite consistency
@@ -27,17 +40,16 @@ Verbose output:
 
 Launch Streamlit dashboard after tests:
     python lex_eval/run_evals.py --streamlit
-
-Launch dashboard against existing results (no re-run):
-    streamlit run lex_eval/reports/streamlit_report.py
 """
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 TESTS_DIR = Path(__file__).parent / "tests"
+REPORTS_DIR = Path(__file__).parent / "reports"
 
 SUITES = {
     "tool_usage": "test_tool_usage.py",
@@ -45,11 +57,107 @@ SUITES = {
     "consistency": "test_consistency.py",
 }
 
+# Maps suite name → results JSON filename
+SUITE_RESULTS = {
+    "tool_usage": "tool_usage_results.json",
+    "groundedness": "groundedness_results.json",
+    "consistency": "consistency_results.json",
+}
+
+
+def _load_existing_results(suite: str) -> list[dict]:
+    """Load existing results for a suite, or return [] if the file doesn't exist."""
+    path = REPORTS_DIR / SUITE_RESULTS[suite]
+    if not path.exists():
+        return []
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return []
+
+
+def _covered_pairs(results: list[dict]) -> set[tuple[int, str]]:
+    """
+    Return the set of (question_id, llm_name) pairs that already have
+    at least one result in the suite's JSON file.
+    """
+    pairs: set[tuple[int, str]] = set()
+    for r in results:
+        pairs.add((int(r["question_id"]), r["llm_name"]))
+    return pairs
+
+
+def _build_deselect_args(suite: str) -> list[str]:
+    """
+    Build pytest ``--deselect`` arguments for test IDs whose (question_id, llm_name)
+    pairs already have results.
+
+    Returns an empty list if there are no existing results or if the suite file
+    doesn't exist.
+    """
+    existing = _load_existing_results(suite)
+    if not existing:
+        return []
+
+    covered = _covered_pairs(existing)
+    if not covered:
+        return []
+
+    # Load the test records to map parametrize IDs to (qid, llm) pairs.
+    # Pytest appends a numeric suffix (0, 1, …) when multiple records share
+    # the same base ID, so we must replicate that logic here.
+    _repo_root = str(Path(__file__).resolve().parent.parent)
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+    from lex_eval.utils.test_helpers import load_test_cases, record_id
+
+    records = load_test_cases()
+    test_file = SUITES[suite]
+
+    # Build the same IDs pytest uses: base_id + counter suffix
+    base_ids = [record_id(r) for r in records]
+    id_counts: dict[str, int] = {}
+    pytest_ids: list[str] = []
+    for bid in base_ids:
+        n = id_counts.get(bid, 0)
+        pytest_ids.append(f"{bid}{n}")
+        id_counts[bid] = n + 1
+
+    deselect_args: list[str] = []
+    for record, pid in zip(records, pytest_ids):
+        qid = int(record["question_id"])
+        llm = record["llm_name"]
+        if (qid, llm) in covered:
+            # Deselect all test functions in this suite file for this parametrize ID
+            if suite == "groundedness":
+                deselect_args.extend([
+                    "--deselect",
+                    f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]",
+                    "--deselect",
+                    f"lex_eval/tests/{test_file}::test_answer_relevancy[{pid}]",
+                ])
+            elif suite == "tool_usage":
+                deselect_args.extend([
+                    "--deselect",
+                    f"lex_eval/tests/{test_file}::test_tool_usage[{pid}]",
+                    "--deselect",
+                    f"lex_eval/tests/{test_file}::test_retrieval_context_populated[{pid}]",
+                ])
+            elif suite == "consistency":
+                deselect_args.extend([
+                    "--deselect",
+                    f"lex_eval/tests/{test_file}::test_consistency[{pid}]",
+                ])
+
+    return deselect_args
+
 
 def run_evals(
     suite: str | None = None,
     markers: str | None = None,
     verbose: bool = False,
+    overwrite: bool = False,
     launch_streamlit: bool = False,
     extra_args: list[str] | None = None,
 ) -> int:
@@ -58,40 +166,73 @@ def run_evals(
 
     Returns the pytest exit code (0 = all passed).
     """
-    cmd: list[str] = [sys.executable, "-m", "pytest"]
+    suites_to_run = [suite] if suite and suite in SUITES else list(SUITES.keys())
+    overall_rc = 0
 
-    # Test target
-    if suite and suite in SUITES:
-        cmd.append(str(TESTS_DIR / SUITES[suite]))
-    else:
-        cmd.append(str(TESTS_DIR))
+    for s in suites_to_run:
+        # Snapshot existing results BEFORE the run so we can merge correctly
+        existing_results: list[dict] = []
+        if not overwrite:
+            existing_results = _load_existing_results(s)
 
-    # Marker filter
-    if markers:
-        cmd.extend(["-m", markers])
+        cmd: list[str] = [sys.executable, "-m", "pytest"]
+        cmd.append(str(TESTS_DIR / SUITES[s]))
 
-    # Display
-    cmd.extend(["-v" if verbose else "-q", "--tb=short"])
+        # Marker filter
+        if markers:
+            cmd.extend(["-m", markers])
 
-    # Pass-through args
-    if extra_args:
-        cmd.extend(extra_args)
+        # Skip logic: deselect tests that already have results
+        if not overwrite:
+            deselect = _build_deselect_args(s)
+            if deselect:
+                cmd.extend(deselect)
+                n_skipped = deselect.count("--deselect")
+                print(f"ℹ️  {s}: skipping {n_skipped} test(s) with existing results "
+                      f"(use --overwrite to force)")
 
-    print(f"Running: {' '.join(cmd)}\n")
-    result = subprocess.run(cmd)
+        # Display
+        cmd.extend(["-v" if verbose else "-q", "--tb=short"])
 
-    reports_dir = Path(__file__).parent / "reports"
+        # Pass-through args
+        if extra_args:
+            cmd.extend(extra_args)
 
-    if result.returncode in (0, 1):  # 0=all pass, 1=some fail
+        print(f"\n{'='*60}")
+        print(f"Running suite: {s}")
+        print(f"{'='*60}")
+        print(f"Command: {' '.join(cmd)}\n")
+
+        result = subprocess.run(cmd)
+
+        # Merge: combine pre-existing results with whatever conftest just wrote
+        if not overwrite and existing_results:
+            results_path = REPORTS_DIR / SUITE_RESULTS[s]
+            new_results: list[dict] = []
+            if results_path.exists():
+                try:
+                    with open(results_path) as f:
+                        new_results = json.load(f)
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            combined = existing_results + new_results
+            REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+            with open(results_path, "w") as f:
+                json.dump(combined, f, indent=2, default=str)
+
+        if result.returncode > overall_rc:
+            overall_rc = result.returncode
+
+    if overall_rc in (0, 1):
         if launch_streamlit:
-            _launch_streamlit(reports_dir)
+            _launch_streamlit(REPORTS_DIR)
         else:
             print(
-                f"\n📊 Results written to {reports_dir / 'eval_report.json'}"
+                f"\n📊 Results written to {REPORTS_DIR}/"
                 "\n   View dashboard: streamlit run lex_eval/reports/streamlit_report.py"
             )
 
-    return result.returncode
+    return overall_rc
 
 
 def _launch_streamlit(reports_dir: Path) -> None:
@@ -112,19 +253,21 @@ def main() -> int:
         epilog="""
 Suites:
   tool_usage     Check tools were invoked correctly (fast, offline)
-  groundedness   LLM-as-judge faithfulness check (needs OPENAI_API_KEY)
+  groundedness   LLM-as-judge faithfulness + relevancy checks (needs OPENAI_API_KEY)
   consistency    Same-model repeatability checks (fast, offline)
 
+Results:
+  Each suite writes to its own JSON file under reports/:
+    groundedness_results.json, consistency_results.json, tool_usage_results.json
+
+  By default, tests are skipped if results already exist for that
+  (question, LLM) pair.  Use --overwrite to force re-running.
+
 Dashboard:
-  Results are written to lex_eval/reports/eval_report.json after each run.
   Launch the Streamlit dashboard at any time:
     streamlit run lex_eval/reports/streamlit_report.py
   Or auto-launch after tests:
     python lex_eval/run_evals.py --streamlit
-
-Markers:
-  groundedness   Tests that call an LLM judge
-  consistency    Same-model repeatability tests
 """,
     )
     parser.add_argument(
@@ -136,6 +279,12 @@ Markers:
         "-m",
         "--markers",
         help="Pytest marker expression (e.g. 'not groundedness')",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        default=False,
+        help="Overwrite existing results instead of skipping completed tests",
     )
     parser.add_argument(
         "--streamlit",
@@ -160,6 +309,7 @@ Markers:
         suite=args.suite,
         markers=args.markers,
         verbose=args.verbose,
+        overwrite=args.overwrite,
         launch_streamlit=args.streamlit,
         extra_args=args.extra,
     )

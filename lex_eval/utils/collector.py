@@ -3,8 +3,9 @@ Helper for attaching metric data to pytest test items.
 
 Tests call ``attach_metric(request, ...)`` to store score/reason data
 on the test node. conftest.pytest_runtest_makereport then collects it
-into a session-level list which is written to eval_report.json at the
-end of the run.
+into per-suite lists which are written to separate JSON files
+(e.g. groundedness_results.json, consistency_results.json,
+tool_usage_results.json) at the end of the run.
 """
 
 from typing import Any, Dict, List
@@ -19,6 +20,7 @@ def attach_metric(
     score: float,
     threshold: float,
     passed: bool,
+    suite: str,
     reason: str = "",
     error: str = "",
     tools_used: List[str] | None = None,
@@ -27,9 +29,17 @@ def attach_metric(
     Attach metric result data to the pytest test item.
 
     The data is picked up by the ``pytest_runtest_makereport`` hook in
-    conftest.py and accumulated for writing to eval_report.json.
+    conftest.py and accumulated for writing to per-suite JSON files.
+
+    Parameters
+    ----------
+    suite : str
+        Identifier for the result file, e.g. ``"groundedness"``,
+        ``"consistency"``, ``"tool_usage"``.  Results are written to
+        ``reports/<suite>_results.json``.
     """
     request.node._metric_data = {
+        "suite": suite,
         "llm_name": record["llm_name"],
         "question_id": record["question_id"],
         "question": record["question"],

@@ -16,30 +16,44 @@ from pathlib import Path
 
 import streamlit as st
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
+
 _HERE = Path(__file__).parent
 _REPORTS_DIR = _HERE
 _DATA_DIR = _HERE.parent / "data"
 
-EVAL_JSON = _REPORTS_DIR / "eval_report.json"
+SUITE_RESULTS = {
+    "groundedness": _REPORTS_DIR / "groundedness_results.json",
+    "consistency": _REPORTS_DIR / "consistency_results.json",
+    "tool_usage": _REPORTS_DIR / "tool_usage_results.json",
+}
 RESPONSES_JSONL = _DATA_DIR / "responses.jsonl"
 
-# ---------------------------------------------------------------------------
-# Data loading (cached so navigation re-renders are instant)
-# ---------------------------------------------------------------------------
+
+def _result_file_mtimes() -> tuple[float, ...]:
+    """Return modification times of all result files for cache-busting."""
+    return tuple(
+        path.stat().st_mtime if path.exists() else 0.0
+        for path in SUITE_RESULTS.values()
+    )
 
 
 @st.cache_data
-def load_eval_results() -> list[dict]:
-    """Load raw eval results from eval_report.json."""
-    with open(EVAL_JSON) as f:
-        return json.load(f)
+def load_eval_results(_mtimes: tuple[float, ...] = ()) -> list[dict]:
+    """Load and merge raw eval results from all per-suite JSON files."""
+    all_results: list[dict] = []
+    for suite, path in SUITE_RESULTS.items():
+        if path.exists():
+            try:
+                with open(path) as f:
+                    results = json.load(f)
+                all_results.extend(results)
+            except (json.JSONDecodeError, ValueError):
+                pass
+    return all_results
 
 
 @st.cache_data
-def load_responses() -> dict[tuple[str, int], list[dict]]:
+def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
     """
     Load responses.jsonl and index by (llm_name, question_id).
     Each key maps to a list of response records (usually 2 runs).
@@ -55,15 +69,18 @@ def load_responses() -> dict[tuple[str, int], list[dict]]:
     return dict(idx)
 
 
-# ---------------------------------------------------------------------------
-# Aggregation
-# ---------------------------------------------------------------------------
+
+_AGGREGATE_ONLY_METRICS = {"Consistency"}
 
 
 def _aggregate_metrics(results: list[dict]) -> list[dict]:
     """
-    Return one aggregated result per metric type, deduplicating within each
-    test_name and computing mean/min/max across distinct test names.
+    Return one aggregated result per metric type.
+
+    - **Consistency**: single aggregated entry (no per-run breakdown).
+    - **Everything else** (Faithfulness, Answer Relevancy, Tool Usage, …):
+      keeps every individual run, computes mean/min/max over all of them,
+      and stores the full list in ``raw_results`` for the detail expander.
     """
     by_metric: dict[str, list[dict]] = defaultdict(list)
     for r in results:
@@ -71,27 +88,24 @@ def _aggregate_metrics(results: list[dict]) -> list[dict]:
 
     aggregated: list[dict] = []
     for metric_name, metric_results in by_metric.items():
-        # Step 1: deduplicate within each test_name (keep first occurrence)
-        seen: dict[str, dict] = {}
-        for r in metric_results:
-            if r["test_name"] not in seen:
-                seen[r["test_name"]] = r
-        deduped = list(seen.values())
-
-        if metric_name == "Consistency":
-            aggregated.append(deduped[0])
+        if metric_name in _AGGREGATE_ONLY_METRICS:
+            # Consistency — show a single summary, no per-run drill-down.
+            aggregated.append(metric_results[0])
         else:
-            scores = [r["score"] for r in deduped]
+            # Faithfulness / Answer Relevancy / Tool Usage —
+            # keep *all* runs so each one appears in the detail expander.
+            scores = [r["score"] for r in metric_results]
             mean_score = sum(scores) / len(scores)
             aggregated.append(
                 {
-                    **deduped[0],
+                    **metric_results[0],
                     "score": mean_score,
                     "min_score": min(scores),
                     "max_score": max(scores),
-                    "test_names": [r["test_name"] for r in deduped],
-                    "raw_results": deduped,
-                    "passed": mean_score >= deduped[0]["threshold"],
+                    "n_runs": len(metric_results),
+                    "test_names": [r["test_name"] for r in metric_results],
+                    "raw_results": metric_results,
+                    "passed": mean_score >= metric_results[0]["threshold"],
                 }
             )
     return aggregated
@@ -107,7 +121,7 @@ def _build_hierarchy(
     grouped: dict[str, dict[int, list[dict]]] = defaultdict(lambda: defaultdict(list))
     for r in raw:
         grouped[r["llm_name"]][int(r["question_id"])].append(r)
-    # Aggregate per metric
+    # aggregate per metric
     hierarchy: dict[str, dict[int, list[dict]]] = {}
     for llm, questions in grouped.items():
         hierarchy[llm] = {}
@@ -115,10 +129,6 @@ def _build_hierarchy(
             hierarchy[llm][qid] = _aggregate_metrics(results)
     return hierarchy
 
-
-# ---------------------------------------------------------------------------
-# Helpers for score badge rendering
-# ---------------------------------------------------------------------------
 
 _SCORE_THRESHOLDS = [(0.95, "excellent"), (0.80, "good"), (0.60, "warning")]
 
@@ -157,11 +167,6 @@ def _score_badge(score: float | str, level: str | None = None) -> str:
 
 def _status_icon(passed: bool) -> str:
     return "✅" if passed else "❌"
-
-
-# ---------------------------------------------------------------------------
-# Page sections
-# ---------------------------------------------------------------------------
 
 
 def _render_top_summary(hierarchy: dict) -> None:
@@ -275,42 +280,47 @@ def _render_metric_summary_table(metrics: list[dict]) -> None:
 def _render_metric_detail(metrics: list[dict]) -> None:
     """
     Drill-down: show individual raw eval results for each metric.
-    For aggregated metrics also shows per-test breakdown.
+    For aggregated metrics also shows per-run breakdown.
+    Uses containers (not expanders) to avoid nested-expander violations.
     """
     for m in metrics:
         name = m["metric_name"]
         has_range = "min_score" in m
+        icon = _status_icon(m["passed"])
 
-        with st.expander(
-            f"**{name}** — {_status_icon(m['passed'])} score: {m['score']:.3f}",
-            expanded=False,
-        ):
+        st.markdown(
+            f"**{name}** {icon} — score: `{m['score']:.3f}`",
+        )
+        with st.container():
             if has_range:
+                n = m.get("n_runs", len(m.get("raw_results", [])))
                 st.markdown(
                     f"**Mean:** `{m['score']:.3f}` &nbsp;|&nbsp; "
                     f"**Min:** `{m['min_score']:.3f}` &nbsp;|&nbsp; "
                     f"**Max:** `{m['max_score']:.3f}` &nbsp;|&nbsp; "
-                    f"**Threshold:** `{m['threshold']:.3f}`"
+                    f"**Threshold:** `{m['threshold']:.3f}` &nbsp;|&nbsp; "
+                    f"**Runs:** `{n}`"
                 )
-                st.markdown("**Individual test results:**")
-                for raw in m.get("raw_results", []):
-                    _render_single_eval_result(raw)
+                for idx, raw in enumerate(m.get("raw_results", []), 1):
+                    _render_single_eval_result(raw, run_label=f"Run {idx}")
             else:
-                # Consistency — single result
+                # Consistency — single aggregated result, no per-run breakdown
                 _render_single_eval_result(m)
+        st.divider()
 
 
-def _render_single_eval_result(r: dict) -> None:
+def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
     """Render one raw eval result entry."""
     passed = r["passed"]
     colour = "#3fb950" if passed else "#f85149"
     label = "✓ Passed" if passed else "✗ Failed"
+    prefix = f"{run_label} — " if run_label else ""
 
     st.markdown(
         f'<div style="background:#0d1117;border-left:3px solid {colour};'
         f'padding:10px 14px;border-radius:4px;margin:6px 0;">'
         f'<span style="color:#8b949e;font-size:0.8em;">'
-        f'{r.get("test_name","")}</span>&nbsp;&nbsp;'
+        f'{prefix}{r.get("test_name","")}</span>&nbsp;&nbsp;'
         f'<span style="color:{colour};font-size:0.85em;font-weight:600;">{label}</span>'
         f"&nbsp;&nbsp;score: <code>{r['score']:.3f}</code>"
         f'<div style="color:#8b949e;font-size:0.85em;margin-top:6px;">'
@@ -342,7 +352,6 @@ def _render_chat_interaction(records: list[dict]) -> None:
         with tab:
             tc = rec.get("test_case", {})
 
-            # ---- LLM Answer ----
             st.markdown("#### LLM Answer")
             actual = tc.get("actual_output", "")
             if actual:
@@ -352,15 +361,14 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
             st.divider()
 
-            # ---- Tools Called ----
             tools_called: list[dict] = tc.get("tools_called") or []
             if tools_called:
                 st.markdown(f"#### Tools Called ({len(tools_called)})")
                 for i, tool in enumerate(tools_called):
                     tool_name = tool.get("name", f"tool_{i}")
-                    with st.expander(f"🔧 {tool_name}", expanded=False):
-                        output_raw = tool.get("output", "")
-                        # Try to parse as JSON for nice rendering
+                    st.markdown(f"🔧 **{tool_name}**")
+                    output_raw = tool.get("output", "")
+                    with st.container():
                         if isinstance(output_raw, str):
                             try:
                                 parsed = json.loads(output_raw)
@@ -376,28 +384,25 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
             st.divider()
 
-            # ---- Retrieval Context ----
             contexts: list[str] = tc.get("retrieval_context") or []
             if contexts:
                 st.markdown(f"#### Retrieved Context ({len(contexts)} items)")
                 for i, ctx in enumerate(contexts):
-                    with st.expander(f"📄 Context {i + 1}", expanded=False):
-                        # Legislation text — render as plain text, not markdown,
-                        # to avoid spurious formatting
+                    st.markdown(f"📄 **Context {i + 1}**")
+                    with st.container():
                         st.text(ctx)
             else:
                 st.caption("No retrieval context captured.")
 
-            # ---- Metadata ----
-            with st.expander("ℹ️ Record metadata", expanded=False):
-                st.json(
-                    {
-                        "timestamp": rec.get("timestamp"),
-                        "deep_research": rec.get("deep_research"),
-                        "llm_name": rec.get("llm_name"),
-                        "question_id": rec.get("question_id"),
-                    }
-                )
+            st.markdown("ℹ️ **Record metadata**")
+            st.json(
+                {
+                    "timestamp": rec.get("timestamp"),
+                    "deep_research": rec.get("deep_research"),
+                    "llm_name": rec.get("llm_name"),
+                    "question_id": rec.get("question_id"),
+                }
+            )
 
 
 def _render_question_block(
@@ -417,12 +422,12 @@ def _render_question_block(
         f"*({n_pass}/{n_total} metrics passed)*",
         expanded=False,
     ):
-        # Metric summary table always visible at the top
+        # summary table always visible at the top
         _render_metric_summary_table(metrics)
 
         st.markdown("")  # spacer
 
-        # Drill-down via tabs
+        # drill-down via tabs
         detail_tab, chat_tab = st.tabs(["📊 Metric Detail", "💬 Chat Interaction"])
 
         with detail_tab:
@@ -432,38 +437,38 @@ def _render_question_block(
             _render_chat_interaction(response_records)
 
 
-# ---------------------------------------------------------------------------
-# Main app
-# ---------------------------------------------------------------------------
-
-
 def main() -> None:
     st.set_page_config(
         page_title="LexChat Eval Dashboard",
-        page_icon="⚖️",
         layout="wide",
         initial_sidebar_state="collapsed",
     )
 
-    st.title("⚖️ LexChat Evaluation Dashboard")
+    st.title("LexChat Evaluation Dashboard")
 
-    # Load data
-    if not EVAL_JSON.exists():
-        st.error(f"eval_report.json not found at {EVAL_JSON}. Run the eval suite first.")
+    # load data
+    available = [name for name, path in SUITE_RESULTS.items() if path.exists()]
+    if not available:
+        st.error(
+            "No results files found. Run the eval suite first:\n\n"
+            "```\npython lex_eval/run_evals.py\n```"
+        )
         st.stop()
 
-    raw_results = load_eval_results()
+    st.caption(f"Loaded results from: {', '.join(available)}")
+
+    raw_results = load_eval_results(_mtimes=_result_file_mtimes())
     hierarchy = _build_hierarchy(raw_results)
-    responses = load_responses() if RESPONSES_JSONL.exists() else {}
+    _resp_mtime = RESPONSES_JSONL.stat().st_mtime if RESPONSES_JSONL.exists() else 0.0
+    responses = load_responses(_mtime=_resp_mtime) if RESPONSES_JSONL.exists() else {}
 
     if not responses:
         st.warning(f"responses.jsonl not found at {RESPONSES_JSONL} — chat interaction tab will be empty.")
 
-    # Overall summary — one row per LLM
     _render_top_summary(hierarchy)
     st.divider()
 
-    # One tab per LLM
+    # tab per LLM
     llm_names = sorted(hierarchy.keys())
     llm_tabs = st.tabs(llm_names)
 
