@@ -16,11 +16,11 @@ from lex_eval.utils.test_helpers import (
 )
 from lex_eval.utils.collector import attach_metric
 
-
 # ---------------------------------------------------------------------------
 # Same-model repeatability: when the same question was asked to the same
 # LLM multiple times (via --append), the answers should be very similar.
 # ---------------------------------------------------------------------------
+
 
 def _same_model_cases():
     """
@@ -36,14 +36,10 @@ def _same_model_cases():
             continue
         for i, record in enumerate(records):
             others = [
-                r["test_case"]["actual_output"]
-                for j, r in enumerate(records)
-                if j != i
+                r["test_case"]["actual_output"] for j, r in enumerate(records) if j != i
             ]
             test_id = f"{key}_run{i + 1}"
-            cases.append(
-                pytest.param(record, others, id=test_id)
-            )
+            cases.append(pytest.param(record, others, id=test_id))
     return cases
 
 

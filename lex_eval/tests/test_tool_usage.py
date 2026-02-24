@@ -15,7 +15,6 @@ from lex_eval.utils.test_helpers import (
 )
 from lex_eval.utils.collector import attach_metric
 
-
 records = load_test_cases()
 
 
@@ -57,4 +56,3 @@ def test_tool_usage(request, record):
     )
 
     assert metric.is_successful(), metric.reason
-

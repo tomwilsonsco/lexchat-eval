@@ -13,7 +13,6 @@ from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 from typing import Set
 
-
 # The three tools that must all be present for a full score
 REQUIRED_TOOLS: list[str] = [
     "delegate_research",
@@ -41,9 +40,7 @@ class ToolUsageMetric(BaseMetric):
         self.reason = ""
         self.success = False
 
-    async def a_measure(
-        self, test_case: LLMTestCase, *args, **kwargs
-    ) -> float:
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
         return self.measure(test_case)
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:

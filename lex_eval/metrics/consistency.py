@@ -28,19 +28,103 @@ def _extract_terms(text: str) -> set:
     tokens = set(re.findall(r"\b\w+\b", text))
     # Remove very common stop words that add noise
     stop = {
-        "the", "a", "an", "is", "are", "was", "were", "be", "been",
-        "being", "have", "has", "had", "do", "does", "did", "will",
-        "would", "could", "should", "may", "might", "shall", "can",
-        "of", "in", "to", "for", "with", "on", "at", "by", "from",
-        "as", "into", "through", "during", "before", "after", "and",
-        "but", "or", "nor", "not", "so", "yet", "both", "either",
-        "neither", "each", "every", "all", "any", "few", "more",
-        "most", "other", "some", "such", "no", "only", "own", "same",
-        "than", "too", "very", "just", "because", "if", "when",
-        "while", "where", "how", "what", "which", "who", "whom",
-        "this", "that", "these", "those", "it", "its", "they",
-        "them", "their", "we", "our", "you", "your", "he", "she",
-        "his", "her", "i", "me", "my",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "shall",
+        "can",
+        "of",
+        "in",
+        "to",
+        "for",
+        "with",
+        "on",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "and",
+        "but",
+        "or",
+        "nor",
+        "not",
+        "so",
+        "yet",
+        "both",
+        "either",
+        "neither",
+        "each",
+        "every",
+        "all",
+        "any",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "only",
+        "own",
+        "same",
+        "than",
+        "too",
+        "very",
+        "just",
+        "because",
+        "if",
+        "when",
+        "while",
+        "where",
+        "how",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "this",
+        "that",
+        "these",
+        "those",
+        "it",
+        "its",
+        "they",
+        "them",
+        "their",
+        "we",
+        "our",
+        "you",
+        "your",
+        "he",
+        "she",
+        "his",
+        "her",
+        "i",
+        "me",
+        "my",
     }
     return tokens - stop
 
@@ -79,9 +163,7 @@ class ConsistencyMetric(BaseMetric):
         self.reason = ""
         self.success = False
 
-    async def a_measure(
-        self, test_case: LLMTestCase, *args, **kwargs
-    ) -> float:
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
         return self.measure(test_case)
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
@@ -93,9 +175,7 @@ class ConsistencyMetric(BaseMetric):
             sim = jaccard_similarity(actual_terms, ref_terms)
             similarities.append(sim)
 
-        self.score = (
-            sum(similarities) / len(similarities) if similarities else 0.0
-        )
+        self.score = sum(similarities) / len(similarities) if similarities else 0.0
         self.success = self.score >= self.threshold
         total_results = len(similarities) + 1  # references + the current response
         self.reason = (

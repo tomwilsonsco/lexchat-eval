@@ -135,33 +135,42 @@ def _build_deselect_args(suite: str) -> list[str]:
         if (qid, llm) in covered:
             # Deselect all test functions in this suite file for this parametrize ID
             if suite == "groundedness":
-                deselect_args.extend([
-                    "--deselect",
-                    f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]",
-                    "--deselect",
-                    f"lex_eval/tests/{test_file}::test_answer_relevancy[{pid}]",
-                ])
+                deselect_args.extend(
+                    [
+                        "--deselect",
+                        f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]",
+                        "--deselect",
+                        f"lex_eval/tests/{test_file}::test_answer_relevancy[{pid}]",
+                    ]
+                )
             elif suite == "tool_usage":
-                deselect_args.extend([
-                    "--deselect",
-                    f"lex_eval/tests/{test_file}::test_tool_usage[{pid}]",
-                ])
+                deselect_args.extend(
+                    [
+                        "--deselect",
+                        f"lex_eval/tests/{test_file}::test_tool_usage[{pid}]",
+                    ]
+                )
             elif suite == "consistency":
-                deselect_args.extend([
-                    "--deselect",
-                    f"lex_eval/tests/{test_file}::test_consistency[{pid}]",
-                ])
+                deselect_args.extend(
+                    [
+                        "--deselect",
+                        f"lex_eval/tests/{test_file}::test_consistency[{pid}]",
+                    ]
+                )
             elif suite == "structure":
-                deselect_args.extend([
-                    "--deselect",
-                    f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]",
-                    "--deselect",
-                    f"lex_eval/tests/{test_file}::test_citation_passthrough[{pid}]",
-                ])
+                deselect_args.extend(
+                    [
+                        "--deselect",
+                        f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]",
+                        "--deselect",
+                        f"lex_eval/tests/{test_file}::test_citation_passthrough[{pid}]",
+                    ]
+                )
 
     # consistency_llm is parametrized by (question, LLM) group, not individual record
     if suite == "consistency_llm":
         from lex_eval.utils.test_helpers import group_by_question_and_llm
+
         deselect_args = []
         for key, grp_records in sorted(group_by_question_and_llm().items()):
             if len(grp_records) < 2:
@@ -169,10 +178,12 @@ def _build_deselect_args(suite: str) -> list[str]:
             qid = int(grp_records[0]["question_id"])
             llm = grp_records[0]["llm_name"]
             if (qid, llm) in covered:
-                deselect_args.extend([
-                    "--deselect",
-                    f"lex_eval/tests/{test_file}::test_consistency_llm[{key}]",
-                ])
+                deselect_args.extend(
+                    [
+                        "--deselect",
+                        f"lex_eval/tests/{test_file}::test_consistency_llm[{key}]",
+                    ]
+                )
 
     return deselect_args
 
@@ -212,8 +223,10 @@ def run_evals(
             if deselect:
                 cmd.extend(deselect)
                 n_skipped = deselect.count("--deselect")
-                print(f"ℹ️  {s}: skipping {n_skipped} test(s) with existing results "
-                      f"(use --overwrite to force)")
+                print(
+                    f"ℹ️  {s}: skipping {n_skipped} test(s) with existing results "
+                    f"(use --overwrite to force)"
+                )
 
         # Display
         cmd.extend(["-v" if verbose else "-q", "--tb=short"])

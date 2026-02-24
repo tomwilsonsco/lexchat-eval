@@ -14,7 +14,10 @@ failing score.
 
 import pytest
 
-from lex_eval.metrics.structure import CitationPassthroughMetric, MandatoryStructureMetric
+from lex_eval.metrics.structure import (
+    CitationPassthroughMetric,
+    MandatoryStructureMetric,
+)
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.test_helpers import (
     load_test_cases,

@@ -2,11 +2,13 @@
 Export a self-contained stlite HTML dashboard with results JSON inlined.
 Configured for fully offline corporate environment execution.
 """
+
 import json
 from pathlib import Path
 
 _REPORTS_DIR = Path(__file__).parent
 _SUITES = ["groundedness", "consistency", "consistency_llm", "tool_usage", "structure"]
+
 
 def _load_all_results() -> dict[str, list]:
     data = {}
@@ -18,8 +20,10 @@ def _load_all_results() -> dict[str, list]:
             data[suite] = []
     return data
 
+
 _MAX_CONTEXT_CHARS = 2_000
 _MAX_TOOL_OUTPUT_CHARS = 1_000
+
 
 def _slim_responses(responses_path: Path) -> str:
     records = []
@@ -42,19 +46,22 @@ def _slim_responses(responses_path: Path) -> str:
                     out = out[:_MAX_TOOL_OUTPUT_CHARS]
                 tools_slim.append({**t, "output": out})
 
-            records.append({
-                "llm_name": rec.get("llm_name"),
-                "question_id": rec.get("question_id"),
-                "timestamp": rec.get("timestamp"),
-                "deep_research": rec.get("deep_research"),
-                "test_case": {
-                    "input": tc.get("input", ""),
-                    "actual_output": tc.get("actual_output", ""),
-                    "retrieval_context": ctx_slim,
-                    "tools_called": tools_slim,
-                },
-            })
+            records.append(
+                {
+                    "llm_name": rec.get("llm_name"),
+                    "question_id": rec.get("question_id"),
+                    "timestamp": rec.get("timestamp"),
+                    "deep_research": rec.get("deep_research"),
+                    "test_case": {
+                        "input": tc.get("input", ""),
+                        "actual_output": tc.get("actual_output", ""),
+                        "retrieval_context": ctx_slim,
+                        "tools_called": tools_slim,
+                    },
+                }
+            )
     return json.dumps(records)
+
 
 def export_html(output_path: Path | None = None) -> Path:
     output_path = output_path or (_REPORTS_DIR / "lex_eval.html")
@@ -63,7 +70,7 @@ def export_html(output_path: Path | None = None) -> Path:
     app_source = (_REPORTS_DIR / "streamlit_report.py").read_text()
     app_source = app_source.replace(
         '_DATA_DIR = _HERE.parent / "data"',
-        '_DATA_DIR = _HERE  # patched for stlite export',
+        "_DATA_DIR = _HERE  # patched for stlite export",
     )
 
     requirements = []
@@ -124,6 +131,7 @@ def export_html(output_path: Path | None = None) -> Path:
     output_path.write_text(html, encoding="utf-8")
     print(f"Dashboard exported to: {output_path}")
     return output_path
+
 
 if __name__ == "__main__":
     export_html()

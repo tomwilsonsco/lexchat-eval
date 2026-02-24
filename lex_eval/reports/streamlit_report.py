@@ -16,7 +16,6 @@ from pathlib import Path
 
 import streamlit as st
 
-
 _HERE = Path(__file__).parent
 _REPORTS_DIR = _HERE
 _DATA_DIR = _HERE.parent / "data"
@@ -69,7 +68,6 @@ def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
                 key = (rec["llm_name"], int(rec["question_id"]))
                 idx[key].append(rec)
     return dict(idx)
-
 
 
 _AGGREGATE_ONLY_METRICS = {"Consistency (Simple)", "Consistency (AI Judge)"}
@@ -185,7 +183,7 @@ def _score_badge(score: float | str, level: str | None = None) -> str:
     bg, fg = _BADGE_COLOURS.get(lvl, ("#30363d", "#c9d1d9"))
     return (
         f'<span style="background:{bg};color:{fg};padding:2px 8px;'
-        f'border-radius:4px;font-family:monospace;font-size:0.85em;'
+        f"border-radius:4px;font-family:monospace;font-size:0.85em;"
         f'font-weight:600;">{text}</span>'
     )
 
@@ -224,9 +222,11 @@ def _render_top_summary(hierarchy: dict) -> None:
             # Sort by METRIC_DISPLAY_ORDER
             metric_names = sorted(
                 by_metric.keys(),
-                key=lambda n: METRIC_DISPLAY_ORDER.index(n)
-                if n in METRIC_DISPLAY_ORDER
-                else len(METRIC_DISPLAY_ORDER),
+                key=lambda n: (
+                    METRIC_DISPLAY_ORDER.index(n)
+                    if n in METRIC_DISPLAY_ORDER
+                    else len(METRIC_DISPLAY_ORDER)
+                ),
             )
 
             rows_html = ""
@@ -401,7 +401,9 @@ def _render_chat_interaction(records: list[dict]) -> None:
         st.info("No response records found in responses.jsonl for this combination.")
         return
 
-    run_tabs = st.tabs([f"Run {i + 1}  ({r['timestamp'][:19]})" for i, r in enumerate(records)])
+    run_tabs = st.tabs(
+        [f"Run {i + 1}  ({r['timestamp'][:19]})" for i, r in enumerate(records)]
+    )
 
     for tab, rec in zip(run_tabs, records):
         with tab:
@@ -518,7 +520,9 @@ def main() -> None:
     responses = load_responses(_mtime=_resp_mtime) if RESPONSES_JSONL.exists() else {}
 
     if not responses:
-        st.warning(f"responses.jsonl not found at {RESPONSES_JSONL} — chat interaction tab will be empty.")
+        st.warning(
+            f"responses.jsonl not found at {RESPONSES_JSONL} — chat interaction tab will be empty."
+        )
 
     _render_top_summary(hierarchy)
     st.divider()

@@ -72,6 +72,7 @@ def test_consistency_llm(request, records):
     reference_outputs = [r["test_case"]["actual_output"] for r in records[1:]]
 
     from lex_eval.utils.test_helpers import record_to_test_case
+
     test_case = record_to_test_case(primary)
 
     metric = LLMConsistencyMetric(

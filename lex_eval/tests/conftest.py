@@ -19,7 +19,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-
 _REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 # Accumulated during the session, keyed by suite name.
@@ -29,6 +28,7 @@ _metric_records: dict[str, list[dict]] = defaultdict(list)
 # ---------------------------------------------------------------------------
 # Pytest hooks
 # ---------------------------------------------------------------------------
+
 
 def pytest_configure(config):
     """Register custom markers and ensure imports resolve."""
@@ -43,7 +43,8 @@ def pytest_configure(config):
         "markers", "consistency: same-model repeatability tests (Jaccard)"
     )
     config.addinivalue_line(
-        "markers", "consistency_llm: same-model repeatability tests (AI judge, requires OPENAI_API_KEY)"
+        "markers",
+        "consistency_llm: same-model repeatability tests (AI judge, requires OPENAI_API_KEY)",
     )
     config.addinivalue_line(
         "markers", "structure: tests that check mandatory Worker output structure"
