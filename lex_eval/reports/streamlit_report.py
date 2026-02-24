@@ -24,7 +24,9 @@ _DATA_DIR = _HERE.parent / "data"
 SUITE_RESULTS = {
     "groundedness": _REPORTS_DIR / "groundedness_results.json",
     "consistency": _REPORTS_DIR / "consistency_results.json",
+    "consistency_llm": _REPORTS_DIR / "consistency_llm_results.json",
     "tool_usage": _REPORTS_DIR / "tool_usage_results.json",
+    "structure": _REPORTS_DIR / "structure_results.json",
 }
 RESPONSES_JSONL = _DATA_DIR / "responses.jsonl"
 
@@ -70,7 +72,30 @@ def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
 
 
 
-_AGGREGATE_ONLY_METRICS = {"Consistency"}
+_AGGREGATE_ONLY_METRICS = {"Consistency (Simple)", "Consistency (AI Judge)"}
+
+# ---------------------------------------------------------------------------
+# Metric display order
+# Edit this list to control the order metrics appear in per-question tables
+# and detail panels.  Any metric not listed here will appear at the end.
+# ---------------------------------------------------------------------------
+METRIC_DISPLAY_ORDER: list[str] = [
+    "Tool Usage",
+    "Research Output Structure",
+    "Reference Links",
+    "Consistency (Simple)",
+    "Consistency (AI Judge)",
+    "Answer Relevancy",
+    "Faithfulness",
+]
+
+
+def _metric_sort_key(metric: dict) -> int:
+    name = metric["metric_name"]
+    try:
+        return METRIC_DISPLAY_ORDER.index(name)
+    except ValueError:
+        return len(METRIC_DISPLAY_ORDER)
 
 
 def _aggregate_metrics(results: list[dict]) -> list[dict]:
@@ -108,7 +133,7 @@ def _aggregate_metrics(results: list[dict]) -> list[dict]:
                     "passed": mean_score >= metric_results[0]["threshold"],
                 }
             )
-    return aggregated
+    return sorted(aggregated, key=_metric_sort_key)
 
 
 def _build_hierarchy(
@@ -170,8 +195,8 @@ def _status_icon(passed: bool) -> str:
 
 
 def _render_top_summary(hierarchy: dict) -> None:
-    """Per-LLM summary row shown at the top of the page."""
-    rows_html = ""
+    """Per-LLM summary rows at the top of the page, each expandable to show
+    mean score per metric across all questions."""
     for llm in sorted(hierarchy.keys()):
         q_data = hierarchy[llm]
         all_m = [r for results in q_data.values() for r in results]
@@ -180,33 +205,63 @@ def _render_top_summary(hierarchy: dict) -> None:
         failed = total - passed
         pct = passed / total * 100 if total else 0.0
         pct_colour = "#3fb950" if pct >= 80 else "#f0ad4e" if pct >= 50 else "#f85149"
-        rows_html += (
-            f"<tr>"
-            f'<td style="padding:8px 14px;color:#c9d1d9;font-weight:600;">{llm}</td>'
-            f'<td style="padding:8px 14px;color:#3fb950;font-weight:600;">{passed}</td>'
-            f'<td style="padding:8px 14px;color:#f85149;font-weight:600;">{failed}</td>'
-            f'<td style="padding:8px 14px;font-family:monospace;color:#8b949e;">{total}</td>'
-            f'<td style="padding:8px 14px;font-weight:600;color:{pct_colour};">{pct:.1f}%</td>'
-            f"</tr>"
+
+        label = (
+            f"**{llm}** &nbsp;|&nbsp; "
+            f"Passed: **{passed}** &nbsp; Failed: **{failed}** &nbsp; "
+            f"Total: **{total}** &nbsp; Pass Rate: **{pct:.1f}%**"
         )
-    st.markdown(
-        f"""
-        <table style="border-collapse:collapse;width:100%;
-                      background:#161b22;border-radius:6px;overflow:hidden;margin-bottom:0.5rem;">
-          <thead>
-            <tr style="background:#21262d;color:#8b949e;font-size:0.8em;text-transform:uppercase;">
-              <th style="padding:8px 14px;text-align:left;">LLM</th>
-              <th style="padding:8px 14px;text-align:left;">Passed</th>
-              <th style="padding:8px 14px;text-align:left;">Failed</th>
-              <th style="padding:8px 14px;text-align:left;">Total</th>
-              <th style="padding:8px 14px;text-align:left;">Pass Rate</th>
-            </tr>
-          </thead>
-          <tbody>{rows_html}</tbody>
-        </table>
-        """,
-        unsafe_allow_html=True,
-    )
+
+        with st.expander(label, expanded=False):
+            # Compute mean score per metric (in display order)
+            by_metric: dict[str, list[float]] = defaultdict(list)
+            thresholds: dict[str, float] = {}
+            for m in all_m:
+                name = m["metric_name"]
+                by_metric[name].append(m["score"])
+                thresholds[name] = m["threshold"]
+
+            # Sort by METRIC_DISPLAY_ORDER
+            metric_names = sorted(
+                by_metric.keys(),
+                key=lambda n: METRIC_DISPLAY_ORDER.index(n)
+                if n in METRIC_DISPLAY_ORDER
+                else len(METRIC_DISPLAY_ORDER),
+            )
+
+            rows_html = ""
+            for name in metric_names:
+                scores = by_metric[name]
+                mean = sum(scores) / len(scores)
+                threshold = thresholds[name]
+                badge = _score_badge(mean)
+                pass_count = sum(1 for s in scores if s >= threshold)
+                rows_html += (
+                    f"<tr>"
+                    f'<td style="padding:6px 14px;color:#c9d1d9;">{name}</td>'
+                    f'<td style="padding:6px 14px;">{badge}</td>'
+                    f'<td style="padding:6px 14px;font-family:monospace;color:#8b949e;">{threshold:.2f}</td>'
+                    f'<td style="padding:6px 14px;font-family:monospace;color:#8b949e;">{pass_count}/{len(scores)}</td>'
+                    f"</tr>"
+                )
+
+            st.markdown(
+                f"""
+                <table style="border-collapse:collapse;width:100%;
+                              background:#161b22;border-radius:6px;overflow:hidden;">
+                  <thead>
+                    <tr style="background:#21262d;color:#8b949e;font-size:0.8em;text-transform:uppercase;">
+                      <th style="padding:8px 14px;text-align:left;">Metric</th>
+                      <th style="padding:8px 14px;text-align:left;">Mean Score</th>
+                      <th style="padding:8px 14px;text-align:left;">Threshold</th>
+                      <th style="padding:8px 14px;text-align:left;">Questions Passed</th>
+                    </tr>
+                  </thead>
+                  <tbody>{rows_html}</tbody>
+                </table>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 def _render_llm_summary_bar(llm: str, q_data: dict[int, list[dict]]) -> None:
@@ -439,12 +494,12 @@ def _render_question_block(
 
 def main() -> None:
     st.set_page_config(
-        page_title="LexChat Eval Dashboard",
+        page_title="LexChat Eval",
         layout="wide",
         initial_sidebar_state="collapsed",
     )
 
-    st.title("LexChat Evaluation Dashboard")
+    st.title("LexChat Evaluation")
 
     # load data
     available = [name for name, path in SUITE_RESULTS.items() if path.exists()]

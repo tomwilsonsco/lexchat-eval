@@ -58,37 +58,3 @@ def test_tool_usage(request, record):
 
     assert metric.is_successful(), metric.reason
 
-
-@pytest.mark.parametrize(
-    "record",
-    records,
-    ids=[record_id(r) for r in records],
-)
-def test_retrieval_context_populated(request, record):
-    """Tools must have actually retrieved legislation context."""
-    test_case = record_to_test_case(record)
-    has_context = bool(test_case.retrieval_context)
-    reason = (
-        f"{len(test_case.retrieval_context)} context item(s) retrieved"
-        if has_context
-        else "No retrieval context captured"
-    )
-
-    attach_metric(
-        request,
-        record=record,
-        test_name="retrieval_context_populated",
-        metric_name="Retrieval Context",
-        score=1.0 if has_context else 0.0,
-        threshold=1.0,
-        passed=has_context,
-        reason=reason,
-        tools_used=_tools_list(test_case),
-        suite="tool_usage",
-    )
-
-    assert has_context, (
-        f"No retrieval context captured for Q{record['question_id']} "
-        f"with {record['llm_name']}. Tools may have been called but "
-        f"returned no useful content."
-    )

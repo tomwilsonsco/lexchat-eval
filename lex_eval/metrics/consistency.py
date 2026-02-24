@@ -110,4 +110,4 @@ class ConsistencyMetric(BaseMetric):
 
     @property
     def __name__(self):
-        return "Consistency"
+        return "Consistency (Simple)"

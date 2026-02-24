@@ -40,7 +40,7 @@ def load_records(
 
 def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
     """
-    Convert a single JSONL record into a DeepEval ``LLMTestCase``.
+    Convert a single JSONL record into a DeepEval LLMTestCase.
 
     Handles the serialisation format produced by
     ``gather_responses.serialize_test_case`` (Pydantic model_dump).

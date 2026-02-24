@@ -14,76 +14,23 @@ more expensive LLM-judge call is avoided.
 """
 
 import os
-from pathlib import Path
 
-import openai
 import pytest
-from dotenv import load_dotenv
 from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric
-from deepeval.models.base_model import DeepEvalBaseLLM
 
 from lex_eval.utils.collector import attach_metric
+from lex_eval.utils.openai_judge import OPENAI_API_KEY as _OPENAI_API_KEY, OpenAIJudge
 from lex_eval.utils.test_helpers import (
     load_test_cases,
     record_id,
     record_to_test_case,
 )
 
-# Load .env from lex_eval/ directory
-_env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(dotenv_path=_env_path)
-
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-_OPENAI_API_KEY: str | None = os.environ.get("OPENAI_API_KEY")
-_DEFAULT_JUDGE_MODEL: str = os.environ.get(
-    "DEEPEVAL_JUDGE_MODEL", "gpt-4o-mini"
-)
 _MIN_OUTPUT_CHARS: int = 50
-
-
-# ---------------------------------------------------------------------------
-# OpenAI judge model
-# ---------------------------------------------------------------------------
-
-
-class OpenAIJudge(DeepEvalBaseLLM):
-    """Thin DeepEval wrapper around the OpenAI chat completions API."""
-
-    def __init__(
-        self,
-        model: str = _DEFAULT_JUDGE_MODEL,
-        api_key: str | None = _OPENAI_API_KEY,
-    ) -> None:
-        self.model = model
-        self._client = openai.OpenAI(api_key=api_key)
-
-    # DeepEval calls load_model() once; we just return the model identifier.
-    def load_model(self):
-        return self.model
-
-    def generate(self, prompt: str, schema=None):
-        """Generate a response, optionally constrained to a Pydantic schema."""
-        if schema is not None:
-            response = self._client.beta.chat.completions.parse(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                response_format=schema,
-            )
-            return response.choices[0].message.parsed
-        response = self._client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return response.choices[0].message.content
-
-    async def a_generate(self, prompt: str, schema=None):
-        return self.generate(prompt, schema)
-
-    def get_model_name(self) -> str:
-        return f"openai/{self.model}"
 
 
 # ---------------------------------------------------------------------------

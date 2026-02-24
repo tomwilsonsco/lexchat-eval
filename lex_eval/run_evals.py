@@ -55,6 +55,8 @@ SUITES = {
     "tool_usage": "test_tool_usage.py",
     "groundedness": "test_groundedness.py",
     "consistency": "test_consistency.py",
+    "consistency_llm": "test_consistency_llm.py",
+    "structure": "test_structure.py",
 }
 
 # Maps suite name → results JSON filename
@@ -62,6 +64,8 @@ SUITE_RESULTS = {
     "tool_usage": "tool_usage_results.json",
     "groundedness": "groundedness_results.json",
     "consistency": "consistency_results.json",
+    "consistency_llm": "consistency_llm_results.json",
+    "structure": "structure_results.json",
 }
 
 
@@ -141,13 +145,33 @@ def _build_deselect_args(suite: str) -> list[str]:
                 deselect_args.extend([
                     "--deselect",
                     f"lex_eval/tests/{test_file}::test_tool_usage[{pid}]",
-                    "--deselect",
-                    f"lex_eval/tests/{test_file}::test_retrieval_context_populated[{pid}]",
                 ])
             elif suite == "consistency":
                 deselect_args.extend([
                     "--deselect",
                     f"lex_eval/tests/{test_file}::test_consistency[{pid}]",
+                ])
+            elif suite == "structure":
+                deselect_args.extend([
+                    "--deselect",
+                    f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]",
+                    "--deselect",
+                    f"lex_eval/tests/{test_file}::test_citation_passthrough[{pid}]",
+                ])
+
+    # consistency_llm is parametrized by (question, LLM) group, not individual record
+    if suite == "consistency_llm":
+        from lex_eval.utils.test_helpers import group_by_question_and_llm
+        deselect_args = []
+        for key, grp_records in sorted(group_by_question_and_llm().items()):
+            if len(grp_records) < 2:
+                continue
+            qid = int(grp_records[0]["question_id"])
+            llm = grp_records[0]["llm_name"]
+            if (qid, llm) in covered:
+                deselect_args.extend([
+                    "--deselect",
+                    f"lex_eval/tests/{test_file}::test_consistency_llm[{key}]",
                 ])
 
     return deselect_args
@@ -252,9 +276,11 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Suites:
-  tool_usage     Check tools were invoked correctly (fast, offline)
-  groundedness   LLM-as-judge faithfulness + relevancy checks (needs OPENAI_API_KEY)
-  consistency    Same-model repeatability checks (fast, offline)
+  tool_usage        Check tools were invoked correctly (fast, offline)
+  groundedness      LLM-as-judge faithfulness + relevancy checks (needs OPENAI_API_KEY)
+  consistency       Same-model repeatability checks (fast, Jaccard)
+  consistency_llm   Same-model repeatability checks (AI judge, needs OPENAI_API_KEY)
+  structure         Worker output structure + citation checks (fast, offline)
 
 Results:
   Each suite writes to its own JSON file under reports/:

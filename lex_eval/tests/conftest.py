@@ -7,7 +7,9 @@ for per-suite JSON report files consumed by the Streamlit dashboard.
 Each test suite writes to its own results file:
   - groundedness_results.json
   - consistency_results.json
+  - consistency_llm_results.json
   - tool_usage_results.json
+  - structure_results.json
 """
 
 import json
@@ -38,7 +40,13 @@ def pytest_configure(config):
         "markers", "groundedness: tests that use an LLM judge (require OPENAI_API_KEY)"
     )
     config.addinivalue_line(
-        "markers", "consistency: same-model repeatability tests"
+        "markers", "consistency: same-model repeatability tests (Jaccard)"
+    )
+    config.addinivalue_line(
+        "markers", "consistency_llm: same-model repeatability tests (AI judge, requires OPENAI_API_KEY)"
+    )
+    config.addinivalue_line(
+        "markers", "structure: tests that check mandatory Worker output structure"
     )
 
 
