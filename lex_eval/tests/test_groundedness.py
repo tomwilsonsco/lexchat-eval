@@ -133,13 +133,23 @@ def test_faithfulness(request, record):
     _threshold = 0.7
 
     ok, reason = _gate_output_length(
-        request, record, test_case, "faithfulness", "Faithfulness", _threshold
+        request,
+        record,
+        test_case,
+        "faithfulness",
+        "Groundedness (AI Judge)",
+        _threshold,
     )
     if not ok:
         pytest.skip(reason)
 
     ok, reason = _gate_retrieval_context(
-        request, record, test_case, "faithfulness", "Faithfulness", _threshold
+        request,
+        record,
+        test_case,
+        "faithfulness",
+        "Groundedness (AI Judge)",
+        _threshold,
     )
     if not ok:
         pytest.skip(reason)
@@ -155,7 +165,7 @@ def test_faithfulness(request, record):
         request,
         record=record,
         test_name="faithfulness",
-        metric_name="Faithfulness",
+        metric_name="Groundedness (AI Judge)",
         score=metric.score,
         threshold=metric.threshold,
         passed=metric.is_successful(),
@@ -165,7 +175,7 @@ def test_faithfulness(request, record):
     )
 
     assert metric.is_successful(), (
-        f"Faithfulness score {metric.score:.2f} < {metric.threshold}: "
+        f"Groundedness (AI Judge) score {metric.score:.2f} < {metric.threshold}: "
         f"{metric.reason}"
     )
 
@@ -190,7 +200,12 @@ def test_answer_relevancy(request, record):
     _threshold = 0.7
 
     ok, reason = _gate_output_length(
-        request, record, test_case, "answer_relevancy", "Answer Relevancy", _threshold
+        request,
+        record,
+        test_case,
+        "answer_relevancy",
+        "Answer Relevancy (AI Judge)",
+        _threshold,
     )
     if not ok:
         pytest.skip(reason)
@@ -206,7 +221,7 @@ def test_answer_relevancy(request, record):
         request,
         record=record,
         test_name="answer_relevancy",
-        metric_name="Answer Relevancy",
+        metric_name="Answer Relevancy (AI Judge)",
         score=metric.score,
         threshold=metric.threshold,
         passed=metric.is_successful(),
@@ -216,6 +231,6 @@ def test_answer_relevancy(request, record):
     )
 
     assert metric.is_successful(), (
-        f"Answer Relevancy score {metric.score:.2f} < {metric.threshold}: "
+        f"Answer Relevancy (AI Judge) score {metric.score:.2f} < {metric.threshold}: "
         f"{metric.reason}"
     )

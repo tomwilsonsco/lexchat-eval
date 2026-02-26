@@ -27,25 +27,28 @@ class _ConsistencyJudgement(BaseModel):
     reason: str
 
 
-_PROMPT_TEMPLATE = """You are a legal consistency auditor. Compare two responses to the same legal question for substantive contradictions or critical omissions.
+_PROMPT_TEMPLATE = """You are evaluating whether two responses to the same legal question are consistent with each other. Consistency means the responses are similar in both their conclusions AND their scope — not just that they don't contradict each other.
 
 Question: {question}
 
-Response A (reference): {reference}
+Response A: {reference}
 
-Response B (to evaluate): {actual}
+Response B: {actual}
 
-Criteria:
-1. Ignore stylistic differences (tone, length, formatting, citation style).
-2. Score 0.0 if Response B directly contradicts a material fact or legal conclusion in Response A.
-3. Score 0.5 if Response B omits a critical warning, requirement, or legal caveat present in Response A.
-4. Score 1.0 if both responses are substantively consistent (same legal conclusions and key facts).
-5. Intermediate scores are acceptable for partial omissions or minor inconsistencies.
+Scoring rules — apply the LOWEST matching score:
+
+1. Score 0.0 — Response B directly contradicts a material fact or legal conclusion stated in Response A.
+2. Score 0.2 — Response B omits a critical warning, requirement, or legal caveat that Response A includes.
+3. Score 0.4 — Response B covers significantly more ground than Response A (e.g., discusses additional sections, provisions, or legal concepts not mentioned in Response A) such that a user would receive a substantially different impression of the topic. A superset response is NOT automatically consistent.
+4. Score 0.7 — Minor differences in depth or emphasis, but both responses address the same legal provisions and reach the same key conclusions.
+5. Score 1.0 — Both responses address the same provisions, reach the same conclusions, and are similar in scope.
+
+Important: "Response B covers everything Response A covers, plus much more" should score 0.4, not 1.0. Consistency requires similar scope, not just agreement on shared content.
 
 Respond with a JSON object:
 {{
     "score": <float between 0.0 and 1.0>,
-    "reason": "<brief explanation>"
+    "reason": "<brief explanation citing specific scope or content differences>"
 }}"""
 
 
@@ -54,13 +57,15 @@ class LLMConsistencyMetric(BaseMetric):
     Evaluates consistency between repeated responses to the same question
     using an AI judge to detect substantive contradictions or omissions.
 
+
     Unlike ConsistencyMetric (Jaccard / token-overlap), this metric
     understands the *meaning* of the responses.
 
+
     Args:
         reference_outputs: Other answers to the same question to compare against.
-        model:             A DeepEval-compatible judge model (e.g. OpenAIJudge()).
-        threshold:         Minimum mean score to pass (default 0.7).
+        model: A DeepEval-compatible judge model (e.g. OpenAIJudge()).
+        threshold: Minimum mean score to pass (default 0.7).
     """
 
     def __init__(
