@@ -5,7 +5,7 @@ import duckdb
 import time
 from pathlib import Path
 
-db_path = Path(__file__).parent / "lex_eval/data/responses.db"
+db_path = Path(__file__).parent / "data/responses.db"
 print(f"Opening {db_path}")
 
 conn = duckdb.connect(str(db_path))

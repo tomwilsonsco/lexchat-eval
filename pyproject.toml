@@ -1,13 +1,35 @@
-[tool.pytest.ini_options]
-testpaths = ["lex_eval/tests"]
-markers = [
-    "groundedness: tests that use an OpenAI LLM judge (require OPENAI_API_KEY in lex_eval/.env)",
-    "consistency: cross-model and repeatability tests",
-    "tool_usage: tests that check tool-calling behaviour",
-]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "lex_eval"
+version = "0.1.0"
+requires-python = ">=3.11"
 dependencies = [
+    "deepeval",
     "duckdb>=1.0",
+    "httpx>=0.27.0",
+    "numpy",
+    "openai",
+    "pydantic",
+    "python-dotenv>=1.0.0",
+    "scikit-learn",
+    "streamlit>=1.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["lex_eval/tests"]
+markers = [
+    "groundedness: LLM-as-judge faithfulness and relevancy tests (require OPENAI_API_KEY)",
+    "consistency: same-model repeatability tests using cosine similarity",
+    "consistency_llm: same-model repeatability tests using an AI judge (require OPENAI_API_KEY)",
+    "tool_usage: tests that check tool-calling behaviour",
+    "structure: tests that check mandatory Worker output structure",
 ]
