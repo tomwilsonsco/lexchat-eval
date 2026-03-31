@@ -1,7 +1,7 @@
 # lex-eval
 
-Evaluations for the LexChat legal Q&A API. Runs questions through
-available LLMs, stores responses in DuckDB, scores them with a suite of coded
+Evaluations for [LexChat](https://github.com/delphium226/lexchat). Runs questions through
+available LLMs (Ollama currently), stores responses in DuckDB, scores them with both coded
 and AI-as-judge metrics, and visualises results in a Streamlit dashboard.
 
 ## Prerequisites
