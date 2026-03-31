@@ -17,6 +17,7 @@ import os
 
 import pytest
 from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric
+from deepeval.test_case import LLMTestCase
 
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.openai_judge import OPENAI_API_KEY as _OPENAI_API_KEY, OpenAIJudge
@@ -31,6 +32,11 @@ from lex_eval.utils.test_helpers import (
 # ---------------------------------------------------------------------------
 
 _MIN_OUTPUT_CHARS: int = 50
+
+# Conservative character budget for retrieval context passed to the judge.
+# 128k token limit; reserve ~30k tokens for the prompt, output, and overhead.
+# Rough approximation: 1 token ≈ 4 chars.
+_MAX_CONTEXT_CHARS: int = (128_000 - 30_000) * 4  # ≈ 392 000 chars
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +85,32 @@ def _gate_output_length(request, record, test_case, test_name, metric_name, thre
         )
         return False, reason
     return True, ""
+
+
+def _truncate_retrieval_context(test_case: "LLMTestCase") -> "LLMTestCase":
+    """
+    Return a copy of *test_case* whose retrieval_context is trimmed so the
+    total character count stays within _MAX_CONTEXT_CHARS.
+
+    Items are included whole in order; the first item that would push the
+    total over the budget is dropped along with all subsequent items.
+    """
+    context = test_case.retrieval_context or []
+    kept: list[str] = []
+    total = 0
+    for item in context:
+        if total + len(item) > _MAX_CONTEXT_CHARS:
+            break
+        kept.append(item)
+        total += len(item)
+    if len(kept) == len(context):
+        return test_case  # nothing to trim
+    return LLMTestCase(
+        input=test_case.input,
+        actual_output=test_case.actual_output,
+        retrieval_context=kept,
+        tools_called=test_case.tools_called,
+    )
 
 
 def _gate_retrieval_context(
@@ -153,6 +185,8 @@ def test_faithfulness(request, record):
     )
     if not ok:
         pytest.skip(reason)
+
+    test_case = _truncate_retrieval_context(test_case)
 
     metric = FaithfulnessMetric(
         threshold=_threshold,

@@ -15,6 +15,7 @@ RUN pip install --requirement requirements.txt --no-cache-dir
 COPY . .
 
 EXPOSE 8501
+EXPOSE 4213
 
 # ENTRYPOINT
 ENTRYPOINT ["bash"]

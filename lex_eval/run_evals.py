@@ -5,13 +5,11 @@ Run LexChat evaluations using pytest + DeepEval.
 This script wraps pytest so the full evaluation suite can be launched
 from the command line with sensible defaults and optional filters.
 
-Each suite writes results to its own JSON file under reports/:
-  - groundedness_results.json
-  - consistency_results.json
-  - tool_usage_results.json
+Each suite writes results to the shared DuckDB database (data/responses.db)
+in the eval_results table.
 
 By default, existing results are preserved: if a (question, LLM) pair
-already has 1+ results in the suite's JSON file, the test is skipped.
+already has 1+ results in the suite's records, the test is skipped.
 Use ``--overwrite`` to force re-running all tests and replacing existing
 results.
 
@@ -43,10 +41,16 @@ Launch Streamlit dashboard after tests:
 """
 
 import argparse
-import json
 import subprocess
 import sys
 from pathlib import Path
+
+# Ensure the repo root is on sys.path so `lex_eval` is importable regardless
+# of how this script is invoked (e.g. `python lex_eval/run_evals.py` from /app
+# vs. a direct path invocation).
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 TESTS_DIR = Path(__file__).parent / "tests"
 REPORTS_DIR = Path(__file__).parent / "reports"
@@ -59,26 +63,11 @@ SUITES = {
     "structure": "test_structure.py",
 }
 
-# Maps suite name → results JSON filename
-SUITE_RESULTS = {
-    "tool_usage": "tool_usage_results.json",
-    "groundedness": "groundedness_results.json",
-    "consistency": "consistency_results.json",
-    "consistency_llm": "consistency_llm_results.json",
-    "structure": "structure_results.json",
-}
-
 
 def _load_existing_results(suite: str) -> list[dict]:
-    """Load existing results for a suite, or return [] if the file doesn't exist."""
-    path = REPORTS_DIR / SUITE_RESULTS[suite]
-    if not path.exists():
-        return []
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (json.JSONDecodeError, ValueError):
-        return []
+    """Load existing results for a suite from DuckDB, or return [] if not found."""
+    from lex_eval.utils.db import DEFAULT_DB, load_eval_results
+    return load_eval_results(DEFAULT_DB, suite=suite)
 
 
 def _covered_pairs(results: list[dict]) -> set[tuple[int, str]]:
@@ -92,15 +81,31 @@ def _covered_pairs(results: list[dict]) -> set[tuple[int, str]]:
     return pairs
 
 
-def _build_deselect_args(suite: str) -> list[str]:
+def _covered_triples(results: list[dict]) -> set[tuple[int, str, str]]:
+    """
+    Return the set of (question_id, llm_name, test_name) triples that already
+    have a result. Used for suites with multiple test functions per pair so that
+    a partially-run pair is not fully skipped.
+    """
+    triples: set[tuple[int, str, str]] = set()
+    for r in results:
+        triples.add((int(r["question_id"]), r["llm_name"], r["test_name"]))
+    return triples
+
+
+def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     """
     Build pytest ``--deselect`` arguments for test IDs whose (question_id, llm_name)
     pairs already have results.
+
+    If *llm* is given, only records matching that LLM name are considered.
 
     Returns an empty list if there are no existing results or if the suite file
     doesn't exist.
     """
     existing = _load_existing_results(suite)
+    if llm:
+        existing = [r for r in existing if r["llm_name"] == llm]
     if not existing:
         return []
 
@@ -108,12 +113,13 @@ def _build_deselect_args(suite: str) -> list[str]:
     if not covered:
         return []
 
+    # For suites with multiple test functions per (qid, llm) pair, track coverage
+    # at the individual test-function level so a partially-run pair is not fully skipped.
+    covered_triples = _covered_triples(existing)
+
     # Load the test records to map parametrize IDs to (qid, llm) pairs.
     # Pytest appends a numeric suffix (0, 1, …) when multiple records share
     # the same base ID, so we must replicate that logic here.
-    _repo_root = str(Path(__file__).resolve().parent.parent)
-    if _repo_root not in sys.path:
-        sys.path.insert(0, _repo_root)
     from lex_eval.utils.test_helpers import load_test_cases, record_id
 
     records = load_test_cases()
@@ -135,14 +141,15 @@ def _build_deselect_args(suite: str) -> list[str]:
         if (qid, llm) in covered:
             # Deselect all test functions in this suite file for this parametrize ID
             if suite == "groundedness":
-                deselect_args.extend(
-                    [
-                        "--deselect",
-                        f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]",
-                        "--deselect",
-                        f"lex_eval/tests/{test_file}::test_answer_relevancy[{pid}]",
-                    ]
-                )
+                # Check per-test-function so a partially-run pair isn't fully skipped
+                if (qid, llm, "faithfulness") in covered_triples:
+                    deselect_args.extend(
+                        ["--deselect", f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]"]
+                    )
+                if (qid, llm, "answer_relevancy") in covered_triples:
+                    deselect_args.extend(
+                        ["--deselect", f"lex_eval/tests/{test_file}::test_answer_relevancy[{pid}]"]
+                    )
             elif suite == "tool_usage":
                 deselect_args.extend(
                     [
@@ -158,14 +165,15 @@ def _build_deselect_args(suite: str) -> list[str]:
                     ]
                 )
             elif suite == "structure":
-                deselect_args.extend(
-                    [
-                        "--deselect",
-                        f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]",
-                        "--deselect",
-                        f"lex_eval/tests/{test_file}::test_citation_passthrough[{pid}]",
-                    ]
-                )
+                # Check per-test-function so a partially-run pair isn't fully skipped
+                if (qid, llm, "mandatory_structure") in covered_triples:
+                    deselect_args.extend(
+                        ["--deselect", f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]"]
+                    )
+                if (qid, llm, "citation_passthrough") in covered_triples:
+                    deselect_args.extend(
+                        ["--deselect", f"lex_eval/tests/{test_file}::test_citation_passthrough[{pid}]"]
+                    )
 
     # consistency_llm is parametrized by (question, LLM) group, not individual record
     if suite == "consistency_llm":
@@ -195,6 +203,7 @@ def run_evals(
     overwrite: bool = False,
     launch_streamlit: bool = False,
     extra_args: list[str] | None = None,
+    llm: str | None = None,
 ) -> int:
     """
     Launch pytest against the evaluation test suite.
@@ -205,10 +214,18 @@ def run_evals(
     overall_rc = 0
 
     for s in suites_to_run:
-        # Snapshot existing results BEFORE the run so we can merge correctly
-        existing_results: list[dict] = []
-        if not overwrite:
-            existing_results = _load_existing_results(s)
+        if overwrite:
+            from lex_eval.utils.db import (
+                DEFAULT_DB,
+                clear_eval_results,
+                get_connection,
+                init_eval_results,
+            )
+            conn = get_connection(DEFAULT_DB)
+            init_eval_results(conn)
+            clear_eval_results(conn, suite=s)
+            conn.commit()
+            conn.close()
 
         cmd: list[str] = [sys.executable, "-m", "pytest"]
         cmd.append(str(TESTS_DIR / SUITES[s]))
@@ -217,9 +234,13 @@ def run_evals(
         if markers:
             cmd.extend(["-m", markers])
 
+        # Filter to a single LLM via pytest keyword expression
+        if llm:
+            cmd.extend(["-k", llm])
+
         # Skip logic: deselect tests that already have results
         if not overwrite:
-            deselect = _build_deselect_args(s)
+            deselect = _build_deselect_args(s, llm=llm)
             if deselect:
                 cmd.extend(deselect)
                 n_skipped = deselect.count("--deselect")
@@ -242,21 +263,6 @@ def run_evals(
 
         result = subprocess.run(cmd)
 
-        # Merge: combine pre-existing results with whatever conftest just wrote
-        if not overwrite and existing_results:
-            results_path = REPORTS_DIR / SUITE_RESULTS[s]
-            new_results: list[dict] = []
-            if results_path.exists():
-                try:
-                    with open(results_path) as f:
-                        new_results = json.load(f)
-                except (json.JSONDecodeError, ValueError):
-                    pass
-            combined = existing_results + new_results
-            REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-            with open(results_path, "w") as f:
-                json.dump(combined, f, indent=2, default=str)
-
         if result.returncode > overall_rc:
             overall_rc = result.returncode
 
@@ -265,7 +271,7 @@ def run_evals(
             _launch_streamlit(REPORTS_DIR)
         else:
             print(
-                f"\n📊 Results written to {REPORTS_DIR}/"
+                "\n📊 Results written to data/responses.db (eval_results table)"
                 "\n   View dashboard: streamlit run lex_eval/reports/streamlit_report.py"
             )
 
@@ -296,11 +302,11 @@ Suites:
   structure         Worker output structure + citation checks (fast, offline)
 
 Results:
-  Each suite writes to its own JSON file under reports/:
-    groundedness_results.json, consistency_results.json, tool_usage_results.json
+  All suites write to the eval_results table in data/responses.db.
 
   By default, tests are skipped if results already exist for that
   (question, LLM) pair.  Use --overwrite to force re-running.
+  Use --llm to restrict evaluation to a single model.
 
 Dashboard:
   Launch the Streamlit dashboard at any time:
@@ -318,6 +324,11 @@ Dashboard:
         "-m",
         "--markers",
         help="Pytest marker expression (e.g. 'not groundedness')",
+    )
+    parser.add_argument(
+        "--llm",
+        metavar="LLM_NAME",
+        help="Only evaluate this LLM (e.g. 'gpt-oss:120b-cloud')",
     )
     parser.add_argument(
         "--overwrite",
@@ -351,6 +362,7 @@ Dashboard:
         overwrite=args.overwrite,
         launch_streamlit=args.streamlit,
         extra_args=args.extra,
+        llm=args.llm,
     )
 
 

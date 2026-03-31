@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+testpaths = ["lex_eval/tests"]
+markers = [
+    "groundedness: tests that use an OpenAI LLM judge (require OPENAI_API_KEY in lex_eval/.env)",
+    "consistency: cross-model and repeatability tests",
+    "tool_usage: tests that check tool-calling behaviour",
+]
+
+[project]
+name = "lex_eval"
+dependencies = [
+    "duckdb>=1.0",
+]

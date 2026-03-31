@@ -4,20 +4,24 @@ Configured for fully offline corporate environment execution.
 """
 
 import json
+import sys
 from pathlib import Path
 
 _REPORTS_DIR = Path(__file__).parent
 _SUITES = ["groundedness", "consistency", "consistency_llm", "tool_usage", "structure"]
 
+# Ensure the package root is importable when run directly
+_repo_root = str(_REPORTS_DIR.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
+from lex_eval.utils.db import DEFAULT_DB, load_eval_results, load_records
+
 
 def _load_all_results() -> dict[str, list]:
-    data = {}
+    data: dict[str, list] = {}
     for suite in _SUITES:
-        path = _REPORTS_DIR / f"{suite}_results.json"
-        if path.exists():
-            data[suite] = json.loads(path.read_text())
-        else:
-            data[suite] = []
+        data[suite] = load_eval_results(DEFAULT_DB, suite=suite)
     return data
 
 
@@ -25,41 +29,36 @@ _MAX_CONTEXT_CHARS = 2_000
 _MAX_TOOL_OUTPUT_CHARS = 1_000
 
 
-def _slim_responses(responses_path: Path) -> str:
+def _slim_responses() -> str:
     records = []
-    with open(responses_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            rec = json.loads(line)
-            tc = rec.get("test_case", {})
+    for rec in load_records(DEFAULT_DB):
+        tc = rec.get("test_case", {})
 
-            ctx = tc.get("retrieval_context") or []
-            ctx_slim = [c[:_MAX_CONTEXT_CHARS] for c in ctx]
+        ctx = tc.get("retrieval_context") or []
+        ctx_slim = [c[:_MAX_CONTEXT_CHARS] for c in ctx]
 
-            tools = tc.get("tools_called") or []
-            tools_slim = []
-            for t in tools:
-                out = t.get("output", "")
-                if isinstance(out, str):
-                    out = out[:_MAX_TOOL_OUTPUT_CHARS]
-                tools_slim.append({**t, "output": out})
+        tools = tc.get("tools_called") or []
+        tools_slim = []
+        for t in tools:
+            out = t.get("output", "")
+            if isinstance(out, str):
+                out = out[:_MAX_TOOL_OUTPUT_CHARS]
+            tools_slim.append({**t, "output": out})
 
-            records.append(
-                {
-                    "llm_name": rec.get("llm_name"),
-                    "question_id": rec.get("question_id"),
-                    "timestamp": rec.get("timestamp"),
-                    "deep_research": rec.get("deep_research"),
-                    "test_case": {
-                        "input": tc.get("input", ""),
-                        "actual_output": tc.get("actual_output", ""),
-                        "retrieval_context": ctx_slim,
-                        "tools_called": tools_slim,
-                    },
-                }
-            )
+        records.append(
+            {
+                "llm_name": rec.get("llm_name"),
+                "question_id": rec.get("question_id"),
+                "timestamp": rec.get("timestamp"),
+                "deep_research": rec.get("deep_research"),
+                "test_case": {
+                    "input": tc.get("input", ""),
+                    "actual_output": tc.get("actual_output", ""),
+                    "retrieval_context": ctx_slim,
+                    "tools_called": tools_slim,
+                },
+            }
+        )
     return json.dumps(records)
 
 
@@ -80,9 +79,8 @@ def export_html(output_path: Path | None = None) -> Path:
         filename = f"{suite}_results.json"
         files_dict[filename] = json.dumps(results.get(suite, []))
 
-    responses_path = _REPORTS_DIR.parent / "data" / "responses.jsonl"
-    if responses_path.exists():
-        slim = json.loads(_slim_responses(responses_path))
+    if DEFAULT_DB.exists():
+        slim = json.loads(_slim_responses())
         files_dict["responses.jsonl"] = "\n".join(json.dumps(r) for r in slim)
 
     html = f"""<!DOCTYPE html>

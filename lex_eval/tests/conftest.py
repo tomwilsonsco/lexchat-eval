@@ -1,25 +1,16 @@
 """
 Shared pytest configuration for the LexChat evaluation suite.
 
-Handles custom markers, sys.path setup, and metric data collection
-for per-suite JSON report files consumed by the Streamlit dashboard.
-
-Each test suite writes to its own results file:
-  - groundedness_results.json
-  - consistency_results.json
-  - consistency_llm_results.json
-  - tool_usage_results.json
-  - structure_results.json
+Handles custom markers, sys.path setup, and metric data collection.
+Results are written to the eval_results table in the shared DuckDB database
+(data/responses.db) at the end of each pytest session.
 """
 
-import json
 import pytest
 import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
-
-_REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 # Accumulated during the session, keyed by suite name.
 _metric_records: dict[str, list[dict]] = defaultdict(list)
@@ -64,12 +55,26 @@ def pytest_runtest_makereport(item, call):
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """Write collected metric data to per-suite JSON files."""
+    """Write collected metric data to the eval_results DuckDB table."""
     if not _metric_records:
         return
-    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    from lex_eval.utils.db import (
+        DEFAULT_DB,
+        get_connection,
+        init_eval_results,
+        insert_eval_result,
+    )
+
+    conn = get_connection(DEFAULT_DB)
+    init_eval_results(conn)
+
+    total = 0
     for suite, records in _metric_records.items():
-        out_path = _REPORTS_DIR / f"{suite}_results.json"
-        with open(out_path, "w") as f:
-            json.dump(records, f, indent=2, default=str)
-        print(f"\n📊 {suite} results written to {out_path}")
+        for record in records:
+            insert_eval_result(conn, record, suite=suite)
+            total += 1
+
+    conn.commit()
+    conn.close()
+    print(f"\n📊 {total} eval result(s) written to {DEFAULT_DB}")

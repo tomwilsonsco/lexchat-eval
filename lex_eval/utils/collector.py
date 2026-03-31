@@ -3,9 +3,8 @@ Helper for attaching metric data to pytest test items.
 
 Tests call ``attach_metric(request, ...)`` to store score/reason data
 on the test node. conftest.pytest_runtest_makereport then collects it
-into per-suite lists which are written to separate JSON files
-(e.g. groundedness_results.json, consistency_results.json,
-tool_usage_results.json) at the end of the run.
+into per-suite lists which are written to the eval_results table in the
+shared DuckDB database (data/responses.db) at the end of the run.
 """
 
 from typing import Any, Dict, List
@@ -34,9 +33,9 @@ def attach_metric(
     Parameters
     ----------
     suite : str
-        Identifier for the result file, e.g. ``"groundedness"``,
-        ``"consistency"``, ``"tool_usage"``.  Results are written to
-        ``reports/<suite>_results.json``.
+        Grouping key used to bucket results, e.g. ``"groundedness"``,
+        ``"consistency"``, ``"tool_usage"``.  Results are stored in the
+        ``eval_results`` DuckDB table under this suite name.
     """
     request.node._metric_data = {
         "suite": suite,

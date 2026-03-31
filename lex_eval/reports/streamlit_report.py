@@ -1,66 +1,72 @@
+"""
+look at groundedness and relevancy metrics under each question - on the dashboard these two are showing 16 runs for each LLM and then duplicating result pairs. This must be a mistake the other metrics are showing 2 runs which sounds correct.
+"""
+
+
 from __future__ import annotations
 
 import json
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 import streamlit as st
 
+# Ensure the repo root is importable when Streamlit launches this file directly.
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from lex_eval.utils.db import (
+    DEFAULT_DB,
+    load_eval_results as db_load_eval_results,
+    load_records as db_load_records,
+)
+
 script_dir = Path(__file__).parent
 data_dir = script_dir.parent / "data"
 
-TEST_RESULTS = {
-    "groundedness": script_dir / "groundedness_results.json",
-    "consistency": script_dir / "consistency_results.json",
-    "consistency_llm": script_dir / "consistency_llm_results.json",
-    "tool_usage": script_dir / "tool_usage_results.json",
-    "structure": script_dir / "structure_results.json",
-}
-RESPONSES_JSONL = data_dir / "responses.jsonl"
-
-
-def _result_file_mtimes() -> tuple[float, ...]:
-    """last modified times of result files for caching check"""
-    return tuple(
-        path.stat().st_mtime if path.exists() else 0.0 for path in TEST_RESULTS.values()
-    )
+RESPONSES_DB = DEFAULT_DB
 
 
 @st.cache_data
-def load_eval_results(_mtimes: tuple[float, ...] = ()) -> list[dict]:
-    """Load and merge raw eval results from all test result JSON files."""
-    all_results: list[dict] = []
-    for suite, path in TEST_RESULTS.items():
-        if path.exists():
-            try:
-                with open(path) as f:
-                    results = json.load(f)
-                all_results.extend(results)
-            except (json.JSONDecodeError, ValueError):
-                pass
-    return all_results
+def load_eval_results(_db_mtime: float = 0.0) -> list[dict]:
+    """Load all eval results from the DuckDB eval_results table."""
+    return db_load_eval_results(RESPONSES_DB)
 
 
 @st.cache_data
 def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
     """
-    load responses.jsonl and index by (llm_name, question_id).
-    each llm-question key maps to a list of response records (could be 2+ runs).
+    Load responses from DuckDB and index by (llm_name, question_id).
+    Each key maps to a list of response records (could be 2+ runs).
     """
     idx: dict[tuple[str, int], list[dict]] = defaultdict(list)
-    with open(RESPONSES_JSONL) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rec = json.loads(line)
-                key = (rec["llm_name"], int(rec["question_id"]))
-                idx[key].append(rec)
+    for rec in db_load_records(RESPONSES_DB):
+        key = (rec["llm_name"], int(rec["question_id"]))
+        idx[key].append(rec)
     return dict(idx)
 
 
 # do not keep the individual response results of these metrics as only make sense
 # comparing multiple
-_AGGREGATE_ONLY_METRICS = {"Consistency (Simple)", "Consistency (AI Judge)"}
+_AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)", "Consistency (AI Judge)"}
+
+# preferred LLM display order — any LLMs not listed appear at the end sorted
+LLM_DISPLAY_ORDER: list[str] = [
+    "gpt-oss:120b-cloud",
+    "kimi-k2-thinking:cloud",
+    "glm-5:cloud",
+    "mistral-large-3:675b-cloud",
+]
+
+
+def _llm_sort_key(name: str) -> tuple[int, str]:
+    try:
+        return (LLM_DISPLAY_ORDER.index(name), name)
+    except ValueError:
+        return (len(LLM_DISPLAY_ORDER), name)
+
 
 # order shown in streamlit
 METRIC_DISPLAY_ORDER: list[str] = [
@@ -78,7 +84,7 @@ METRIC_TOOLTIPS: dict[str, str] = {
     "Tool Usage": "Are all of delegate research, search legislation, get legislation text used.",
     "Research Output Structure": "Does the worker agent return the findings to the manager with the requested headers.",
     "Reference Links": "Are reference links included in the answer provided to the user.",
-    "Consistency (Simple)": "Compare the answers provided when the same question is asked multiple times. Compare using Jaccard Index.",
+    "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity.",
     "Consistency (AI Judge)": "Use another LLM to decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information.",
     "Answer Relevancy (AI Judge)": "AI as a judge metric from DeepEval: How relevant is the answer to the question asked.",
     "Groundedness (AI Judge)": "AI as a judge metric from DeepEval: Has the answer been derived from the information extracted from the Lex API.",
@@ -188,7 +194,7 @@ def _status_icon(passed: bool) -> str:
 def _render_top_summary(hierarchy: dict) -> None:
     """summary rows at the top of the page for each LLM. Expand to show
     mean score per metric across all questions."""
-    for llm in sorted(hierarchy.keys()):
+    for llm in sorted(hierarchy.keys(), key=_llm_sort_key):
         q_data = hierarchy[llm]
         all_m = [r for results in q_data.values() for r in results]
         total = len(all_m)
@@ -553,21 +559,22 @@ def main() -> None:
 
     st.divider()
 
-    available = [name for name, path in TEST_RESULTS.items() if path.exists()]
-    if not available:
-        st.error("No results files found.")
+    _db_mtime = RESPONSES_DB.stat().st_mtime if RESPONSES_DB.exists() else 0.0
+
+    if not RESPONSES_DB.exists():
+        st.error("No results found. Run evaluations first: python lex_eval/run_evals.py")
         st.stop()
 
-    st.caption(f"Loaded results from: {', '.join(available)}")
+    raw_results = load_eval_results(_db_mtime=_db_mtime)
+    if not raw_results:
+        st.warning("eval_results table is empty — run evaluations first.")
 
-    raw_results = load_eval_results(_mtimes=_result_file_mtimes())
     hierarchy = _build_hierarchy(raw_results)
-    _resp_mtime = RESPONSES_JSONL.stat().st_mtime if RESPONSES_JSONL.exists() else 0.0
-    responses = load_responses(_mtime=_resp_mtime) if RESPONSES_JSONL.exists() else {}
+    responses = load_responses(_mtime=_db_mtime) if RESPONSES_DB.exists() else {}
 
     if not responses:
         st.warning(
-            f"responses.jsonl not found at {RESPONSES_JSONL} — chat interaction tab will be empty."
+            f"responses.db not found at {RESPONSES_DB} — chat interaction tab will be empty."
         )
 
     st.markdown(
@@ -582,7 +589,7 @@ def main() -> None:
     _render_top_summary(hierarchy)
     st.divider()
 
-    llm_names = sorted(hierarchy.keys())
+    llm_names = sorted(hierarchy.keys(), key=_llm_sort_key)
     llm_tabs = st.tabs(llm_names)
 
     for tab, llm in zip(llm_tabs, llm_names):

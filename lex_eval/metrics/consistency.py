@@ -3,140 +3,44 @@ Custom metric to measure consistency across multiple responses to the same
 question, either from the same LLM (repeatability) or across different LLMs
 (cross-model agreement).
 
-Uses Jaccard similarity on key legal terms/phrases to avoid penalising
-stylistic differences while catching substantive divergence.
+Uses TF vectorisation (no IDF) with cosine similarity. Skipping IDF ensures
+that shared legal terminology is not down-weighted when comparing a small
+number of responses, giving more meaningful scores.
 """
 
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 from typing import List
+import numpy as np
 import re
 
 
-def _extract_terms(text: str) -> set:
-    """
-    Extract normalised tokens from text, keeping legal references intact.
-
-    Strips markdown formatting and lowercases everything so that
-    superficial style differences don't affect the score.
-    """
-    # Remove markdown formatting
+def _preprocess(text: str) -> str:
+    """Strip markdown formatting and normalise whitespace."""
     text = re.sub(r"[*_#>`\[\]()]", " ", text)
-    # Normalise whitespace
-    text = re.sub(r"\s+", " ", text).strip().lower()
-    # Split into tokens (words and number groups)
-    tokens = set(re.findall(r"\b\w+\b", text))
-    # Remove very common stop words that add noise
-    stop = {
-        "the",
-        "a",
-        "an",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "being",
-        "have",
-        "has",
-        "had",
-        "do",
-        "does",
-        "did",
-        "will",
-        "would",
-        "could",
-        "should",
-        "may",
-        "might",
-        "shall",
-        "can",
-        "of",
-        "in",
-        "to",
-        "for",
-        "with",
-        "on",
-        "at",
-        "by",
-        "from",
-        "as",
-        "into",
-        "through",
-        "during",
-        "before",
-        "after",
-        "and",
-        "but",
-        "or",
-        "nor",
-        "not",
-        "so",
-        "yet",
-        "both",
-        "either",
-        "neither",
-        "each",
-        "every",
-        "all",
-        "any",
-        "few",
-        "more",
-        "most",
-        "other",
-        "some",
-        "such",
-        "no",
-        "only",
-        "own",
-        "same",
-        "than",
-        "too",
-        "very",
-        "just",
-        "because",
-        "if",
-        "when",
-        "while",
-        "where",
-        "how",
-        "what",
-        "which",
-        "who",
-        "whom",
-        "this",
-        "that",
-        "these",
-        "those",
-        "it",
-        "its",
-        "they",
-        "them",
-        "their",
-        "we",
-        "our",
-        "you",
-        "your",
-        "he",
-        "she",
-        "his",
-        "her",
-        "i",
-        "me",
-        "my",
-    }
-    return tokens - stop
+    return re.sub(r"\s+", " ", text).strip().lower()
 
 
-def jaccard_similarity(set_a: set, set_b: set) -> float:
-    """Jaccard similarity coefficient between two sets."""
-    if not set_a and not set_b:
-        return 1.0
-    union = set_a | set_b
-    if not union:
-        return 1.0
-    return len(set_a & set_b) / len(union)
+def _vectorize(texts: List[str]):
+    """
+    Fit a TF vectorizer on *texts*, falling back to no stop-word removal
+    if all tokens in a document are stop words (which would otherwise raise
+    a ValueError).  Returns None if vectorization is not possible.
+    """
+    for stop_words in ("english", None):
+        vectorizer = TfidfVectorizer(
+            stop_words=stop_words,
+            ngram_range=(1, 2),
+            use_idf=False,
+            sublinear_tf=True,
+        )
+        try:
+            return vectorizer.fit_transform(texts)
+        except ValueError:
+            continue
+    return None
 
 
 class ConsistencyMetric(BaseMetric):
@@ -144,8 +48,10 @@ class ConsistencyMetric(BaseMetric):
     Measures how consistent a response is compared to one or more
     reference responses to the same question.
 
-    The score is the mean Jaccard similarity (on extracted terms) between
-    the actual output and each reference output.
+    Responses are vectorised with TF (no IDF) so that shared legal
+    terminology retains its full weight rather than being penalised for
+    appearing across the small comparison corpus. Cosine similarity then
+    captures directional agreement independent of response length.
 
     Args:
         reference_outputs: Other answers to compare against.
@@ -167,20 +73,41 @@ class ConsistencyMetric(BaseMetric):
         return self.measure(test_case)
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        actual_terms = _extract_terms(test_case.actual_output or "")
+        actual = _preprocess(test_case.actual_output or "")
+        refs = [_preprocess(r) for r in self.reference_outputs]
 
-        similarities = []
-        for ref in self.reference_outputs:
-            ref_terms = _extract_terms(ref)
-            sim = jaccard_similarity(actual_terms, ref_terms)
-            similarities.append(sim)
+        if not actual:
+            self.score = 0.0
+            self.success = False
+            self.reason = "Actual output is empty."
+            return self.score
 
-        self.score = sum(similarities) / len(similarities) if similarities else 0.0
+        if not refs:
+            self.score = 0.0
+            self.success = False
+            self.reason = "No reference outputs provided."
+            return self.score
+
+        # Vectorise with TF only (use_idf=False) so shared domain terms keep
+        # their weight. Bigrams capture legal phrases like "good faith".
+        all_texts = [actual] + refs
+        tfidf_matrix = _vectorize(all_texts)
+
+        if tfidf_matrix is None:
+            self.score = 0.0
+            self.success = False
+            self.reason = "Could not vectorize responses (possibly empty inputs)."
+            return self.score
+
+        actual_vec = tfidf_matrix[0]
+        ref_vecs = tfidf_matrix[1:]
+
+        sims = cosine_similarity(actual_vec, ref_vecs)[0]
+        self.score = float(np.mean(sims))
         self.success = self.score >= self.threshold
-        total_results = len(similarities) + 1  # references + the current response
         self.reason = (
-            f"Mean Jaccard similarity: {self.score:.3f} "
-            f"(across {total_results} results, "
+            f"Mean cosine similarity: {self.score:.3f} "
+            f"(across {len(all_texts)} responses, "
             f"threshold: {self.threshold})"
         )
         return self.score
@@ -190,4 +117,4 @@ class ConsistencyMetric(BaseMetric):
 
     @property
     def __name__(self):
-        return "Consistency (Simple)"
+        return "Consistency (Cosine)"

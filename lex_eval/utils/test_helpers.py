@@ -1,41 +1,32 @@
 """
-Helpers for loading captured JSONL responses and converting them into
+Helpers for loading captured responses (from DuckDB) and converting them into
 DeepEval LLMTestCase objects for evaluation.
 """
 
-import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from deepeval.test_case import LLMTestCase, ToolCall
 
+from .db import load_records as _db_load_records
+from .db import DEFAULT_DB
+
 DATA_DIR = Path(__file__).parent.parent / "data"
-DEFAULT_RESPONSES = DATA_DIR / "responses.jsonl"
+DEFAULT_RESPONSES = DEFAULT_DB
 
 
 def load_records(
     filepath: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Load all records from a responses JSONL file.
+    Load all records from the DuckDB responses database.
 
     Each record has the shape produced by gather_responses.py:
         {question_id, question, llm_name, timestamp, deep_research, test_case}
 
-    Silently skips lines that contain an ``error`` key (failed captures).
+    Error rows are excluded.
     """
-    filepath = filepath or DEFAULT_RESPONSES
-    records: List[Dict[str, Any]] = []
-    with open(filepath) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            record = json.loads(line)
-            if "error" in record:
-                continue
-            records.append(record)
-    return records
+    return _db_load_records(path=filepath)
 
 
 def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
@@ -110,7 +101,8 @@ def group_by_question_and_llm(
     when ``gather_responses.py`` is run with ``--append``.
     """
     if records is None:
-        records = load_records(filepath)
+        from .db import group_by_question_and_llm as _db_group
+        return _db_group(path=filepath)
 
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in records:
