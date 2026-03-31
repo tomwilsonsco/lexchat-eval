@@ -269,10 +269,8 @@ def completeness_report(path: Optional[Path] = None) -> None:
     ready = sum(1 for _, _, _, complete in rows if complete >= 2)
     print(f"\n{ready}/{total_pairs} pairs have >= 2 complete responses")
 
-
-# ---------------------------------------------------------------------------
-# eval_results table
-# ---------------------------------------------------------------------------
+# ----------------------------
+# EVAL
 
 _CREATE_EVAL_RESULTS_TABLE = """
 CREATE SEQUENCE IF NOT EXISTS eval_results_id_seq START 1;

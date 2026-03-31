@@ -42,9 +42,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Ensure the repo root is on sys.path so `lex_eval` is importable regardless
-# of how this script is invoked (e.g. `python lex_eval/run_evals.py` from /app
-# vs. a direct path invocation).
 _REPO_ROOT = str(Path(__file__).resolve().parent.parent)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
@@ -111,19 +108,16 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     if not covered:
         return []
 
-    # For suites with multiple test functions per (qid, llm) pair, track coverage
-    # at the individual test-function level so a partially-run pair is not fully skipped.
     covered_triples = _covered_triples(existing)
 
-    # Load the test records to map parametrize IDs to (qid, llm) pairs.
     # Pytest appends a numeric suffix (0, 1, …) when multiple records share
-    # the same base ID, so we must replicate that logic here.
+    # the same base ID, so we must replicate that here.
     from lex_eval.utils.test_helpers import load_records, record_id
 
     records = load_records()
     test_file = SUITES[suite]
 
-    # Build the same IDs pytest uses: base_id + counter suffix
+    # build the same IDs pytest uses: base_id + counter suffix
     base_ids = [record_id(r) for r in records]
     id_counts: dict[str, int] = {}
     pytest_ids: list[str] = []
@@ -137,7 +131,7 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
         qid = int(record["question_id"])
         llm = record["llm_name"]
         if (qid, llm) in covered:
-            # Deselect all test functions in this suite file for this parametrize ID
+            # deselect all test functions in this suite file for this parametrize ID
             if suite == "groundedness":
                 # Check per-test-function so a partially-run pair isn't fully skipped
                 if (qid, llm, "faithfulness") in covered_triples:
@@ -169,7 +163,7 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                     ]
                 )
             elif suite == "structure":
-                # Check per-test-function so a partially-run pair isn't fully skipped
+                # check per-test-function so a partially-run pair isn't fully skipped
                 if (qid, llm, "mandatory_structure") in covered_triples:
                     deselect_args.extend(
                         [
@@ -240,15 +234,14 @@ def run_evals(
         cmd: list[str] = [sys.executable, "-m", "pytest"]
         cmd.append(str(TESTS_DIR / SUITES[s]))
 
-        # Marker filter
         if markers:
             cmd.extend(["-m", markers])
 
-        # Filter to a single LLM via pytest keyword expression
+        # filter to a single LLM via pytest keyword expression
         if llm:
             cmd.extend(["-k", llm])
 
-        # Skip logic: deselect tests that already have results
+        # skip logic: deselect tests that already have results
         if not overwrite:
             deselect = _build_deselect_args(s, llm=llm)
             if deselect:
@@ -259,10 +252,10 @@ def run_evals(
                     f"(use --overwrite to force)"
                 )
 
-        # Display
+        # display
         cmd.extend(["-v" if verbose else "-q", "--tb=short"])
 
-        # Pass-through args
+        # pass-through args
         if extra_args:
             cmd.extend(extra_args)
 
