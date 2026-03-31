@@ -523,6 +523,7 @@ def make_deploy_db(
     return output_path
 
 
+if __name__ == "__main__":
     import argparse as _argparse
 
     _parser = _argparse.ArgumentParser(description="DuckDB responses database utilities")

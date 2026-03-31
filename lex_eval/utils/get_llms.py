@@ -1,12 +1,7 @@
 import logging
-import sys
-from pathlib import Path
 from typing import List
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
-
-from lexchat_client import get_authenticated_client
+from .lexchat_client import get_authenticated_client
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +38,6 @@ if __name__ == "__main__":
     # For testing purposes
     logging.basicConfig(level=logging.INFO)
     llms = get_llms()
-    print(f"\Available LLMs ({len(llms)}):")
+    print(f"\nAvailable LLMs ({len(llms)}):")
     for llm in llms:
         print(f"  - {llm}")

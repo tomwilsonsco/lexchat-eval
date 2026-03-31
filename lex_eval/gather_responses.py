@@ -9,20 +9,16 @@ for later evaluation using DeepEval metrics.
 import argparse
 import json
 import logging
-import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-# Add utils to path
-sys.path.insert(0, str(Path(__file__).parent / "utils"))
-
-from utils.audit_capture import audit_capture
-from utils.db import get_connection, init_db, clear_responses, insert_response, DEFAULT_DB
-from utils.get_llms import get_llms
-from utils.lexchat_client import get_authenticated_client
+from lex_eval.utils.audit_capture import audit_capture
+from lex_eval.utils.db import get_connection, init_db, clear_responses, insert_response, DEFAULT_DB
+from lex_eval.utils.get_llms import get_llms
+from lex_eval.utils.lexchat_client import get_authenticated_client
 
 # Configure logging
 logging.basicConfig(

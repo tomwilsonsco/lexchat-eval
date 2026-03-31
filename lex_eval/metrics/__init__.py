@@ -1,6 +1,15 @@
 """Custom DeepEval metrics for LexChat evaluation."""
 
-from .tool_usage import ToolUsageMetric
 from .consistency import ConsistencyMetric
+from .consistency_llm import LLMConsistencyMetric
+from .structure import CitationPassthroughMetric, MandatoryStructureMetric
+from .tool_usage import ToolUsageMetric
 
-__all__ = ["ToolUsageMetric", "ConsistencyMetric"]
+
+__all__ = [
+    "ConsistencyMetric",
+    "LLMConsistencyMetric",
+    "CitationPassthroughMetric",
+    "MandatoryStructureMetric",
+    "ToolUsageMetric",
+]
