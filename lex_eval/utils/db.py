@@ -95,11 +95,10 @@ def insert_response(
     """
     Insert one record into the responses table.
 
-    *record* is the dict produced by ``gather_responses.process_combination``:
-      - success path: has a ``test_case`` key
-      - error path:   has an ``error`` key
+    *record* is the flat dict produced by ``gather_responses.process_combination``
+    with top-level keys: ``actual_output``, ``retrieval_context``, ``tools_called``.
+    An ``error`` key signals a failed capture.
     """
-    tc = record.get("test_case", {})
     is_error = "error" in record
 
     conn.execute(
@@ -110,9 +109,9 @@ def insert_response(
             record["llm_name"],
             record["timestamp"],
             record.get("deep_research", False),
-            tc.get("actual_output", "") if not is_error else "",
-            json.dumps(tc.get("retrieval_context") or []),
-            json.dumps(tc.get("tools_called") or []),
+            record.get("actual_output", "") if not is_error else "",
+            json.dumps(record.get("retrieval_context") or []),
+            json.dumps(record.get("tools_called") or []),
             is_error,
             record.get("error") if is_error else None,
         ],
@@ -124,11 +123,10 @@ def load_records(
     include_errors: bool = False,
 ) -> List[Dict[str, Any]]:
     """
-    Load responses from the database and return them as a list of record dicts
-    with the same shape produced by the old JSONL file::
+    Load responses from the database and return them as flat record dicts::
 
         {question_id, question, llm_name, timestamp, deep_research,
-         test_case: {input, actual_output, retrieval_context, tools_called}}
+         actual_output, retrieval_context, tools_called}
 
     Error rows are excluded unless *include_errors* is True.
     """
@@ -163,12 +161,9 @@ def load_records(
                 "llm_name": llm_name,
                 "timestamp": timestamp,
                 "deep_research": deep_research,
-                "test_case": {
-                    "input": question,
-                    "actual_output": actual_output,
-                    "retrieval_context": retrieval_context,
-                    "tools_called": tools_called,
-                },
+                "actual_output": actual_output,
+                "retrieval_context": retrieval_context,
+                "tools_called": tools_called,
             }
         )
     return records
@@ -273,39 +268,6 @@ def completeness_report(path: Optional[Path] = None) -> None:
     print(f"\n{ready}/{total_pairs} pairs have >= 2 complete responses")
 
 
-def migrate_from_jsonl(
-    jsonl_path: Path,
-    db_path: Optional[Path] = None,
-    overwrite: bool = False,
-) -> int:
-    """
-    Import records from a JSONL file into the DuckDB database.
-
-    Returns the number of rows inserted.
-    """
-    import json as _json
-
-    db_path = db_path or DEFAULT_DB
-    conn = get_connection(db_path)
-    init_db(conn)
-
-    if overwrite:
-        clear_responses(conn)
-
-    inserted = 0
-    with open(jsonl_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            record = _json.loads(line)
-            insert_response(conn, record)
-            inserted += 1
-
-    conn.close()
-    return inserted
-
-
 # ---------------------------------------------------------------------------
 # eval_results table
 # ---------------------------------------------------------------------------
@@ -381,8 +343,8 @@ def load_eval_results(
     suite: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Load eval results from the database.  Returns a list of dicts with the
-    same shape as the old per-suite JSON files.
+    Load eval results from the database.  Returns a list of dicts loaded from
+    the `eval_results` DuckDB table.
 
     Optionally filter to a single suite (e.g. ``"groundedness"``).
     """

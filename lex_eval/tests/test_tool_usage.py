@@ -9,13 +9,13 @@ import pytest
 
 from lex_eval.metrics.tool_usage import ToolUsageMetric
 from lex_eval.utils.test_helpers import (
-    load_test_cases,
+    load_records,
     record_to_test_case,
     record_id,
 )
 from lex_eval.utils.collector import attach_metric
 
-records = load_test_cases()
+records = load_records()
 
 
 def _tools_list(test_case):

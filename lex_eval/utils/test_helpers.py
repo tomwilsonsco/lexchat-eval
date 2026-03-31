@@ -21,8 +21,9 @@ def load_records(
     """
     Load all records from the DuckDB responses database.
 
-    Each record has the shape produced by gather_responses.py:
-        {question_id, question, llm_name, timestamp, deep_research, test_case}
+    Each record is a flat dict:
+        {question_id, question, llm_name, timestamp, deep_research,
+         actual_output, retrieval_context, tools_called}
 
     Error rows are excluded.
     """
@@ -31,15 +32,13 @@ def load_records(
 
 def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
     """
-    Convert a single JSONL record into a DeepEval LLMTestCase.
+    Convert a flat record dict into a DeepEval LLMTestCase.
 
     Handles the serialisation format produced by
     ``gather_responses.serialize_test_case`` (Pydantic model_dump).
     """
-    tc = record["test_case"]
-
     tools_called = []
-    for tool_dict in tc.get("tools_called", []):
+    for tool_dict in record.get("tools_called", []):
         tools_called.append(
             ToolCall(
                 name=tool_dict.get("name", ""),
@@ -50,24 +49,12 @@ def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
         )
 
     return LLMTestCase(
-        input=tc.get("input", ""),
-        actual_output=tc.get("actual_output", ""),
-        retrieval_context=tc.get("retrieval_context", []),
+        input=record.get("question", ""),
+        actual_output=record.get("actual_output", ""),
+        retrieval_context=record.get("retrieval_context", []),
         tools_called=tools_called,
     )
 
-
-def load_test_cases(
-    filepath: Optional[Path] = None,
-) -> List[Dict[str, Any]]:
-    """
-    Load records and return them as a list suitable for
-    ``@pytest.mark.parametrize``.
-
-    Each element carries the full record *plus* a human-readable ``id``
-    string for pytest output.
-    """
-    return load_records(filepath)
 
 
 def group_by_question(

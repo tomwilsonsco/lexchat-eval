@@ -35,9 +35,6 @@ Exclude slow LLM-judge tests:
 
 Verbose output:
     python lex_eval/run_evals.py -v
-
-Launch Streamlit dashboard after tests:
-    python lex_eval/run_evals.py --streamlit
 """
 
 import argparse
@@ -73,7 +70,7 @@ def _load_existing_results(suite: str) -> list[dict]:
 def _covered_pairs(results: list[dict]) -> set[tuple[int, str]]:
     """
     Return the set of (question_id, llm_name) pairs that already have
-    at least one result in the suite's JSON file.
+    at least one result in the `eval_results` DuckDB table.
     """
     pairs: set[tuple[int, str]] = set()
     for r in results:
@@ -120,9 +117,9 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     # Load the test records to map parametrize IDs to (qid, llm) pairs.
     # Pytest appends a numeric suffix (0, 1, …) when multiple records share
     # the same base ID, so we must replicate that logic here.
-    from lex_eval.utils.test_helpers import load_test_cases, record_id
+    from lex_eval.utils.test_helpers import load_records, record_id
 
-    records = load_test_cases()
+    records = load_records()
     test_file = SUITES[suite]
 
     # Build the same IDs pytest uses: base_id + counter suffix
@@ -201,7 +198,6 @@ def run_evals(
     markers: str | None = None,
     verbose: bool = False,
     overwrite: bool = False,
-    launch_streamlit: bool = False,
     extra_args: list[str] | None = None,
     llm: str | None = None,
 ) -> int:
@@ -267,26 +263,12 @@ def run_evals(
             overall_rc = result.returncode
 
     if overall_rc in (0, 1):
-        if launch_streamlit:
-            _launch_streamlit(REPORTS_DIR)
-        else:
-            print(
-                "\n📊 Results written to data/responses.db (eval_results table)"
-                "\n   View dashboard: streamlit run lex_eval/reports/streamlit_report.py"
-            )
+        print(
+            "\n📊 Results written to data/responses.db (eval_results table)"
+            "\n   View dashboard: streamlit run lex_eval/reports/streamlit_report.py"
+        )
 
     return overall_rc
-
-
-def _launch_streamlit(reports_dir: Path) -> None:
-    """Launch the Streamlit dashboard, blocking until the user exits."""
-    app_path = reports_dir / "streamlit_report.py"
-    print(f"\n🚀 Launching Streamlit dashboard: {app_path}")
-    print("   Press Ctrl+C to stop.\n")
-    subprocess.run(
-        [sys.executable, "-m", "streamlit", "run", str(app_path)],
-        check=False,
-    )
 
 
 def main() -> int:
@@ -311,8 +293,6 @@ Results:
 Dashboard:
   Launch the Streamlit dashboard at any time:
     streamlit run lex_eval/reports/streamlit_report.py
-  Or auto-launch after tests:
-    python lex_eval/run_evals.py --streamlit
 """,
     )
     parser.add_argument(
@@ -337,12 +317,6 @@ Dashboard:
         help="Overwrite existing results instead of skipping completed tests",
     )
     parser.add_argument(
-        "--streamlit",
-        action="store_true",
-        default=False,
-        help="Launch the Streamlit dashboard automatically after tests complete",
-    )
-    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -360,7 +334,6 @@ Dashboard:
         markers=args.markers,
         verbose=args.verbose,
         overwrite=args.overwrite,
-        launch_streamlit=args.streamlit,
         extra_args=args.extra,
         llm=args.llm,
     )

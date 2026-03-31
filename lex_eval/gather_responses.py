@@ -191,7 +191,9 @@ def gather_responses(
                     "llm_name": llm_name,
                     "timestamp": datetime.now().isoformat(),
                     "deep_research": deep_research,
-                    "test_case": test_case_data,
+                    "actual_output": test_case_data.get("actual_output", ""),
+                    "retrieval_context": test_case_data.get("retrieval_context") or [],
+                    "tools_called": test_case_data.get("tools_called") or [],
                 }
                 logger.info(
                     f"✓ Q{question_id} × {llm_name}: "
