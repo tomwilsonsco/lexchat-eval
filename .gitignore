@@ -206,7 +206,17 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-*.json
-*.jsonl
 *.html
+*.db
+
+# DeepEval telemetry
+.deepeval/
+
+# Local databases (deploy copy is intentionally committed; responses.db is not)
+lex_eval/data/responses.db
+
+# Python build
+dist/
+*.egg-info/
+.venv/
 *.db

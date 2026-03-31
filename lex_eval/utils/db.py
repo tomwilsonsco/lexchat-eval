@@ -13,7 +13,6 @@ responses
     question         TEXT
     llm_name         TEXT
     timestamp        TEXT
-    deep_research    BOOLEAN
     actual_output    TEXT        (empty string if not captured)
     retrieval_context JSON       (list of context strings)
     tools_called     JSON        (list of tool-call dicts)
@@ -56,7 +55,6 @@ CREATE TABLE IF NOT EXISTS responses (
     question         TEXT     NOT NULL,
     llm_name         TEXT     NOT NULL,
     timestamp        TEXT     NOT NULL,
-    deep_research    BOOLEAN  NOT NULL DEFAULT FALSE,
     actual_output    TEXT     NOT NULL DEFAULT '',
     retrieval_context JSON,
     tools_called     JSON,
@@ -67,9 +65,9 @@ CREATE TABLE IF NOT EXISTS responses (
 
 _INSERT_RESPONSE = """
 INSERT INTO responses (
-    question_id, question, llm_name, timestamp, deep_research,
+    question_id, question, llm_name, timestamp,
     actual_output, retrieval_context, tools_called, is_error, error_message
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -89,17 +87,14 @@ def clear_responses(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("DELETE FROM responses")
 
 
-def insert_response(
-    conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]
-) -> None:
+def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> None:
     """
     Insert one record into the responses table.
 
-    *record* is the dict produced by ``gather_responses.process_combination``:
-      - success path: has a ``test_case`` key
-      - error path:   has an ``error`` key
+    *record* is the flat dict produced by ``gather_responses.process_combination``
+    with top-level keys: ``actual_output``, ``retrieval_context``, ``tools_called``.
+    An ``error`` key signals a failed capture.
     """
-    tc = record.get("test_case", {})
     is_error = "error" in record
 
     conn.execute(
@@ -109,10 +104,9 @@ def insert_response(
             record["question"],
             record["llm_name"],
             record["timestamp"],
-            record.get("deep_research", False),
-            tc.get("actual_output", "") if not is_error else "",
-            json.dumps(tc.get("retrieval_context") or []),
-            json.dumps(tc.get("tools_called") or []),
+            record.get("actual_output", "") if not is_error else "",
+            json.dumps(record.get("retrieval_context") or []),
+            json.dumps(record.get("tools_called") or []),
             is_error,
             record.get("error") if is_error else None,
         ],
@@ -124,11 +118,10 @@ def load_records(
     include_errors: bool = False,
 ) -> List[Dict[str, Any]]:
     """
-    Load responses from the database and return them as a list of record dicts
-    with the same shape produced by the old JSONL file::
+    Load responses from the database and return them as flat record dicts::
 
-        {question_id, question, llm_name, timestamp, deep_research,
-         test_case: {input, actual_output, retrieval_context, tools_called}}
+        {question_id, question, llm_name, timestamp,
+         actual_output, retrieval_context, tools_called}
 
     Error rows are excluded unless *include_errors* is True.
     """
@@ -139,22 +132,29 @@ def load_records(
     conn = get_connection(path)
     try:
         where = "" if include_errors else "WHERE NOT is_error"
-        rows = conn.execute(
-            f"""
-            SELECT question_id, question, llm_name, timestamp, deep_research,
+        rows = conn.execute(f"""
+            SELECT question_id, question, llm_name, timestamp,
                    actual_output, retrieval_context, tools_called
             FROM responses
             {where}
             ORDER BY id
-            """
-        ).fetchall()
+            """).fetchall()
     finally:
         conn.close()
 
     records = []
-    for (qid, question, llm_name, timestamp, deep_research,
-         actual_output, retrieval_context_json, tools_called_json) in rows:
-        retrieval_context = json.loads(retrieval_context_json) if retrieval_context_json else []
+    for (
+        qid,
+        question,
+        llm_name,
+        timestamp,
+        actual_output,
+        retrieval_context_json,
+        tools_called_json,
+    ) in rows:
+        retrieval_context = (
+            json.loads(retrieval_context_json) if retrieval_context_json else []
+        )
         tools_called = json.loads(tools_called_json) if tools_called_json else []
         records.append(
             {
@@ -162,13 +162,9 @@ def load_records(
                 "question": question,
                 "llm_name": llm_name,
                 "timestamp": timestamp,
-                "deep_research": deep_research,
-                "test_case": {
-                    "input": question,
-                    "actual_output": actual_output,
-                    "retrieval_context": retrieval_context,
-                    "tools_called": tools_called,
-                },
+                "actual_output": actual_output,
+                "retrieval_context": retrieval_context,
+                "tools_called": tools_called,
             }
         )
     return records
@@ -213,14 +209,12 @@ def clean_incomplete_responses(
         ).fetchone()[0]
 
         if dry_run:
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT id, question_id, llm_name, is_error, LEFT(actual_output, 40)
                 FROM responses
                 WHERE TRIM(actual_output) = '' OR is_error
                 ORDER BY question_id, llm_name
-                """
-            ).fetchall()
+                """).fetchall()
             print(f"Dry run — {count} row(s) would be deleted:")
             for row in rows:
                 rid, qid, llm, is_err, preview = row
@@ -247,8 +241,7 @@ def completeness_report(path: Optional[Path] = None) -> None:
 
     conn = get_connection(path)
     try:
-        rows = conn.execute(
-            """
+        rows = conn.execute("""
             SELECT
                 question_id,
                 llm_name,
@@ -257,8 +250,7 @@ def completeness_report(path: Optional[Path] = None) -> None:
             FROM responses
             GROUP BY question_id, llm_name
             ORDER BY question_id, llm_name
-            """
-        ).fetchall()
+            """).fetchall()
     finally:
         conn.close()
 
@@ -272,43 +264,8 @@ def completeness_report(path: Optional[Path] = None) -> None:
     ready = sum(1 for _, _, _, complete in rows if complete >= 2)
     print(f"\n{ready}/{total_pairs} pairs have >= 2 complete responses")
 
-
-def migrate_from_jsonl(
-    jsonl_path: Path,
-    db_path: Optional[Path] = None,
-    overwrite: bool = False,
-) -> int:
-    """
-    Import records from a JSONL file into the DuckDB database.
-
-    Returns the number of rows inserted.
-    """
-    import json as _json
-
-    db_path = db_path or DEFAULT_DB
-    conn = get_connection(db_path)
-    init_db(conn)
-
-    if overwrite:
-        clear_responses(conn)
-
-    inserted = 0
-    with open(jsonl_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            record = _json.loads(line)
-            insert_response(conn, record)
-            inserted += 1
-
-    conn.close()
-    return inserted
-
-
-# ---------------------------------------------------------------------------
-# eval_results table
-# ---------------------------------------------------------------------------
+# ----------------------------
+# EVAL
 
 _CREATE_EVAL_RESULTS_TABLE = """
 CREATE SEQUENCE IF NOT EXISTS eval_results_id_seq START 1;
@@ -381,8 +338,8 @@ def load_eval_results(
     suite: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Load eval results from the database.  Returns a list of dicts with the
-    same shape as the old per-suite JSON files.
+    Load eval results from the database.  Returns a list of dicts loaded from
+    the `eval_results` DuckDB table.
 
     Optionally filter to a single suite (e.g. ``"groundedness"``).
     """
@@ -409,25 +366,38 @@ def load_eval_results(
         conn.close()
 
     results = []
-    for (llm_name, question_id, question, test_name, metric_name,
-         score, threshold, passed, reason, error, tools_used_json) in rows:
-        results.append({
-            "llm_name": llm_name,
-            "question_id": question_id,
-            "question": question,
-            "test_name": test_name,
-            "metric_name": metric_name,
-            "score": score,
-            "threshold": threshold,
-            "passed": passed,
-            "reason": reason or "",
-            "error": error or "",
-            "tools_used": (
-                json.loads(tools_used_json)
-                if tools_used_json and tools_used_json != "null"
-                else None
-            ),
-        })
+    for (
+        llm_name,
+        question_id,
+        question,
+        test_name,
+        metric_name,
+        score,
+        threshold,
+        passed,
+        reason,
+        error,
+        tools_used_json,
+    ) in rows:
+        results.append(
+            {
+                "llm_name": llm_name,
+                "question_id": question_id,
+                "question": question,
+                "test_name": test_name,
+                "metric_name": metric_name,
+                "score": score,
+                "threshold": threshold,
+                "passed": passed,
+                "reason": reason or "",
+                "error": error or "",
+                "tools_used": (
+                    json.loads(tools_used_json)
+                    if tools_used_json and tools_used_json != "null"
+                    else None
+                ),
+            }
+        )
     return results
 
 
@@ -475,15 +445,24 @@ def make_deploy_db(
 
         # Copy responses with trimmed retrieval_context
         rows = src.execute(
-            "SELECT question_id, question, llm_name, timestamp, deep_research, "
+            "SELECT question_id, question, llm_name, timestamp, "
             "actual_output, retrieval_context, tools_called, is_error, error_message "
             "FROM responses ORDER BY id"
         ).fetchall()
 
         trimmed_count = 0
         for row in rows:
-            (question_id, question, llm_name, timestamp, deep_research,
-             actual_output, ctx_json, tools_json, is_error, error_message) = row
+            (
+                question_id,
+                question,
+                llm_name,
+                timestamp,
+                actual_output,
+                ctx_json,
+                tools_json,
+                is_error,
+                error_message,
+            ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
             trimmed = [item[:_DEPLOY_CONTEXT_CHARS] for item in ctx]
@@ -493,9 +472,15 @@ def make_deploy_db(
             dst.execute(
                 _INSERT_RESPONSE,
                 [
-                    question_id, question, llm_name, timestamp, deep_research,
-                    actual_output, json.dumps(trimmed), tools_json,
-                    is_error, error_message,
+                    question_id,
+                    question,
+                    llm_name,
+                    timestamp,
+                    actual_output,
+                    json.dumps(trimmed),
+                    tools_json,
+                    is_error,
+                    error_message,
                 ],
             )
 
@@ -523,11 +508,18 @@ def make_deploy_db(
     return output_path
 
 
+if __name__ == "__main__":
     import argparse as _argparse
 
-    _parser = _argparse.ArgumentParser(description="DuckDB responses database utilities")
-    _parser.add_argument("--clean", action="store_true", help="Delete incomplete/error responses")
-    _parser.add_argument("--dry-run", action="store_true", help="Preview what --clean would delete")
+    _parser = _argparse.ArgumentParser(
+        description="DuckDB responses database utilities"
+    )
+    _parser.add_argument(
+        "--clean", action="store_true", help="Delete incomplete/error responses"
+    )
+    _parser.add_argument(
+        "--dry-run", action="store_true", help="Preview what --clean would delete"
+    )
     _parser.add_argument(
         "--deploy-db",
         metavar="OUTPUT",

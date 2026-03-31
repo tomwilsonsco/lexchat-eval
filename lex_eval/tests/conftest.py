@@ -2,7 +2,7 @@
 Shared pytest configuration for the LexChat evaluation suite.
 
 Handles custom markers, sys.path setup, and metric data collection.
-Results are written to the eval_results table in the shared DuckDB database
+Results are written to the `eval_results` DuckDB table
 (data/responses.db) at the end of each pytest session.
 """
 

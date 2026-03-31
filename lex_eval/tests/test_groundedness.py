@@ -22,7 +22,7 @@ from deepeval.test_case import LLMTestCase
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.openai_judge import OPENAI_API_KEY as _OPENAI_API_KEY, OpenAIJudge
 from lex_eval.utils.test_helpers import (
-    load_test_cases,
+    load_records,
     record_id,
     record_to_test_case,
 )
@@ -43,7 +43,7 @@ _MAX_CONTEXT_CHARS: int = (128_000 - 30_000) * 4  # ≈ 392 000 chars
 # Shared state
 # ---------------------------------------------------------------------------
 
-records = load_test_cases()
+records = load_records()
 
 # Single shared judge instance.
 _judge = OpenAIJudge() if _OPENAI_API_KEY else None

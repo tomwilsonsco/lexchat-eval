@@ -3,8 +3,8 @@ Helper for attaching metric data to pytest test items.
 
 Tests call ``attach_metric(request, ...)`` to store score/reason data
 on the test node. conftest.pytest_runtest_makereport then collects it
-into per-suite lists which are written to the eval_results table in the
-shared DuckDB database (data/responses.db) at the end of the run.
+and writes results to the `eval_results` table in the shared DuckDB database
+(data/responses.db) at the end of the run.
 """
 
 from typing import Any, Dict, List

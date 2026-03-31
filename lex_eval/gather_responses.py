@@ -9,20 +9,22 @@ for later evaluation using DeepEval metrics.
 import argparse
 import json
 import logging
-import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-# Add utils to path
-sys.path.insert(0, str(Path(__file__).parent / "utils"))
-
-from utils.audit_capture import audit_capture
-from utils.db import get_connection, init_db, clear_responses, insert_response, DEFAULT_DB
-from utils.get_llms import get_llms
-from utils.lexchat_client import get_authenticated_client
+from lex_eval.utils.audit_capture import audit_capture
+from lex_eval.utils.db import (
+    get_connection,
+    init_db,
+    clear_responses,
+    insert_response,
+    DEFAULT_DB,
+)
+from lex_eval.utils.get_llms import get_llms
+from lex_eval.utils.lexchat_client import get_authenticated_client
 
 # Configure logging
 logging.basicConfig(
@@ -102,7 +104,6 @@ def gather_responses(
     questions: List[Dict[str, Any]],
     llm_names: List[str],
     output_file: Path,
-    deep_research: bool = False,
     append: bool = False,
     max_workers: int = 10,
 ) -> None:
@@ -118,7 +119,6 @@ def gather_responses(
         questions: List of question dictionaries
         llm_names: List of LLM names to test
         output_file: Path to the DuckDB database file
-        deep_research: Whether to enable deep research mode
         append: If True, add to existing rows; if False, clear table first
         max_workers: Maximum number of concurrent threads
     """
@@ -168,9 +168,7 @@ def gather_responses(
         question_id = question_data.get("id")
         question_text = question_data.get("question")
 
-        logger.info(
-            f"[{index}/{total_combinations}] Q{question_id} × {llm_name}"
-        )
+        logger.info(f"[{index}/{total_combinations}] Q{question_id} × {llm_name}")
 
         client = get_client()
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -179,7 +177,6 @@ def gather_responses(
                     client=client,
                     question=question_text,
                     model_name=llm_name,
-                    deep_research=deep_research,
                 )
                 test_case_data = serialize_test_case(test_case)
                 actual_output = test_case_data.get("actual_output", "")
@@ -194,8 +191,9 @@ def gather_responses(
                     "question": question_text,
                     "llm_name": llm_name,
                     "timestamp": datetime.now().isoformat(),
-                    "deep_research": deep_research,
-                    "test_case": test_case_data,
+                    "actual_output": test_case_data.get("actual_output", ""),
+                    "retrieval_context": test_case_data.get("retrieval_context") or [],
+                    "tools_called": test_case_data.get("tools_called") or [],
                 }
                 logger.info(
                     f"✓ Q{question_id} × {llm_name}: "
@@ -218,9 +216,7 @@ def gather_responses(
     # Build flat list of all (question, llm, index) combinations
     combinations = [
         (q, llm, i + 1)
-        for i, (q, llm) in enumerate(
-            (q, llm) for q in questions for llm in llm_names
-        )
+        for i, (q, llm) in enumerate((q, llm) for q in questions for llm in llm_names)
     ]
 
     completed = 0
@@ -292,10 +288,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--deep-research", action="store_true", help="Enable deep research mode"
-    )
-
-    parser.add_argument(
         "--output",
         type=Path,
         default=Path(__file__).parent / "data" / "responses.db",
@@ -352,7 +344,6 @@ Examples:
             questions=questions,
             llm_names=llm_names,
             output_file=args.output,
-            deep_research=args.deep_research,
             append=args.append,
             max_workers=args.workers,
         )
@@ -371,4 +362,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

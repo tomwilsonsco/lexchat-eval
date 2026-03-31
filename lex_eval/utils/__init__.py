@@ -3,7 +3,6 @@
 from .audit_capture import audit_capture
 from .test_helpers import (
     load_records,
-    load_test_cases,
     record_to_test_case,
     group_by_question,
     group_by_question_and_llm,
@@ -13,7 +12,6 @@ from .test_helpers import (
 __all__ = [
     "audit_capture",
     "load_records",
-    "load_test_cases",
     "record_to_test_case",
     "group_by_question",
     "group_by_question_and_llm",
