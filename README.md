@@ -1,143 +1,131 @@
 # lex-eval
 
-# Setting up lexchat
-## Building lexchat in docker
-```bash
-docker-compose up --build -d
-```
+Evaluations for the LexChat legal Q&A API. Runs questions through
+available LLMs, stores responses in DuckDB, scores them with a suite of coded
+and AI-as-judge metrics, and visualises results in a Streamlit dashboard.
 
-Inside the container, use these hostnames:
+## Prerequisites
 
-http://backend:8000 - FastAPI backend
-http://db:5432 - PostgreSQL
-http://ollama:11434 - Ollama service
+Python 3.11+. Install dependencies:
 
-## Starting lexchat
-```bash
-cd delphium/lexchat
-docker-compose start
-```
+    pip install -e ".[dev]"
 
-## Urls to use
-In this python eval repo the url to use for backend/ API access:
-http://host.docker.internal:8000
+Create `lex_eval/.env`:
 
-In browser for the docs, Swagger:
-http://localhost:8000/docs
+    LEXCHAT_API=https://your-lexchat-host
+    USERNAME=your_username
+    PASSWORD=your_password
 
-Frontend in browser:
-http://localhost:80
+    # Required only for AI-judge evaluation suites
+    OPENAI_API_KEY=sk-...
+    DEEPEVAL_JUDGE_MODEL=gpt-4o-mini   # optional, this is the default
 
-## Tidy up
-```bash
-# Stop all containers (keeps them for restart)
-docker-compose stop
+## Step 1 — Check LLMs are available
 
-# Stop and remove containers (but keeps volumes/data)
-docker-compose down
+    python -m lex_eval.utils.get_llms
 
-# Stop, remove containers AND delete volumes (fresh start)
-docker-compose down -v
-```
+Lists all LLMs currently responding on the lexchat API. `gather_responses.py`
+calls this automatically, but it is useful to run first as a sanity check.
 
-# Running Evaluations
+## Step 2 — Gather responses
 
-The evaluation framework uses **pytest** + **DeepEval** to test LexChat responses for:
-- **Tool Usage**: Validates that legislation tools are invoked correctly
-- **Groundedness**: Uses LLM-as-judge to check faithfulness to retrieved context
-- **Consistency**: Measures same-model repeatability using Jaccard similarity
+    # All questions, all LLMs:
+    python lex_eval/gather_responses.py
 
-## Quick Start
+    # Specific question:
+    python lex_eval/gather_responses.py --question-id 1
 
-```bash
-# Run all evaluations (except groundedness which needs OPENAI_API_KEY)
-python lex_eval/run_evals.py -m "not groundedness"
+    # Specific LLM:
+    python lex_eval/gather_responses.py --llm "model-name"
 
-# Run only tool usage checks (fast, offline)
-python lex_eval/run_evals.py --suite tool_usage
+    # Append to existing results (for incremental runs):
+    python lex_eval/gather_responses.py --append
 
-# Run only consistency checks
-python lex_eval/run_evals.py --suite consistency
+    # Enable deep research mode:
+    python lex_eval/gather_responses.py --deep-research
 
-# Run groundedness (requires OPENAI_API_KEY)
-export OPENAI_API_KEY="sk-..."
-python lex_eval/run_evals.py --suite groundedness
+Responses are stored in `lex_eval/data/responses.db` (DuckDB).
+Each question/LLM combination is attempted up to 3 times; only complete
+responses (non-empty `actual_output`) are written to the database.
 
-# Generate custom hierarchical HTML report instead of pytest-html
-python lex_eval/run_evals.py --format custom -m "not groundedness"
+## Step 3 — Run evaluations
 
-# Generate both report formats
-python lex_eval/run_evals.py --format both -m "not groundedness"
-```
+    # All suites:
+    python lex_eval/run_evals.py
 
-## Viewing Reports
+    # Specific suite:
+    python lex_eval/run_evals.py --suite tool_usage
+    python lex_eval/run_evals.py --suite groundedness    # needs OPENAI_API_KEY
+    python lex_eval/run_evals.py --suite consistency
+    python lex_eval/run_evals.py --suite consistency_llm # needs OPENAI_API_KEY
+    python lex_eval/run_evals.py --suite structure
 
-After each run, **HTML reports** are generated in `lex_eval/reports/`.
+    # Force re-run (overwrite existing results):
+    python lex_eval/run_evals.py --suite groundedness --overwrite
 
-### Report Formats
+    # Single LLM only:
+    python lex_eval/run_evals.py --llm "model-name"
 
-You can choose between two report formats using the `--format` option:
+    # Verbose output:
+    python lex_eval/run_evals.py -v
 
-#### 1. pytest-html (default)
-```bash
-python lex_eval/run_evals.py --format pytest-html
-```
-- **File**: `eval_report.html`
-- **Style**: Standard pytest table format
-- **Features**: Sortable columns, click-to-filter, familiar pytest layout
-- **Best for**: Quick scanning, CI/CD integration, standard workflows
+Results are written to the `eval_results` table in `lex_eval/data/responses.db`.
+By default, tests are skipped if results already exist for a (question, LLM)
+pair — use `--overwrite` to force re-running.
 
-**Custom columns included:**
-- **LLM**: Model name (e.g., gpt-4o, claude-3-5-sonnet)
-- **Question**: Question ID from the test data  
-- **Metric**: Which metric was evaluated (tool_usage, groundedness, consistency)
-- **Score**: Numeric score (0.0-1.0 or similarity value)
-- **Threshold**: Pass/fail threshold for the metric
-- **Reason**: Detailed explanation of the result
+### Evaluation suites
 
-#### 2. Custom Hierarchical (alternative)
-```bash
-python lex_eval/run_evals.py --format custom
-```
-- **File**: `eval_report_custom.html`
-- **Style**: Hierarchical collapsible sections (LLM → Question → Metrics)
-- **Features**: Dark theme, drill-down navigation, grouped results
-- **Best for**: Exploring patterns, comparing LLMs per question, detailed analysis
+| Suite | Speed | Requires |
+|---|---|---|
+| `tool_usage` | Fast | Nothing extra |
+| `structure` | Fast | Nothing extra |
+| `consistency` | Fast | ≥2 responses per question/LLM pair |
+| `groundedness` | Slow | `OPENAI_API_KEY` |
+| `consistency_llm` | Slow | `OPENAI_API_KEY` + ≥2 responses per pair |
 
-#### 3. Both Formats
-```bash
-python lex_eval/run_evals.py --format both
-```
-Generates both `eval_report.html` (pytest-html) and `eval_report_custom.html` (hierarchical).
+## Step 4 — Streamlit dashboard
 
-### What's in the Reports
+    streamlit run lex_eval/reports/streamlit_report.py
 
-Both report formats include:
-- **LLM**: Model name being tested
-- **Question**: Question ID from test data
-- **Metric**: Type of evaluation (tool_usage, groundedness, consistency)
-- **Score**: Numeric score (0.0-1.0 or Jaccard similarity)
-- **Threshold**: Pass/fail threshold
-- **Reason**: Detailed explanation of why the test passed or failed
+The dashboard reads directly from `lex_eval/data/responses.db`.
 
-The reports make it easy to:
-- Compare LLM performance per question
-- Drill into failed tests to see reasons
-- Identify patterns in tool usage or consistency issues
+## Step 5 — Compact database for deployment
 
-## Gathering Response Data
+Produces a smaller copy of the database with `retrieval_context` trimmed to
+2,000 characters per item, suitable for committing to GitHub and deploying to
+Streamlit Cloud:
 
-Before running evaluations, you need to collect LexChat responses:
+    python -m lex_eval.utils.db --deploy-db
+    # Output: lex_eval/data/deploy.db
 
-```bash
-# Gather responses from default LLMs (gpt-4o, claude-3-5-sonnet, gemini-2.0-flash)
-python lex_eval/gather_responses.py
+    # Custom output path:
+    python -m lex_eval.utils.db --deploy-db path/to/output.db
 
-# Append additional responses for consistency testing
-python lex_eval/gather_responses.py --append
+Commit `deploy.db` (not `responses.db`) to the repository. Configure
+Streamlit Cloud to point at `deploy.db`.
 
-# Use specific LLMs
-python lex_eval/gather_responses.py --llm gpt-4o --llm claude-3-5-sonnet
-```
+## Database utilities
 
-Responses are saved to `lex_eval/data/responses.jsonl`.
+    # Show completeness report (responses per question/LLM pair):
+    python -m lex_eval.utils.db
+
+    # Remove incomplete / error rows:
+    python -m lex_eval.utils.db --clean
+
+    # Preview what --clean would remove without deleting:
+    python -m lex_eval.utils.db --dry-run
+
+## Repository structure
+
+    lex_eval/
+    ├── data/
+    │   ├── questions.json       # evaluation questions
+    │   └── deploy.db            # committed compact database for Streamlit Cloud
+    ├── metrics/                 # custom DeepEval metric classes
+    ├── reports/
+    │   └── streamlit_report.py  # Streamlit dashboard
+    ├── tests/                   # pytest evaluation suites
+    ├── utils/                   # shared utilities (db, client, capture, judge)
+    ├── gather_responses.py      # Step 2 entry point
+    ├── open_db_ui.py            # opens responses.db in browser UI
+    └── run_evals.py             # Step 3 entry point
