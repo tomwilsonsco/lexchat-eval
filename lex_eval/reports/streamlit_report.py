@@ -1,7 +1,3 @@
-"""
-look at groundedness and relevancy metrics under each question - on the dashboard these two are showing 16 runs for each LLM and then duplicating result pairs. This must be a mistake the other metrics are showing 2 runs which sounds correct.
-"""
-
 from __future__ import annotations
 
 import json
