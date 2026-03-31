@@ -5,7 +5,6 @@ from .consistency_llm import LLMConsistencyMetric
 from .structure import CitationPassthroughMetric, MandatoryStructureMetric
 from .tool_usage import ToolUsageMetric
 
-
 __all__ = [
     "ConsistencyMetric",
     "LLMConsistencyMetric",

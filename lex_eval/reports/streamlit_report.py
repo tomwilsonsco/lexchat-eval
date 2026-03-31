@@ -2,7 +2,6 @@
 look at groundedness and relevancy metrics under each question - on the dashboard these two are showing 16 runs for each LLM and then duplicating result pairs. This must be a mistake the other metrics are showing 2 runs which sounds correct.
 """
 
-
 from __future__ import annotations
 
 import json
@@ -562,7 +561,9 @@ def main() -> None:
     _db_mtime = RESPONSES_DB.stat().st_mtime if RESPONSES_DB.exists() else 0.0
 
     if not RESPONSES_DB.exists():
-        st.error("No results found. Run evaluations first: python lex_eval/run_evals.py")
+        st.error(
+            "No results found. Run evaluations first: python lex_eval/run_evals.py"
+        )
         st.stop()
 
     raw_results = load_eval_results(_db_mtime=_db_mtime)

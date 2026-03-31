@@ -56,7 +56,6 @@ def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
     )
 
 
-
 def group_by_question(
     records: Optional[List[Dict[str, Any]]] = None,
     filepath: Optional[Path] = None,
@@ -89,6 +88,7 @@ def group_by_question_and_llm(
     """
     if records is None:
         from .db import group_by_question_and_llm as _db_group
+
         return _db_group(path=filepath)
 
     grouped: Dict[str, List[Dict[str, Any]]] = {}

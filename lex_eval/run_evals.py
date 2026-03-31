@@ -64,6 +64,7 @@ SUITES = {
 def _load_existing_results(suite: str) -> list[dict]:
     """Load existing results for a suite from DuckDB, or return [] if not found."""
     from lex_eval.utils.db import DEFAULT_DB, load_eval_results
+
     return load_eval_results(DEFAULT_DB, suite=suite)
 
 
@@ -141,11 +142,17 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                 # Check per-test-function so a partially-run pair isn't fully skipped
                 if (qid, llm, "faithfulness") in covered_triples:
                     deselect_args.extend(
-                        ["--deselect", f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]"]
+                        [
+                            "--deselect",
+                            f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]",
+                        ]
                     )
                 if (qid, llm, "answer_relevancy") in covered_triples:
                     deselect_args.extend(
-                        ["--deselect", f"lex_eval/tests/{test_file}::test_answer_relevancy[{pid}]"]
+                        [
+                            "--deselect",
+                            f"lex_eval/tests/{test_file}::test_answer_relevancy[{pid}]",
+                        ]
                     )
             elif suite == "tool_usage":
                 deselect_args.extend(
@@ -165,11 +172,17 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                 # Check per-test-function so a partially-run pair isn't fully skipped
                 if (qid, llm, "mandatory_structure") in covered_triples:
                     deselect_args.extend(
-                        ["--deselect", f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]"]
+                        [
+                            "--deselect",
+                            f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]",
+                        ]
                     )
                 if (qid, llm, "citation_passthrough") in covered_triples:
                     deselect_args.extend(
-                        ["--deselect", f"lex_eval/tests/{test_file}::test_citation_passthrough[{pid}]"]
+                        [
+                            "--deselect",
+                            f"lex_eval/tests/{test_file}::test_citation_passthrough[{pid}]",
+                        ]
                     )
 
     # consistency_llm is parametrized by (question, LLM) group, not individual record
@@ -217,6 +230,7 @@ def run_evals(
                 get_connection,
                 init_eval_results,
             )
+
             conn = get_connection(DEFAULT_DB)
             init_eval_results(conn)
             clear_eval_results(conn, suite=s)

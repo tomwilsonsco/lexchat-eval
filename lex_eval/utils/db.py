@@ -89,9 +89,7 @@ def clear_responses(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("DELETE FROM responses")
 
 
-def insert_response(
-    conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]
-) -> None:
+def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> None:
     """
     Insert one record into the responses table.
 
@@ -137,22 +135,30 @@ def load_records(
     conn = get_connection(path)
     try:
         where = "" if include_errors else "WHERE NOT is_error"
-        rows = conn.execute(
-            f"""
+        rows = conn.execute(f"""
             SELECT question_id, question, llm_name, timestamp, deep_research,
                    actual_output, retrieval_context, tools_called
             FROM responses
             {where}
             ORDER BY id
-            """
-        ).fetchall()
+            """).fetchall()
     finally:
         conn.close()
 
     records = []
-    for (qid, question, llm_name, timestamp, deep_research,
-         actual_output, retrieval_context_json, tools_called_json) in rows:
-        retrieval_context = json.loads(retrieval_context_json) if retrieval_context_json else []
+    for (
+        qid,
+        question,
+        llm_name,
+        timestamp,
+        deep_research,
+        actual_output,
+        retrieval_context_json,
+        tools_called_json,
+    ) in rows:
+        retrieval_context = (
+            json.loads(retrieval_context_json) if retrieval_context_json else []
+        )
         tools_called = json.loads(tools_called_json) if tools_called_json else []
         records.append(
             {
@@ -208,14 +214,12 @@ def clean_incomplete_responses(
         ).fetchone()[0]
 
         if dry_run:
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT id, question_id, llm_name, is_error, LEFT(actual_output, 40)
                 FROM responses
                 WHERE TRIM(actual_output) = '' OR is_error
                 ORDER BY question_id, llm_name
-                """
-            ).fetchall()
+                """).fetchall()
             print(f"Dry run — {count} row(s) would be deleted:")
             for row in rows:
                 rid, qid, llm, is_err, preview = row
@@ -242,8 +246,7 @@ def completeness_report(path: Optional[Path] = None) -> None:
 
     conn = get_connection(path)
     try:
-        rows = conn.execute(
-            """
+        rows = conn.execute("""
             SELECT
                 question_id,
                 llm_name,
@@ -252,8 +255,7 @@ def completeness_report(path: Optional[Path] = None) -> None:
             FROM responses
             GROUP BY question_id, llm_name
             ORDER BY question_id, llm_name
-            """
-        ).fetchall()
+            """).fetchall()
     finally:
         conn.close()
 
@@ -371,25 +373,38 @@ def load_eval_results(
         conn.close()
 
     results = []
-    for (llm_name, question_id, question, test_name, metric_name,
-         score, threshold, passed, reason, error, tools_used_json) in rows:
-        results.append({
-            "llm_name": llm_name,
-            "question_id": question_id,
-            "question": question,
-            "test_name": test_name,
-            "metric_name": metric_name,
-            "score": score,
-            "threshold": threshold,
-            "passed": passed,
-            "reason": reason or "",
-            "error": error or "",
-            "tools_used": (
-                json.loads(tools_used_json)
-                if tools_used_json and tools_used_json != "null"
-                else None
-            ),
-        })
+    for (
+        llm_name,
+        question_id,
+        question,
+        test_name,
+        metric_name,
+        score,
+        threshold,
+        passed,
+        reason,
+        error,
+        tools_used_json,
+    ) in rows:
+        results.append(
+            {
+                "llm_name": llm_name,
+                "question_id": question_id,
+                "question": question,
+                "test_name": test_name,
+                "metric_name": metric_name,
+                "score": score,
+                "threshold": threshold,
+                "passed": passed,
+                "reason": reason or "",
+                "error": error or "",
+                "tools_used": (
+                    json.loads(tools_used_json)
+                    if tools_used_json and tools_used_json != "null"
+                    else None
+                ),
+            }
+        )
     return results
 
 
@@ -444,8 +459,18 @@ def make_deploy_db(
 
         trimmed_count = 0
         for row in rows:
-            (question_id, question, llm_name, timestamp, deep_research,
-             actual_output, ctx_json, tools_json, is_error, error_message) = row
+            (
+                question_id,
+                question,
+                llm_name,
+                timestamp,
+                deep_research,
+                actual_output,
+                ctx_json,
+                tools_json,
+                is_error,
+                error_message,
+            ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
             trimmed = [item[:_DEPLOY_CONTEXT_CHARS] for item in ctx]
@@ -455,9 +480,16 @@ def make_deploy_db(
             dst.execute(
                 _INSERT_RESPONSE,
                 [
-                    question_id, question, llm_name, timestamp, deep_research,
-                    actual_output, json.dumps(trimmed), tools_json,
-                    is_error, error_message,
+                    question_id,
+                    question,
+                    llm_name,
+                    timestamp,
+                    deep_research,
+                    actual_output,
+                    json.dumps(trimmed),
+                    tools_json,
+                    is_error,
+                    error_message,
                 ],
             )
 
@@ -488,9 +520,15 @@ def make_deploy_db(
 if __name__ == "__main__":
     import argparse as _argparse
 
-    _parser = _argparse.ArgumentParser(description="DuckDB responses database utilities")
-    _parser.add_argument("--clean", action="store_true", help="Delete incomplete/error responses")
-    _parser.add_argument("--dry-run", action="store_true", help="Preview what --clean would delete")
+    _parser = _argparse.ArgumentParser(
+        description="DuckDB responses database utilities"
+    )
+    _parser.add_argument(
+        "--clean", action="store_true", help="Delete incomplete/error responses"
+    )
+    _parser.add_argument(
+        "--dry-run", action="store_true", help="Preview what --clean would delete"
+    )
     _parser.add_argument(
         "--deploy-db",
         metavar="OUTPUT",

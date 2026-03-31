@@ -16,7 +16,13 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from lex_eval.utils.audit_capture import audit_capture
-from lex_eval.utils.db import get_connection, init_db, clear_responses, insert_response, DEFAULT_DB
+from lex_eval.utils.db import (
+    get_connection,
+    init_db,
+    clear_responses,
+    insert_response,
+    DEFAULT_DB,
+)
 from lex_eval.utils.get_llms import get_llms
 from lex_eval.utils.lexchat_client import get_authenticated_client
 
@@ -164,9 +170,7 @@ def gather_responses(
         question_id = question_data.get("id")
         question_text = question_data.get("question")
 
-        logger.info(
-            f"[{index}/{total_combinations}] Q{question_id} × {llm_name}"
-        )
+        logger.info(f"[{index}/{total_combinations}] Q{question_id} × {llm_name}")
 
         client = get_client()
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -216,9 +220,7 @@ def gather_responses(
     # Build flat list of all (question, llm, index) combinations
     combinations = [
         (q, llm, i + 1)
-        for i, (q, llm) in enumerate(
-            (q, llm) for q in questions for llm in llm_names
-        )
+        for i, (q, llm) in enumerate((q, llm) for q in questions for llm in llm_names)
     ]
 
     completed = 0
