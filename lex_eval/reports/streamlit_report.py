@@ -503,7 +503,6 @@ def _render_chat_interaction(records: list[dict]) -> None:
             st.json(
                 {
                     "timestamp": rec.get("timestamp"),
-                    "deep_research": rec.get("deep_research"),
                     "llm_name": rec.get("llm_name"),
                     "question_id": rec.get("question_id"),
                 }

@@ -13,7 +13,6 @@ responses
     question         TEXT
     llm_name         TEXT
     timestamp        TEXT
-    deep_research    BOOLEAN
     actual_output    TEXT        (empty string if not captured)
     retrieval_context JSON       (list of context strings)
     tools_called     JSON        (list of tool-call dicts)
@@ -56,7 +55,6 @@ CREATE TABLE IF NOT EXISTS responses (
     question         TEXT     NOT NULL,
     llm_name         TEXT     NOT NULL,
     timestamp        TEXT     NOT NULL,
-    deep_research    BOOLEAN  NOT NULL DEFAULT FALSE,
     actual_output    TEXT     NOT NULL DEFAULT '',
     retrieval_context JSON,
     tools_called     JSON,
@@ -67,9 +65,9 @@ CREATE TABLE IF NOT EXISTS responses (
 
 _INSERT_RESPONSE = """
 INSERT INTO responses (
-    question_id, question, llm_name, timestamp, deep_research,
+    question_id, question, llm_name, timestamp,
     actual_output, retrieval_context, tools_called, is_error, error_message
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -106,7 +104,6 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             record["question"],
             record["llm_name"],
             record["timestamp"],
-            record.get("deep_research", False),
             record.get("actual_output", "") if not is_error else "",
             json.dumps(record.get("retrieval_context") or []),
             json.dumps(record.get("tools_called") or []),
@@ -123,7 +120,7 @@ def load_records(
     """
     Load responses from the database and return them as flat record dicts::
 
-        {question_id, question, llm_name, timestamp, deep_research,
+        {question_id, question, llm_name, timestamp,
          actual_output, retrieval_context, tools_called}
 
     Error rows are excluded unless *include_errors* is True.
@@ -136,7 +133,7 @@ def load_records(
     try:
         where = "" if include_errors else "WHERE NOT is_error"
         rows = conn.execute(f"""
-            SELECT question_id, question, llm_name, timestamp, deep_research,
+            SELECT question_id, question, llm_name, timestamp,
                    actual_output, retrieval_context, tools_called
             FROM responses
             {where}
@@ -151,7 +148,6 @@ def load_records(
         question,
         llm_name,
         timestamp,
-        deep_research,
         actual_output,
         retrieval_context_json,
         tools_called_json,
@@ -166,7 +162,6 @@ def load_records(
                 "question": question,
                 "llm_name": llm_name,
                 "timestamp": timestamp,
-                "deep_research": deep_research,
                 "actual_output": actual_output,
                 "retrieval_context": retrieval_context,
                 "tools_called": tools_called,
@@ -450,7 +445,7 @@ def make_deploy_db(
 
         # Copy responses with trimmed retrieval_context
         rows = src.execute(
-            "SELECT question_id, question, llm_name, timestamp, deep_research, "
+            "SELECT question_id, question, llm_name, timestamp, "
             "actual_output, retrieval_context, tools_called, is_error, error_message "
             "FROM responses ORDER BY id"
         ).fetchall()
@@ -462,7 +457,6 @@ def make_deploy_db(
                 question,
                 llm_name,
                 timestamp,
-                deep_research,
                 actual_output,
                 ctx_json,
                 tools_json,
@@ -482,7 +476,6 @@ def make_deploy_db(
                     question,
                     llm_name,
                     timestamp,
-                    deep_research,
                     actual_output,
                     json.dumps(trimmed),
                     tools_json,

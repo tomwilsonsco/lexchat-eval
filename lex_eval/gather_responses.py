@@ -104,7 +104,6 @@ def gather_responses(
     questions: List[Dict[str, Any]],
     llm_names: List[str],
     output_file: Path,
-    deep_research: bool = False,
     append: bool = False,
     max_workers: int = 10,
 ) -> None:
@@ -120,7 +119,6 @@ def gather_responses(
         questions: List of question dictionaries
         llm_names: List of LLM names to test
         output_file: Path to the DuckDB database file
-        deep_research: Whether to enable deep research mode
         append: If True, add to existing rows; if False, clear table first
         max_workers: Maximum number of concurrent threads
     """
@@ -179,7 +177,6 @@ def gather_responses(
                     client=client,
                     question=question_text,
                     model_name=llm_name,
-                    deep_research=deep_research,
                 )
                 test_case_data = serialize_test_case(test_case)
                 actual_output = test_case_data.get("actual_output", "")
@@ -194,7 +191,6 @@ def gather_responses(
                     "question": question_text,
                     "llm_name": llm_name,
                     "timestamp": datetime.now().isoformat(),
-                    "deep_research": deep_research,
                     "actual_output": test_case_data.get("actual_output", ""),
                     "retrieval_context": test_case_data.get("retrieval_context") or [],
                     "tools_called": test_case_data.get("tools_called") or [],
@@ -292,10 +288,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--deep-research", action="store_true", help="Enable deep research mode"
-    )
-
-    parser.add_argument(
         "--output",
         type=Path,
         default=Path(__file__).parent / "data" / "responses.db",
@@ -352,7 +344,6 @@ Examples:
             questions=questions,
             llm_names=llm_names,
             output_file=args.output,
-            deep_research=args.deep_research,
             append=args.append,
             max_workers=args.workers,
         )

@@ -25,7 +25,7 @@ Create `lex_eval/.env`:
     python -m lex_eval.utils.get_llms
 
 Lists all LLMs currently responding on the lexchat API. `gather_responses.py`
-calls this automatically, but it is useful to run first as a sanity check.
+calls this automatically, but it is useful to run first to see the names of the LLMs available to use.
 
 ## Step 2 — Gather responses
 
@@ -40,9 +40,6 @@ calls this automatically, but it is useful to run first as a sanity check.
 
     # Append to existing results (for incremental runs):
     python lex_eval/gather_responses.py --append
-
-    # Enable deep research mode:
-    python lex_eval/gather_responses.py --deep-research
 
 Responses are stored in `lex_eval/data/responses.db` (DuckDB).
 Each question/LLM combination is attempted up to 3 times; only complete

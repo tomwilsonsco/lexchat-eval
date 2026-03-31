@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def audit_capture(client, question, model_name, deep_research=False):
+def audit_capture(client, question, model_name):
     chat_payload = {
         "messages": [
             {
@@ -15,7 +15,6 @@ def audit_capture(client, question, model_name, deep_research=False):
             {"role": "user", "content": question},
         ],
         "model": model_name,
-        "deep_research": deep_research,
         "stream": True,
     }
 

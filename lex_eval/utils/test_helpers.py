@@ -22,7 +22,7 @@ def load_records(
     Load all records from the DuckDB responses database.
 
     Each record is a flat dict:
-        {question_id, question, llm_name, timestamp, deep_research,
+        {question_id, question, llm_name, timestamp,
          actual_output, retrieval_context, tools_called}
 
     Error rows are excluded.

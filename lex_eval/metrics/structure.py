@@ -110,7 +110,7 @@ class CitationPassthroughMetric(BaseMetric):
     Score:
         0.0  — Failure A: no URLs found in Worker output at all.
         0.5  — Failure B: Worker output contains URLs but none appear in the
-                          final response (deep-research agent dropped them).
+                          final response (citation links were dropped).
         1.0  — Pass: at least one Worker URL is present in the final response.
 
     Threshold defaults to 1.0, so both failure modes are recorded as fails.
