@@ -297,7 +297,7 @@ Examples:
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Overwrite existing output file instead of appending",
+        help="Clear existing responses in the output database before writing new ones",
     )
 
     parser.add_argument(
