@@ -48,7 +48,7 @@ METRIC_DISPLAY_ORDER: list[str] = [
     "Tool Usage",
     "Research Output Structure",
     "Reference Links",
-    "Consistency (Cosine)", # Corrected from Consistency (Simple)
+    "Consistency (Cosine)",
     "Consistency (AI Judge)",
     "Answer Relevancy (AI Judge)",
     "Groundedness (AI Judge)",
