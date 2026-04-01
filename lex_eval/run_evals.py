@@ -47,7 +47,6 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 TESTS_DIR = Path(__file__).parent / "tests"
-REPORTS_DIR = Path(__file__).parent / "reports"
 
 SUITES = {
     "tool_usage": "test_tool_usage.py",

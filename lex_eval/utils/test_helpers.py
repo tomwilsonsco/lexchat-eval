@@ -12,7 +12,6 @@ from .db import load_records as _db_load_records
 from .db import DEFAULT_DB
 
 DATA_DIR = Path(__file__).parent.parent / "data"
-DEFAULT_RESPONSES = DEFAULT_DB
 
 
 def load_records(
