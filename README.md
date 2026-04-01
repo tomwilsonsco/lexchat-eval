@@ -93,7 +93,7 @@ Results are written to the `eval_results` table in `lex_eval/data/responses.db`.
 By default, tests are skipped if results already exist for a (question, LLM)
 pair — use `--overwrite` to force re-running.
 
-### Evaluation suites
+### Evaluation requirements
 
 | Suite | Speed | Requires |
 |---|---|---|
