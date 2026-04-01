@@ -69,7 +69,7 @@ def test_consistency_llm(request, records):
     """
     # Use the first record as the primary test case; compare against the rest
     primary = records[0]
-    reference_outputs = [r["test_case"]["actual_output"] for r in records[1:]]
+    reference_outputs = [r["actual_output"] for r in records[1:]]
 
     from lex_eval.utils.test_helpers import record_to_test_case
 

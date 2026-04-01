@@ -36,7 +36,7 @@ def _same_model_cases():
             continue
         for i, record in enumerate(records):
             others = [
-                r["test_case"]["actual_output"] for j, r in enumerate(records) if j != i
+                r["actual_output"] for j, r in enumerate(records) if j != i
             ]
             test_id = f"{key}_run{i + 1}"
             cases.append(pytest.param(record, others, id=test_id))
