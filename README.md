@@ -24,7 +24,7 @@ OPENAI_API_KEY=sk-...
 DEEPEVAL_JUDGE_MODEL=gpt-4o-mini   # optional default
 ```
 
-## Step 1 — Check LLMs are available
+## Step 1 Check LLMs are available
 
 ```bash
 python -m lex_eval.utils.get_llms
@@ -33,7 +33,7 @@ python -m lex_eval.utils.get_llms
 Lists all LLMs currently responding on the lexchat API. `gather_responses.py`
 calls this automatically, but it is useful to run first to see the names of the LLMs available to use.
 
-## Step 2 — Gather responses
+## Step 2 Gather responses
 
 ```bash
 # All questions, all LLMs:
@@ -66,7 +66,7 @@ python -m lex_eval.utils.db
 python lex_eval/gather_responses.py
 ```
 
-## Step 3 — Run evaluations
+## Step 3 Run evaluations
 
 ```bash
 # All suites:
@@ -103,7 +103,7 @@ pair — use `--overwrite` to force re-running.
 | `groundedness` | Slow | `OPENAI_API_KEY` |
 | `consistency_llm` | Slow | `OPENAI_API_KEY` + ≥2 responses per pair |
 
-## Step 4 — Streamlit dashboard
+## Step 4 Streamlit dashboard
 
 ```bash
 streamlit run lex_eval/reports/streamlit_report.py
@@ -111,7 +111,7 @@ streamlit run lex_eval/reports/streamlit_report.py
 
 The dashboard reads directly from `lex_eval/data/responses.db`.
 
-## Step 5 — Compact database for deployment
+## Step 5 Compact database for deployment
 
 Produces a smaller copy of the database with `retrieval_context` trimmed to
 2,000 characters per item, suitable for committing to GitHub and deploying to
