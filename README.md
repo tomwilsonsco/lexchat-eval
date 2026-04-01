@@ -12,7 +12,7 @@ Python 3.11+. Install dependencies:
 pip install -e ".[dev]"
 ```
 
-Create `lex_eval/.env`:
+Create `lex_eval/.env` (see `lex_eval/.env.example`):
 
 ```bash
 LEXCHAT_API=https://your-lexchat-host
@@ -21,7 +21,7 @@ PASSWORD=your_password
 
 # Required only for AI-judge evaluation suites
 OPENAI_API_KEY=sk-...
-DEEPEVAL_JUDGE_MODEL=gpt-4o-mini   # optional, this is the default
+DEEPEVAL_JUDGE_MODEL=gpt-4o-mini   # optional default
 ```
 
 ## Step 1 — Check LLMs are available
