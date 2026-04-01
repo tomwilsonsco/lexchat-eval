@@ -43,32 +43,12 @@ def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
     return dict(idx)
 
 
-# do not keep the individual response results of these metrics as only make sense
-# comparing multiple
-_AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)", "Consistency (AI Judge)"}
-
-# preferred LLM display order — any LLMs not listed appear at the end sorted
-LLM_DISPLAY_ORDER: list[str] = [
-    "gpt-oss:120b-cloud",
-    "kimi-k2-thinking:cloud",
-    "glm-5:cloud",
-    "mistral-large-3:675b-cloud",
-]
-
-
-def _llm_sort_key(name: str) -> tuple[int, str]:
-    try:
-        return (LLM_DISPLAY_ORDER.index(name), name)
-    except ValueError:
-        return (len(LLM_DISPLAY_ORDER), name)
-
-
 # order shown in streamlit
 METRIC_DISPLAY_ORDER: list[str] = [
     "Tool Usage",
     "Research Output Structure",
     "Reference Links",
-    "Consistency (Simple)",
+    "Consistency (Cosine)",
     "Consistency (AI Judge)",
     "Answer Relevancy (AI Judge)",
     "Groundedness (AI Judge)",
@@ -84,6 +64,10 @@ METRIC_TOOLTIPS: dict[str, str] = {
     "Answer Relevancy (AI Judge)": "AI as a judge metric from DeepEval: How relevant is the answer to the question asked.",
     "Groundedness (AI Judge)": "AI as a judge metric from DeepEval: Has the answer been derived from the information extracted from the Lex API.",
 }
+
+# do not keep the individual response results of these metrics as only make sense
+# comparing multiple
+_AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)", "Consistency (AI Judge)"}
 
 
 def _metric_sort_key(metric: dict) -> int:
@@ -186,10 +170,18 @@ def _status_icon(passed: bool) -> str:
     return "✅" if passed else "❌"
 
 
+def _get_llm_pass_rate(llm: str, hierarchy: dict) -> float:
+    """Calculate the overall pass rate for an LLM."""
+    q_data = hierarchy.get(llm, {})
+    all_m = [r for results in q_data.values() for r in results]
+    total = len(all_m)
+    return (sum(1 for r in all_m if r["passed"]) / total) if total else 0.0
+
+
 def _render_top_summary(hierarchy: dict) -> None:
     """summary rows at the top of the page for each LLM. Expand to show
     mean score per metric across all questions."""
-    for llm in sorted(hierarchy.keys(), key=_llm_sort_key):
+    for llm in sorted(hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)):
         q_data = hierarchy[llm]
         all_m = [r for results in q_data.values() for r in results]
         total = len(all_m)
@@ -401,10 +393,10 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
 def _render_chat_interaction(records: list[dict]) -> None:
     """
     raw chat interaction(s) for an LLM/question pair.
-    A row/record in responses.jsonl is one run.
+    A row/record in responses.db is one run.
     """
     if not records:
-        st.info("No response records found in responses.jsonl for this combination.")
+        st.info("No response records found in responses.db for this combination.")
         return
 
     run_tabs = st.tabs(
@@ -413,10 +405,8 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
     for tab, rec in zip(run_tabs, records):
         with tab:
-            tc = rec.get("test_case", {})
-
             st.markdown("#### LLM Answer")
-            actual = tc.get("actual_output", "")
+            actual = rec.get("actual_output", "")
             if actual:
                 st.markdown(actual)
             else:
@@ -424,7 +414,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
             st.divider()
 
-            tools_called: list[dict] = tc.get("tools_called") or []
+            tools_called: list[dict] = rec.get("tools_called") or []
             if tools_called:
                 st.markdown(f"#### Tools Called ({len(tools_called)})")
                 for i, tool in enumerate(tools_called):
@@ -439,7 +429,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
                     )
                     st.markdown(f"🔧 **{tool_name}**")
                     if is_lex_api:
-                        params = tool.get("input_parameters") or {}
+                        params = tool.get("input_parameters") or tool.get("inputParameters") or {}
                         output_raw = tool.get("output", "")
                         req_col, _ = st.columns([3, 1])
                         with req_col:
@@ -489,7 +479,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
             st.divider()
 
-            contexts: list[str] = tc.get("retrieval_context") or []
+            contexts: list[str] = rec.get("retrieval_context") or []
             if contexts:
                 st.markdown(f"#### Retrieved Context ({len(contexts)} items)")
                 for i, ctx in enumerate(contexts):
@@ -585,7 +575,7 @@ def main() -> None:
     _render_top_summary(hierarchy)
     st.divider()
 
-    llm_names = sorted(hierarchy.keys(), key=_llm_sort_key)
+    llm_names = sorted(hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x))
     llm_tabs = st.tabs(llm_names)
 
     for tab, llm in zip(llm_tabs, llm_names):

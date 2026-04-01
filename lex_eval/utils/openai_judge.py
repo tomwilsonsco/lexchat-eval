@@ -31,6 +31,7 @@ class OpenAIJudge(DeepEvalBaseLLM):
     ) -> None:
         self.model = model
         self._client = openai.OpenAI(api_key=api_key)
+        self._async_client = openai.AsyncOpenAI(api_key=api_key)
 
     def load_model(self):
         return self.model
@@ -50,7 +51,18 @@ class OpenAIJudge(DeepEvalBaseLLM):
         return response.choices[0].message.content
 
     async def a_generate(self, prompt: str, schema=None):
-        return self.generate(prompt, schema)
+        if schema is not None:
+            response = await self._async_client.beta.chat.completions.parse(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format=schema,
+            )
+            return response.choices[0].message.parsed
+        response = await self._async_client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
 
     def get_model_name(self) -> str:
         return f"openai/{self.model}"

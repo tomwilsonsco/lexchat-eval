@@ -2,7 +2,7 @@
 AI-judge consistency test — checks that the same LLM produces substantively
 consistent answers when asked the same question multiple times.
 
-Requires repeated runs (gather_responses.py run with --append) AND an OpenAI
+Requires repeated runs (gather_responses.py 2X without --overwrite) AND an OpenAI
 API key for the judge model.
 
 Run this suite independently to avoid waiting for groundedness checks:
@@ -55,7 +55,7 @@ _groups = _multi_run_groups()
 @_skip_no_api_key
 @pytest.mark.skipif(
     not _groups,
-    reason="No repeated runs found — re-run gather_responses.py with --append",
+    reason="No repeated runs found — re-run gather_responses.py",
 )
 @pytest.mark.parametrize("records", _groups)
 def test_consistency_llm(request, records):
@@ -69,7 +69,7 @@ def test_consistency_llm(request, records):
     """
     # Use the first record as the primary test case; compare against the rest
     primary = records[0]
-    reference_outputs = [r["test_case"]["actual_output"] for r in records[1:]]
+    reference_outputs = [r["actual_output"] for r in records[1:]]
 
     from lex_eval.utils.test_helpers import record_to_test_case
 
