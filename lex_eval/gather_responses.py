@@ -104,7 +104,7 @@ def gather_responses(
     questions: List[Dict[str, Any]],
     llm_names: List[str],
     output_file: Path,
-    append: bool = False,
+    overwrite: bool = False,
     max_workers: int = 10,
 ) -> None:
     """
@@ -119,7 +119,7 @@ def gather_responses(
         questions: List of question dictionaries
         llm_names: List of LLM names to test
         output_file: Path to the DuckDB database file
-        append: If True, add to existing rows; if False, clear table first
+        overwrite: If True, clear table first; if False, add to existing rows
         max_workers: Maximum number of concurrent threads
     """
     total_combinations = len(questions) * len(llm_names)
@@ -134,11 +134,11 @@ def gather_responses(
     conn = get_connection(output_file)
     init_db(conn)
 
-    if append:
-        logger.info(f"Appending to existing database: {output_file}")
-    else:
+    if overwrite:
         clear_responses(conn)
         logger.info(f"Cleared existing responses, writing fresh to: {output_file}")
+    else:
+        logger.info(f"Appending to existing database: {output_file}")
 
     # Per-thread client management
     thread_local = threading.local()
@@ -270,8 +270,8 @@ Examples:
   # Run with specific LLM:
   python gather_responses.py --llm "gpt-oss:120b-cloud"
   
-  # Append to existing results (for incremental testing):
-  python gather_responses.py --question-id 2 --append
+  # Overwrite existing results (start fresh):
+  python gather_responses.py --overwrite
         """,
     )
 
@@ -295,9 +295,9 @@ Examples:
     )
 
     parser.add_argument(
-        "--append",
+        "--overwrite",
         action="store_true",
-        help="Append to existing output file instead of overwriting",
+        help="Overwrite existing output file instead of appending",
     )
 
     parser.add_argument(
@@ -344,7 +344,7 @@ Examples:
             questions=questions,
             llm_names=llm_names,
             output_file=args.output,
-            append=args.append,
+            overwrite=args.overwrite,
             max_workers=args.workers,
         )
 
