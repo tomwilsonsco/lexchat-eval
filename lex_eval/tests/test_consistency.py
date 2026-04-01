@@ -27,7 +27,7 @@ def _same_model_cases():
     Yield (record, other_outputs, test_id) for same-model repeatability.
 
     Only produces cases when a (question, LLM) pair has more than one
-    captured response (i.e. gathered with ``--append``).
+    captured response.
     """
     grouped = group_by_question_and_llm()
     cases = []
