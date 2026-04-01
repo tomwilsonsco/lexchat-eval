@@ -217,18 +217,20 @@ def run_evals(
     overall_rc = 0
 
     for s in suites_to_run:
-        if overwrite:
-            from lex_eval.utils.db import (
-                DEFAULT_DB,
-                clear_eval_results,
-                get_connection,
-                init_eval_results,
-            )
+        from lex_eval.utils.db import (
+            DEFAULT_DB,
+            clear_eval_results,
+            get_connection,
+            init_eval_results,
+        )
 
-            conn = get_connection(DEFAULT_DB)
-            init_eval_results(conn)
-            clear_eval_results(conn, suite=s)
-            conn.commit()
+        conn = get_connection(DEFAULT_DB)
+        try:
+            init_eval_results(conn)  # Ensure table exists first
+            if overwrite:
+                clear_eval_results(conn, suite=s)
+            conn.commit()  # Commit after init and potential clear
+        finally:
             conn.close()
 
         cmd: list[str] = [sys.executable, "-m", "pytest"]
@@ -244,6 +246,7 @@ def run_evals(
         # skip logic: deselect tests that already have results
         if not overwrite:
             deselect = _build_deselect_args(s, llm=llm)
+            # The connection for _build_deselect_args is opened and closed within load_eval_results
             if deselect:
                 cmd.extend(deselect)
                 n_skipped = deselect.count("--deselect")
