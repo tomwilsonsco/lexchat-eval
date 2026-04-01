@@ -34,7 +34,7 @@ def pytest_configure(config):
         "markers", "groundedness: tests that use an LLM judge (require OPENAI_API_KEY)"
     )
     config.addinivalue_line(
-        "markers", "consistency: same-model repeatability tests (Jaccard)"
+        "markers", "consistency: same-model repeatability tests (cosine similarity)"
     )
     config.addinivalue_line(
         "markers",
