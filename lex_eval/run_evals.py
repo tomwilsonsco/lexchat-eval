@@ -129,19 +129,19 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     deselect_args: list[str] = []
     for record, pid in zip(records, pytest_ids):
         qid = int(record["question_id"])
-        llm = record["llm_name"]
-        if (qid, llm) in covered:
+        rec_llm = record["llm_name"]
+        if (qid, rec_llm) in covered:
             # deselect all test functions in this suite file for this parametrize ID
             if suite == "groundedness":
                 # Check per-test-function so a partially-run pair isn't fully skipped
-                if (qid, llm, "faithfulness") in covered_triples:
+                if (qid, rec_llm, "faithfulness") in covered_triples:
                     deselect_args.extend(
                         [
                             "--deselect",
                             f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]",
                         ]
                     )
-                if (qid, llm, "answer_relevancy") in covered_triples:
+                if (qid, rec_llm, "answer_relevancy") in covered_triples:
                     deselect_args.extend(
                         [
                             "--deselect",
@@ -164,14 +164,14 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                 )
             elif suite == "structure":
                 # check per-test-function so a partially-run pair isn't fully skipped
-                if (qid, llm, "mandatory_structure") in covered_triples:
+                if (qid, rec_llm, "mandatory_structure") in covered_triples:
                     deselect_args.extend(
                         [
                             "--deselect",
                             f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]",
                         ]
                     )
-                if (qid, llm, "citation_passthrough") in covered_triples:
+                if (qid, rec_llm, "citation_passthrough") in covered_triples:
                     deselect_args.extend(
                         [
                             "--deselect",
@@ -188,8 +188,8 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
             if len(grp_records) < 2:
                 continue
             qid = int(grp_records[0]["question_id"])
-            llm = grp_records[0]["llm_name"]
-            if (qid, llm) in covered:
+            rec_llm = grp_records[0]["llm_name"]
+            if (qid, rec_llm) in covered:
                 deselect_args.extend(
                     [
                         "--deselect",

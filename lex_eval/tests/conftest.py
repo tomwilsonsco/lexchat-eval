@@ -28,6 +28,9 @@ def pytest_configure(config):
         sys.path.insert(0, str(repo_root))
 
     config.addinivalue_line(
+        "markers", "tool_usage: tests that check correct tool invocation (fast, offline)"
+    )
+    config.addinivalue_line(
         "markers", "groundedness: tests that use an LLM judge (require OPENAI_API_KEY)"
     )
     config.addinivalue_line(

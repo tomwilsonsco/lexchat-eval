@@ -3,7 +3,6 @@ import os
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import Optional
 
 # Configure logging
 logger = logging.getLogger(__name__)
