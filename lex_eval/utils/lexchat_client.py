@@ -3,7 +3,6 @@ import os
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import Optional
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -61,14 +60,12 @@ def get_authenticated_client() -> httpx.Client:
     """
     config = _validate_config()
 
-    # Use longer timeout for LLM operations (5 minutes total)
-    # Read timeout is especially important for streaming responses
+    # 5-minute timeout for streaming LLM responses
     timeout = httpx.Timeout(300.0, read=300.0)
     client = httpx.Client(base_url=config["base_url"], timeout=timeout)
 
     logger.info("Authenticating with LexChat API...")
     try:
-        # Perform login
         auth_data = {"username": config["username"], "password": config["password"]}
         resp = client.post("/api/auth/login", json=auth_data)
         resp.raise_for_status()

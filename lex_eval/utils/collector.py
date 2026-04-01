@@ -28,7 +28,7 @@ def attach_metric(
     Attach metric result data to the pytest test item.
 
     The data is picked up by the ``pytest_runtest_makereport`` hook in
-    conftest.py and accumulated for writing to per-suite JSON files.
+    conftest.py and accumulated for writing to the eval_results DuckDB table.
 
     Parameters
     ----------
