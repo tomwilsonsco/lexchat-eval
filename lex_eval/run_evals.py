@@ -246,7 +246,6 @@ def run_evals(
         # skip logic: deselect tests that already have results
         if not overwrite:
             deselect = _build_deselect_args(s, llm=llm)
-            # The connection for _build_deselect_args is opened and closed within load_eval_results
             if deselect:
                 cmd.extend(deselect)
                 n_skipped = deselect.count("--deselect")

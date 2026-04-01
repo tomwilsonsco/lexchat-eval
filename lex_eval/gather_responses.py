@@ -323,14 +323,11 @@ Examples:
         logging.getLogger().setLevel(logging.DEBUG)
 
     try:
-        # Load questions
         questions = load_questions(args.questions_file, args.question_id)
 
-        # Get available LLMs
         logger.info("Fetching available LLMs...")
         available_llms = get_llms()
 
-        # Determine which LLMs to use
         if args.llm:
             validate_llm(args.llm, available_llms)
             llm_names = [args.llm]
@@ -339,7 +336,6 @@ Examples:
             llm_names = available_llms
             logger.info(f"Using all {len(llm_names)} available LLMs")
 
-        # Gather responses
         gather_responses(
             questions=questions,
             llm_names=llm_names,
