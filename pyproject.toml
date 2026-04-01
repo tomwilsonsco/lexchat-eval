@@ -7,7 +7,7 @@ name = "lex_eval"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "deepeval",
+    "deepeval>=2.0",
     "duckdb>=1.0",
     "httpx>=0.27.0",
     "numpy",
