@@ -245,12 +245,12 @@ def completeness_report(path: Optional[Path] = None) -> None:
             SELECT
                 question_id,
                 llm_name,
-                COUNT(*) AS total_runs,
-                SUM(CASE WHEN actual_output != '' AND NOT is_error THEN 1 ELSE 0 END) AS complete_runs,
-                SUM(CASE WHEN actual_output != '' AND NOT is_error THEN LENGTH(actual_output) ELSE 0 END) AS total_actual_output_chars,
+                COUNT(*) AS total_runs, -- Total number of runs for this Q/LLM pair
+                SUM(CASE WHEN TRIM(actual_output) != '' AND NOT is_error THEN 1 ELSE 0 END) AS complete_runs,
+                SUM(CASE WHEN TRIM(actual_output) != '' AND NOT is_error THEN LENGTH(actual_output) ELSE 0 END) AS total_actual_output_chars,
                 SUM(
                     CASE
-                        WHEN actual_output != '' AND NOT is_error
+                        WHEN TRIM(actual_output) != '' AND NOT is_error
                         THEN COALESCE(LENGTH(LIST_AGGR(JSON_EXTRACT_STRING(retrieval_context, '$[*]'), 'string_agg')), 0)
                         ELSE 0
                     END
