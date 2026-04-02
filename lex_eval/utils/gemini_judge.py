@@ -20,7 +20,7 @@ _env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=_env_path)
 
 GEMINI_API_KEY: str | None = os.environ.get("GEMINI_API_KEY")
-DEFAULT_GEMINI_MODEL: str = os.environ.get("GEMINI_JUDGE_MODEL", "gemini-1.5-flash")
+DEFAULT_GEMINI_MODEL: str = os.environ.get("GEMINI_JUDGE_MODEL", "gemini-2.0-flash")
 
 
 class GeminiJudge(DeepEvalBaseLLM):
@@ -31,44 +31,44 @@ class GeminiJudge(DeepEvalBaseLLM):
         model: str = DEFAULT_GEMINI_MODEL,
         api_key: str | None = GEMINI_API_KEY,
     ) -> None:
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY must be set")
         self.model = model
-        genai.configure(api_key=api_key)
-        self._client = genai.GenerativeModel(self.model)
+        self._client = genai.Client(api_key=api_key)
 
     def load_model(self):
-        return self._client
+        return self.model
 
     def generate(self, prompt: str, schema=None):
         if schema is not None:
-            config = types.GenerationConfig(
+            config = types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=schema.schema(),
+                response_schema=schema,
             )
-            response = self._client.generate_content(
+            response = self._client.models.generate_content(
+                model=self.model,
                 contents=prompt,
-                generation_config=config,
+                config=config,
             )
-            return response.text
-        response = self._client.generate_content(
+            return schema.model_validate_json(response.text)
+        response = self._client.models.generate_content(
+            model=self.model,
             contents=prompt,
         )
         return response.text
 
     async def a_generate(self, prompt: str, schema=None):
         if schema is not None:
-            config = types.GenerationConfig(
+            config = types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=schema.schema(),
+                response_schema=schema,
             )
-            response = await self._client.generate_content_async(
+            response = await self._client.aio.models.generate_content(
+                model=self.model,
                 contents=prompt,
-                generation_config=config,
+                config=config,
             )
-            return response.text
-
-        response = await self._client.generate_content_async(
+            return schema.model_validate_json(response.text)
+        response = await self._client.aio.models.generate_content(
+            model=self.model,
             contents=prompt,
         )
         return response.text
