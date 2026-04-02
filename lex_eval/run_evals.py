@@ -18,7 +18,7 @@ Examples
 Run everything (skipping already-completed tests):
     python lex_eval/run_evals.py
 
-Run only groundedness (requires OPENAI_API_KEY):
+Run only groundedness (requires OPENAI_API_KEY or GEMINI_API_KEY):
     python lex_eval/run_evals.py --suite groundedness
 
 Force re-run (overwrite existing results):
@@ -287,8 +287,10 @@ def main() -> int:
 Suites:
   tool_usage        Check tools were invoked correctly (fast, offline)
   groundedness      LLM-as-judge faithfulness + relevancy checks (needs OPENAI_API_KEY)
+  groundedness      LLM-as-judge faithfulness + relevancy checks (needs OPENAI_API_KEY or GEMINI_API_KEY)
   consistency       Same-model repeatability checks (fast, cosine similarity)
   consistency_llm   Same-model repeatability checks (AI judge, needs OPENAI_API_KEY)
+  consistency_llm   Same-model repeatability checks (AI judge, needs OPENAI_API_KEY or GEMINI_API_KEY)
   structure         Worker output structure + citation checks (fast, offline)
 
 Results:
