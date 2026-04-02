@@ -3,9 +3,9 @@ Test groundedness and answer relevancy of LLM responses against retrieved
 legislation.
 
 Uses DeepEval's FaithfulnessMetric and AnswerRelevancyMetric (LLM-as-judge)
-with an OpenAI judge model (default: gpt-4o-mini, overridable via the
-DEEPEVAL_JUDGE_MODEL environment variable).  The API key is read from the
-.env file in lex_eval/.
+with a configurable AI judge (OpenAI gpt-4o-mini by default; set
+JUDGE_PROVIDER=gemini to use Gemini instead).  The API key and model are
+read from the .env file in lex_eval/.
 
 Output length and retrieval context are used as pre-flight gates rather than
 standalone dashboard metrics.  If either gate fails the Faithfulness metric is
@@ -13,14 +13,12 @@ scored 0.0 with the failure reason recorded, and the test is skipped so the
 more expensive LLM-judge call is avoided.
 """
 
-import os
-
 import pytest
 from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric
 from deepeval.test_case import LLMTestCase
 
 from lex_eval.utils.collector import attach_metric
-from lex_eval.utils.openai_judge import OPENAI_API_KEY as _OPENAI_API_KEY, OpenAIJudge
+from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
     load_records,
     record_id,
@@ -45,12 +43,9 @@ _MAX_CONTEXT_CHARS: int = (128_000 - 30_000) * 4  # ≈ 392 000 chars
 
 records = load_records()
 
-# Single shared judge instance.
-_judge = OpenAIJudge() if _OPENAI_API_KEY else None
-
 _skip_no_api_key = pytest.mark.skipif(
-    _OPENAI_API_KEY is None,
-    reason="OPENAI_API_KEY not set (check lex_eval/.env)",
+    _judge is None,
+    reason="Configured judge API key not set (check lex_eval/.env)",
 )
 
 

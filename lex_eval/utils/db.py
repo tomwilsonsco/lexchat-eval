@@ -245,8 +245,16 @@ def completeness_report(path: Optional[Path] = None) -> None:
             SELECT
                 question_id,
                 llm_name,
-                COUNT(*) AS total,
-                SUM(CASE WHEN actual_output != '' AND NOT is_error THEN 1 ELSE 0 END) AS complete
+                COUNT(*) AS total_runs, -- Total number of runs for this Q/LLM pair
+                SUM(CASE WHEN TRIM(actual_output) != '' AND NOT is_error THEN 1 ELSE 0 END) AS complete_runs,
+                SUM(CASE WHEN TRIM(actual_output) != '' AND NOT is_error THEN LENGTH(actual_output) ELSE 0 END) AS total_actual_output_chars,
+                SUM(
+                    CASE
+                        WHEN TRIM(actual_output) != '' AND NOT is_error
+                        THEN COALESCE(LENGTH(LIST_AGGR(JSON_EXTRACT_STRING(retrieval_context, '$[*]'), 'string_agg')), 0)
+                        ELSE 0
+                    END
+                ) AS total_retrieval_context_chars
             FROM responses
             GROUP BY question_id, llm_name
             ORDER BY question_id, llm_name
@@ -254,15 +262,20 @@ def completeness_report(path: Optional[Path] = None) -> None:
     finally:
         conn.close()
 
-    print(f"{'Q':>3}  {'LLM':<35}  {'total':>5}  {'complete':>8}  {'ok':>4}")
-    print("-" * 65)
-    for qid, llm, total, complete in rows:
+    print(
+        f"{'Q':>3}  {'LLM':<35}  {'total':>5}  {'comp':>4}  {'out_chars':>9}  {'ctx_chars':>9}  {'ok':>4}"
+    )
+    print("-" * 85)
+    for qid, llm, total, complete, out_chars, ctx_chars in rows:
         ok = "YES" if complete >= 2 else "NO "
-        print(f"{qid:>3}  {llm:<35}  {total:>5}  {complete:>8}  {ok}")
+        print(
+            f"{qid:>3}  {llm:<35}  {total:>5}  {complete:>4}  {out_chars:>9}  {ctx_chars:>9}  {ok}"
+        )
 
     total_pairs = len(rows)
-    ready = sum(1 for _, _, _, complete in rows if complete >= 2)
+    ready = sum(1 for _, _, _, complete, _, _ in rows if complete >= 2)
     print(f"\n{ready}/{total_pairs} pairs have >= 2 complete responses")
+
 
 # ----------------------------
 # EVAL

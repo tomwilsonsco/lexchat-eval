@@ -15,13 +15,19 @@ pip install -e ".[dev]"
 Create `lex_eval/.env` (see `lex_eval/.env.example`):
 
 ```bash
-LEXCHAT_API=https://your-lexchat-host
-USERNAME=your_username
-PASSWORD=your_password
+# LexChat API Configuration
+LEXCHAT_API=http://host.docker.internal:80
+
+# Authentication
+USERNAME=admin
+PASSWORD=admin
 
 # Required only for AI-judge evaluation suites
 OPENAI_API_KEY=sk-...
-DEEPEVAL_JUDGE_MODEL=gpt-4o-mini   # optional default
+# DEEPEVAL_JUDGE_MODEL=gpt-4o-mini   # optional default
+GEMINI_API_KEY=yourkeyhere
+# GEMINI_JUDGE_MODEL=gemini-2.0-flash
+JUDGE_PROVIDER=openai # Set to 'gemini' to use Gemini as the AI judge
 ```
 
 ## Step 1 Check LLMs are available

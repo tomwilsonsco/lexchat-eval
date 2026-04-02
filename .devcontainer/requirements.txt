@@ -3,6 +3,7 @@ python-dotenv>=1.0.0
 httpx>=0.27.0
 deepeval
 duckdb
+google-genai
 openai
 scikit-learn
 numpy

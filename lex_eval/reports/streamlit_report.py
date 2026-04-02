@@ -181,7 +181,9 @@ def _get_llm_pass_rate(llm: str, hierarchy: dict) -> float:
 def _render_top_summary(hierarchy: dict) -> None:
     """summary rows at the top of the page for each LLM. Expand to show
     mean score per metric across all questions."""
-    for llm in sorted(hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)):
+    for llm in sorted(
+        hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)
+    ):
         q_data = hierarchy[llm]
         all_m = [r for results in q_data.values() for r in results]
         total = len(all_m)
@@ -429,7 +431,11 @@ def _render_chat_interaction(records: list[dict]) -> None:
                     )
                     st.markdown(f"🔧 **{tool_name}**")
                     if is_lex_api:
-                        params = tool.get("input_parameters") or tool.get("inputParameters") or {}
+                        params = (
+                            tool.get("input_parameters")
+                            or tool.get("inputParameters")
+                            or {}
+                        )
                         output_raw = tool.get("output", "")
                         req_col, _ = st.columns([3, 1])
                         with req_col:
@@ -575,7 +581,9 @@ def main() -> None:
     _render_top_summary(hierarchy)
     st.divider()
 
-    llm_names = sorted(hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x))
+    llm_names = sorted(
+        hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)
+    )
     llm_tabs = st.tabs(llm_names)
 
     for tab, llm in zip(llm_tabs, llm_names):

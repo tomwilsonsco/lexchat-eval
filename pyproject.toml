@@ -9,6 +9,7 @@ requires-python = ">=3.11"
 dependencies = [
     "deepeval>=2.0",
     "duckdb>=1.0",
+    "google-genai",
     "httpx>=0.27.0",
     "numpy",
     "openai",
@@ -27,9 +28,9 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["lex_eval/tests"]
 markers = [
-    "groundedness: LLM-as-judge faithfulness and relevancy tests (require OPENAI_API_KEY)",
+    "groundedness: LLM-as-judge faithfulness and relevancy tests (require OPENAI_API_KEY or GEMINI_API_KEY)",
     "consistency: same-model repeatability tests using cosine similarity",
-    "consistency_llm: same-model repeatability tests using an AI judge (require OPENAI_API_KEY)",
+    "consistency_llm: same-model repeatability tests using an AI judge (require OPENAI_API_KEY or GEMINI_API_KEY)",
     "tool_usage: tests that check tool-calling behaviour",
     "structure: tests that check mandatory Worker output structure",
 ]

@@ -2,8 +2,8 @@
 AI-judge consistency test — checks that the same LLM produces substantively
 consistent answers when asked the same question multiple times.
 
-Requires repeated runs (gather_responses.py 2X without --overwrite) AND an OpenAI
-API key for the judge model.
+Requires repeated runs (gather_responses.py 2X without --overwrite) AND an API
+key for the configured judge model (set via OPENAI_API_KEY or GEMINI_API_KEY).
 
 Run this suite independently to avoid waiting for groundedness checks:
     python lex_eval/run_evals.py --suite consistency_llm
@@ -15,18 +15,16 @@ import pytest
 
 from lex_eval.metrics.consistency_llm import LLMConsistencyMetric
 from lex_eval.utils.collector import attach_metric
-from lex_eval.utils.openai_judge import OPENAI_API_KEY as _OPENAI_API_KEY, OpenAIJudge
+from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import group_by_question_and_llm
 
 # ---------------------------------------------------------------------------
 # Judge setup
 # ---------------------------------------------------------------------------
 
-_judge = OpenAIJudge() if _OPENAI_API_KEY else None
-
 _skip_no_api_key = pytest.mark.skipif(
-    _OPENAI_API_KEY is None,
-    reason="OPENAI_API_KEY not set (check lex_eval/.env)",
+    _judge is None,
+    reason="Configured judge API key not set (check lex_eval/.env)",
 )
 
 # ---------------------------------------------------------------------------
