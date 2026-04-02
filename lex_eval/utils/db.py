@@ -262,15 +262,20 @@ def completeness_report(path: Optional[Path] = None) -> None:
     finally:
         conn.close()
 
-    print(f"{'Q':>3}  {'LLM':<35}  {'total':>5}  {'comp':>4}  {'out_chars':>9}  {'ctx_chars':>9}  {'ok':>4}")
+    print(
+        f"{'Q':>3}  {'LLM':<35}  {'total':>5}  {'comp':>4}  {'out_chars':>9}  {'ctx_chars':>9}  {'ok':>4}"
+    )
     print("-" * 85)
     for qid, llm, total, complete, out_chars, ctx_chars in rows:
         ok = "YES" if complete >= 2 else "NO "
-        print(f"{qid:>3}  {llm:<35}  {total:>5}  {complete:>4}  {out_chars:>9}  {ctx_chars:>9}  {ok}")
+        print(
+            f"{qid:>3}  {llm:<35}  {total:>5}  {complete:>4}  {out_chars:>9}  {ctx_chars:>9}  {ok}"
+        )
 
     total_pairs = len(rows)
     ready = sum(1 for _, _, _, complete, _, _ in rows if complete >= 2)
     print(f"\n{ready}/{total_pairs} pairs have >= 2 complete responses")
+
 
 # ----------------------------
 # EVAL
