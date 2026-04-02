@@ -286,10 +286,8 @@ def main() -> int:
         epilog="""
 Suites:
   tool_usage        Check tools were invoked correctly (fast, offline)
-  groundedness      LLM-as-judge faithfulness + relevancy checks (needs OPENAI_API_KEY)
   groundedness      LLM-as-judge faithfulness + relevancy checks (needs OPENAI_API_KEY or GEMINI_API_KEY)
   consistency       Same-model repeatability checks (fast, cosine similarity)
-  consistency_llm   Same-model repeatability checks (AI judge, needs OPENAI_API_KEY)
   consistency_llm   Same-model repeatability checks (AI judge, needs OPENAI_API_KEY or GEMINI_API_KEY)
   structure         Worker output structure + citation checks (fast, offline)
 
