@@ -80,7 +80,8 @@ python lex_eval/run_evals.py
 
 # Specific suite:
 python lex_eval/run_evals.py --suite tool_usage
-python lex_eval/run_evals.py --suite groundedness    # needs OPENAI_API_KEY
+python lex_eval/run_evals.py --suite groundedness    # needs OPENAI_API_KEY or GEMINI_API_KEY
+# (Groundedness measures: answer relevancy, response groundedness, research groundedness)
 python lex_eval/run_evals.py --suite consistency
 python lex_eval/run_evals.py --suite consistency_llm # needs OPENAI_API_KEY
 python lex_eval/run_evals.py --suite structure
@@ -106,7 +107,7 @@ pair — use `--overwrite` to force re-running.
 | `tool_usage` | Fast | Nothing extra |
 | `structure` | Fast | Nothing extra |
 | `consistency` | Fast | ≥2 responses per question/LLM pair |
-| `groundedness` | Slow | `OPENAI_API_KEY` |
+| `groundedness` | Medium (1 LLM call/test) | `OPENAI_API_KEY` or `GEMINI_API_KEY` |
 | `consistency_llm` | Slow | `OPENAI_API_KEY` + ≥2 responses per pair |
 
 ## Step 4 Streamlit dashboard
