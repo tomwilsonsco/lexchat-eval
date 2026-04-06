@@ -23,6 +23,7 @@ def audit_capture(client, question, model_name):
     actual_output = ""
     retrieval_context = []
     tools_captured = []
+    research_output = ""
     tool_stack = []
 
     with client.stream("POST", "/api/system/chat", json=chat_payload) as response:
@@ -104,6 +105,7 @@ def audit_capture(client, question, model_name):
 
                 elif event_type == "tool_result":
                     result_text = str(data.get("result", ""))
+                    research_output = result_text
                     if tool_stack:
                         delegation = tool_stack.pop()
                         tools_captured.append(
@@ -146,9 +148,12 @@ def audit_capture(client, question, model_name):
     if not isinstance(actual_output, str):
         actual_output = str(actual_output) if actual_output else ""
 
-    return LLMTestCase(
-        input=question,
-        actual_output=actual_output,
-        retrieval_context=list(dict.fromkeys(retrieval_context)),
-        tools_called=tools_captured,
-    )
+    return {
+        "test_case": LLMTestCase(
+            input=question,
+            actual_output=actual_output,
+            retrieval_context=list(dict.fromkeys(retrieval_context)),
+            tools_called=tools_captured,
+        ),
+        "research_output": research_output,
+    }
