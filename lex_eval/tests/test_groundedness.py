@@ -1,22 +1,25 @@
 """
-Test groundedness and answer relevancy of LLM responses against retrieved
-legislation.
+Test answer relevancy and groundedness of LexChat responses.
 
-Uses DeepEval's FaithfulnessMetric and AnswerRelevancyMetric (LLM-as-judge)
-with a configurable AI judge (OpenAI gpt-4o-mini by default; set
-JUDGE_PROVIDER=gemini to use Gemini instead).  The API key and model are
-read from the .env file in lex_eval/.
+Three custom single-call metrics replace the previous multi-step
+FaithfulnessMetric and AnswerRelevancyMetric:
 
-Output length and retrieval context are used as pre-flight gates rather than
-standalone dashboard metrics.  If either gate fails the Faithfulness metric is
-scored 0.0 with the failure reason recorded, and the test is skipped so the
-more expensive LLM-judge call is avoided.
+  - LegalAnswerRelevancyMetric   : is the final response relevant to the question?
+  - ResponseGroundednessMetric   : is the final response grounded in research output?
+  - ResearchGroundednessMetric   : is the research output grounded in retrieval context?
+
+All metrics use a single LLM call per test case. The judge (OpenAI or Gemini)
+is configured via JUDGE_PROVIDER in lex_eval/.env.
 """
 
 import pytest
-from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric
 from deepeval.test_case import LLMTestCase
 
+from lex_eval.metrics import (
+    LegalAnswerRelevancyMetric,
+    ResponseGroundednessMetric,
+    ResearchGroundednessMetric,
+)
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
@@ -30,11 +33,7 @@ from lex_eval.utils.test_helpers import (
 # ---------------------------------------------------------------------------
 
 _MIN_OUTPUT_CHARS: int = 50
-
-# Conservative character budget for retrieval context passed to the judge.
-# 128k token limit; reserve ~30k tokens for the prompt, output, and overhead.
-# Rough approximation: 1 token ≈ 4 chars.
-_MAX_CONTEXT_CHARS: int = (128_000 - 30_000) * 4  # ≈ 392 000 chars
+_THRESHOLD: float = 0.6
 
 
 # ---------------------------------------------------------------------------
@@ -54,14 +53,9 @@ _skip_no_api_key = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 
-def _gate_output_length(request, record, test_case, test_name, metric_name, threshold):
-    """
-    Fail fast if the output is too short to be meaningful.
-
-    Attaches a 0.0 score and returns False so the caller can skip the test.
-    """
-    output = (test_case.actual_output or "").strip()
-    char_count = len(output)
+def _gate_output_length(request, record, test_case, test_name, metric_name):
+    """Fail fast if the output is too short to be meaningful."""
+    char_count = len((test_case.actual_output or "").strip())
     if char_count <= _MIN_OUTPUT_CHARS:
         reason = (
             f"Output too short ({char_count} chars ≤ {_MIN_OUTPUT_CHARS}); "
@@ -73,7 +67,7 @@ def _gate_output_length(request, record, test_case, test_name, metric_name, thre
             test_name=test_name,
             metric_name=metric_name,
             score=0.0,
-            threshold=threshold,
+            threshold=_THRESHOLD,
             passed=False,
             reason=reason,
             suite="groundedness",
@@ -82,40 +76,8 @@ def _gate_output_length(request, record, test_case, test_name, metric_name, thre
     return True, ""
 
 
-def _truncate_retrieval_context(test_case: "LLMTestCase") -> "LLMTestCase":
-    """
-    Return a copy of *test_case* whose retrieval_context is trimmed so the
-    total character count stays within _MAX_CONTEXT_CHARS.
-
-    Items are included whole in order; the first item that would push the
-    total over the budget is dropped along with all subsequent items.
-    """
-    context = test_case.retrieval_context or []
-    kept: list[str] = []
-    total = 0
-    for item in context:
-        if total + len(item) > _MAX_CONTEXT_CHARS:
-            break
-        kept.append(item)
-        total += len(item)
-    if len(kept) == len(context):
-        return test_case  # nothing to trim
-    return LLMTestCase(
-        input=test_case.input,
-        actual_output=test_case.actual_output,
-        retrieval_context=kept,
-        tools_called=test_case.tools_called,
-    )
-
-
-def _gate_retrieval_context(
-    request, record, test_case, test_name, metric_name, threshold
-):
-    """
-    Fail fast if no retrieval context was captured.
-
-    Attaches a 0.0 score and returns False so the caller can skip the test.
-    """
+def _gate_retrieval_context(request, record, test_case, test_name, metric_name):
+    """Fail fast if no retrieval context was captured."""
     if not test_case.retrieval_context:
         reason = f"No retrieval context captured; {metric_name} scored 0"
         attach_metric(
@@ -124,7 +86,26 @@ def _gate_retrieval_context(
             test_name=test_name,
             metric_name=metric_name,
             score=0.0,
-            threshold=threshold,
+            threshold=_THRESHOLD,
+            passed=False,
+            reason=reason,
+            suite="groundedness",
+        )
+        return False, reason
+    return True, ""
+
+
+def _gate_research_output(request, record, test_name, metric_name):
+    """Fail fast if no research output was captured."""
+    if not record.get("research_output", "").strip():
+        reason = f"No research output captured; {metric_name} scored 0"
+        attach_metric(
+            request,
+            record=record,
+            test_name=test_name,
+            metric_name=metric_name,
+            score=0.0,
+            threshold=_THRESHOLD,
             passed=False,
             reason=reason,
             suite="groundedness",
@@ -138,128 +119,142 @@ def _gate_retrieval_context(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "record",
-    records,
-    ids=[record_id(r) for r in records],
-)
-@pytest.mark.groundedness
-@_skip_no_api_key
-def test_faithfulness(request, record):
-    """
-    The actual output must be faithful to the retrieved legislation.
-
-    Uses DeepEval's FaithfulnessMetric which extracts claims from the output
-    and verifies each is supported by the retrieval context.
-
-    Pre-flight gates (do NOT appear as separate dashboard metrics):
-      - Output must be > 50 chars (otherwise nothing to judge)
-      - Retrieval context must be non-empty (otherwise nothing to check against)
-    """
-    test_case = record_to_test_case(record)
-    _threshold = 0.7
-
-    ok, reason = _gate_output_length(
-        request,
-        record,
-        test_case,
-        "faithfulness",
-        "Groundedness (AI Judge)",
-        _threshold,
-    )
-    if not ok:
-        pytest.skip(reason)
-
-    ok, reason = _gate_retrieval_context(
-        request,
-        record,
-        test_case,
-        "faithfulness",
-        "Groundedness (AI Judge)",
-        _threshold,
-    )
-    if not ok:
-        pytest.skip(reason)
-
-    test_case = _truncate_retrieval_context(test_case)
-
-    metric = FaithfulnessMetric(
-        threshold=_threshold,
-        model=_judge,
-        include_reason=True,
-    )
-    metric.measure(test_case)
-
-    attach_metric(
-        request,
-        record=record,
-        test_name="faithfulness",
-        metric_name="Groundedness (AI Judge)",
-        score=metric.score,
-        threshold=metric.threshold,
-        passed=metric.is_successful(),
-        reason=metric.reason or "",
-        error=str(metric.error) if metric.error else "",
-        suite="groundedness",
-    )
-
-    assert metric.is_successful(), (
-        f"Groundedness (AI Judge) score {metric.score:.2f} < {metric.threshold}: "
-        f"{metric.reason}"
-    )
-
-
-@pytest.mark.parametrize(
-    "record",
-    records,
-    ids=[record_id(r) for r in records],
-)
+@pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
 @pytest.mark.groundedness
 @_skip_no_api_key
 def test_answer_relevancy(request, record):
     """
-    The actual output must be relevant to the input question.
-
-    Uses DeepEval's AnswerRelevancyMetric which scores how directly and
-    completely the response addresses what was asked.
+    The final response must directly and usefully answer the user's legal question.
 
     Pre-flight gate: output must be > 50 chars.
     """
     test_case = record_to_test_case(record)
-    _threshold = 0.7
 
     ok, reason = _gate_output_length(
-        request,
-        record,
-        test_case,
-        "answer_relevancy",
-        "Answer Relevancy (AI Judge)",
-        _threshold,
+        request, record, test_case, "answer_relevancy", "Answer Relevancy"
     )
     if not ok:
         pytest.skip(reason)
 
-    metric = AnswerRelevancyMetric(
-        threshold=_threshold,
-        model=_judge,
-        include_reason=True,
-    )
+    metric = LegalAnswerRelevancyMetric(model=_judge, threshold=_THRESHOLD)
     metric.measure(test_case)
 
     attach_metric(
         request,
         record=record,
         test_name="answer_relevancy",
-        metric_name="Answer Relevancy (AI Judge)",
+        metric_name="Answer Relevancy",
         score=metric.score,
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason or "",
-        error=str(metric.error) if metric.error else "",
+        error=str(metric.error) if getattr(metric, "error", None) else "",
         suite="groundedness",
     )
 
     assert metric.is_successful(), (
-        f"Answer Relevancy (AI Judge) score {metric.score:.2f} < {metric.threshold}: "
+        f"Answer Relevancy score {metric.score:.2f} < {metric.threshold}: "
+        f"{metric.reason}"
+    )
+
+
+@pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
+@pytest.mark.groundedness
+@_skip_no_api_key
+def test_response_groundedness(request, record):
+    """
+    The final response must be grounded in the research agent's output.
+
+    Pre-flight gates:
+      - Output must be > 50 chars.
+      - research_output must be non-empty.
+    """
+    test_case = record_to_test_case(record)
+
+    ok, reason = _gate_output_length(
+        request, record, test_case, "response_groundedness", "Response Groundedness"
+    )
+    if not ok:
+        pytest.skip(reason)
+
+    ok, reason = _gate_research_output(
+        request, record, "response_groundedness", "Response Groundedness"
+    )
+    if not ok:
+        pytest.skip(reason)
+
+    metric = ResponseGroundednessMetric(
+        research_output=record["research_output"],
+        model=_judge,
+        threshold=_THRESHOLD,
+    )
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="response_groundedness",
+        metric_name="Response Groundedness",
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason or "",
+        error=str(metric.error) if getattr(metric, "error", None) else "",
+        suite="groundedness",
+    )
+
+    assert metric.is_successful(), (
+        f"Response Groundedness score {metric.score:.2f} < {metric.threshold}: "
+        f"{metric.reason}"
+    )
+
+
+@pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
+@pytest.mark.groundedness
+@_skip_no_api_key
+def test_research_groundedness(request, record):
+    """
+    The research agent's output must be grounded in the raw retrieval context.
+
+    Pre-flight gates:
+      - retrieval_context must be non-empty.
+      - research_output must be non-empty.
+    """
+    test_case = record_to_test_case(record)
+
+    ok, reason = _gate_retrieval_context(
+        request, record, test_case, "research_groundedness", "Research Groundedness"
+    )
+    if not ok:
+        pytest.skip(reason)
+
+    ok, reason = _gate_research_output(
+        request, record, "research_groundedness", "Research Groundedness"
+    )
+    if not ok:
+        pytest.skip(reason)
+
+    metric = ResearchGroundednessMetric(
+        research_output=record["research_output"],
+        model=_judge,
+        threshold=_THRESHOLD,
+    )
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="research_groundedness",
+        metric_name="Research Groundedness",
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason or "",
+        error=str(metric.error) if getattr(metric, "error", None) else "",
+        suite="groundedness",
+    )
+
+    assert metric.is_successful(), (
+        f"Research Groundedness score {metric.score:.2f} < {metric.threshold}: "
         f"{metric.reason}"
     )
