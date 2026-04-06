@@ -32,7 +32,9 @@ def pytest_configure(config):
         "tool_usage: tests that check correct tool invocation (fast, offline)",
     )
     config.addinivalue_line(
-        "markers", "groundedness: tests that use an LLM judge (require OPENAI_API_KEY)"
+        "markers",
+        "groundedness: custom legal AI-judge metrics — answer relevancy, response groundedness, "
+        "research groundedness (require OPENAI_API_KEY or GEMINI_API_KEY)",
     )
     config.addinivalue_line(
         "markers", "consistency: same-model repeatability tests (cosine similarity)"
