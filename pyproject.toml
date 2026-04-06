@@ -28,7 +28,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["lex_eval/tests"]
 markers = [
-    "groundedness: LLM-as-judge faithfulness and relevancy tests (require OPENAI_API_KEY or GEMINI_API_KEY)",
+    "groundedness: Custom legal AI-judge metrics — answer relevancy, response groundedness, research groundedness (require OPENAI_API_KEY or GEMINI_API_KEY)",
     "consistency: same-model repeatability tests using cosine similarity",
     "consistency_llm: same-model repeatability tests using an AI judge (require OPENAI_API_KEY or GEMINI_API_KEY)",
     "tool_usage: tests that check tool-calling behaviour",
