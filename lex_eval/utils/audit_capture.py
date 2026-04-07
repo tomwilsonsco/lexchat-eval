@@ -106,16 +106,18 @@ def audit_capture(client, question, model_name):
                 elif event_type == "tool_result":
                     result_text = str(data.get("result", ""))
                     input_params = {}
+                    effective_tool_name = tool_name
                     if tool_stack:
                         delegation = tool_stack.pop()
                         input_params = delegation.get("input_parameters", {})
+                        effective_tool_name = delegation.get("name", tool_name)
 
-                    if tool_name == "delegate_research":
+                    if effective_tool_name == "delegate_research":
                         research_output = result_text
 
                     tools_captured.append(
                         ToolCall(
-                            name=tool_name,
+                            name=effective_tool_name,
                             input_parameters=input_params,
                             output=result_text,
                         )
