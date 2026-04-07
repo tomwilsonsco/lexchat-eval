@@ -15,12 +15,12 @@ from pydantic import BaseModel
 
 
 class _GroundednessJudgement(BaseModel):
-    is_grounded: bool
+    analysis: str
     score: int   # 1–5
     reason: str
 
 
-_PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to determine if a final response is strictly grounded in the provided research output.
+_PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to score whether a final response is strictly grounded in the provided research output.
 
 Research Output:
 {research_output}
@@ -28,16 +28,23 @@ Research Output:
 Final Response:
 {actual_output}
 
-Evaluate the response against these criteria:
-1. Factual alignment: Does the final response contain any facts, claims, or legal assertions not present in the research output?
-2. Hallucination check: Has the model invented new information?
-3. Accuracy: Does the response misrepresent or contradict the research output?
+Before scoring, explicitly identify:
+- Any fact, legal assertion, or claim in the final response that does NOT appear in the research output.
+- Any place where the response contradicts or misrepresents the research output.
+- Any hedging, qualifications, or caveats present in the research output that are omitted in the final response in a way that changes meaning.
+
+Then assign a score using this rubric:
+1 - Multiple hallucinated or contradictory claims; the response cannot be trusted.
+2 - Several claims are unsupported by or contradict the research output.
+3 - Mostly grounded but contains at least one unsupported claim or meaningful misrepresentation.
+4 - Only trivial wording differences; all substantive claims present in the research output.
+5 - Every claim is directly and accurately traceable to the research output.
 
 Provide your evaluation in strict JSON format exactly like this:
 {{
-    "is_grounded": true or false,
-    "score": <a number from 1 to 5, where 5 is perfectly grounded>,
-    "reason": "<A one-sentence explanation of why it passed or failed>"
+    "analysis": "<A short paragraph explicitly identifying any hallucinated facts, contradictions, or omitted caveats you found above>",
+    "score": <integer 1–5>,
+    "reason": "<One sentence citing the specific hallucination or confirming full grounding>"
 }}
 """
 
@@ -53,11 +60,11 @@ class ResponseGroundednessMetric(BaseMetric):
     Args:
         research_output: The research agent's synthesised output for this question.
         model:           A DeepEval-compatible judge model.
-        threshold:       Minimum normalised score to pass (default 0.6).
+        threshold:       Minimum normalised score to pass (default 0.7).
     """
 
     def __init__(
-        self, research_output: str, model, threshold: float = 0.6
+        self, research_output: str, model, threshold: float = 0.7
     ) -> None:
         self.research_output = research_output
         self.model = model

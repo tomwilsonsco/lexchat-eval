@@ -17,12 +17,12 @@ _MAX_CONTEXT_CHARS: int = (128_000 - 30_000) * 4  # ≈ 392 000 chars
 
 
 class _GroundednessJudgement(BaseModel):
-    is_grounded: bool
+    analysis: str
     score: int   # 1–5
     reason: str
 
 
-_PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to determine if a research agent's output is completely grounded in the raw legal text retrieved from the API.
+_PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to score whether a research agent's output is strictly grounded in the raw legal text retrieved from the API.
 
 Raw Retrieval Context:
 {retrieval_context}
@@ -30,16 +30,23 @@ Raw Retrieval Context:
 Research Agent Output:
 {research_output}
 
-Evaluate the research output against these criteria:
-1. Sourcing: Can every factual point in the research output be traced directly back to the raw retrieval context?
-2. Distillation accuracy: Did the research agent accurately summarise the legal text without altering its meaning?
-3. Extrapolation: Has the agent added external knowledge or assumed facts not explicitly stated in the context?
+Before scoring, explicitly identify:
+- Any factual claim in the research output that CANNOT be traced to a specific passage in the retrieval context.
+- Any place where the agent has altered the meaning, overstated, or understated what the legal text says.
+- Any external knowledge, assumptions, or inferences not supported by the retrieved text.
+
+Then assign a score using this rubric:
+1 - Multiple fabricated or unsupported claims; output cannot be trusted.
+2 - Several claims lack grounding or meaningfully distort the source text.
+3 - Mostly grounded but contains at least one unsupported claim or notable distortion.
+4 - Only minor wording differences; all substantive claims traceable to the context.
+5 - Every claim is directly and accurately traceable to the retrieval context.
 
 Provide your evaluation in strict JSON format exactly like this:
 {{
-    "is_grounded": true or false,
-    "score": <a number from 1 to 5, where 5 is perfectly grounded>,
-    "reason": "<A one-sentence explanation of why it passed or failed>"
+    "analysis": "<A short paragraph explicitly identifying any ungrounded claims, distortions, or external inferences you found above>",
+    "score": <integer 1–5>,
+    "reason": "<One sentence citing the specific ungrounded claim or confirming full traceability>"
 }}
 """
 
@@ -56,11 +63,11 @@ class ResearchGroundednessMetric(BaseMetric):
     Args:
         research_output: The research agent's synthesised output.
         model:           A DeepEval-compatible judge model.
-        threshold:       Minimum normalised score to pass (default 0.6).
+        threshold:       Minimum normalised score to pass (default 0.7).
     """
 
     def __init__(
-        self, research_output: str, model, threshold: float = 0.6
+        self, research_output: str, model, threshold: float = 0.7
     ) -> None:
         self.research_output = research_output
         self.model = model

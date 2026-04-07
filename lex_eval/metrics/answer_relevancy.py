@@ -16,12 +16,12 @@ from pydantic import BaseModel
 
 
 class _RelevancyJudgement(BaseModel):
-    is_relevant: bool
+    analysis: str
     score: int   # 1–5
     reason: str
 
 
-_PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to determine if the provided response directly and usefully answers the user's question.
+_PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to score how directly and usefully the response answers the user's legal question.
 
 User Question:
 {input}
@@ -29,16 +29,23 @@ User Question:
 Generated Response:
 {actual_output}
 
-Evaluate the response based on the following criteria:
-1. Directness: Does it answer the specific legal question asked?
-2. Completeness: Does it address all parts of the user's query?
-3. Conciseness: Does it avoid rambling or providing irrelevant legal trivia?
+Before scoring, identify:
+- Parts of the question that are NOT answered or are answered only vaguely.
+- Any content in the response that is off-topic or does not contribute to answering the question.
+- Aspects of the question that are addressed incompletely.
+
+Then assign a score using this rubric:
+1 - Fails to answer the question; response is off-topic or addresses a different question entirely.
+2 - Partially answers but misses the main point or omits critical aspects of the question.
+3 - Answers the main question but is incomplete, vague, or includes significant irrelevant content.
+4 - Answers the question well with only minor gaps or minor irrelevant content.
+5 - Answers the question completely, directly, and without unnecessary waffle.
 
 Provide your evaluation in strict JSON format exactly like this:
 {{
-    "is_relevant": true or false,
-    "score": <a number from 1 to 5, where 5 is perfectly relevant>,
-    "reason": "<A one-sentence explanation of why it passed or failed>"
+    "analysis": "<A short paragraph explicitly identifying any unanswered parts, off-topic content, or incompleteness you found above>",
+    "score": <integer 1–5>,
+    "reason": "<One sentence citing the specific gap or strength that determined the score>"
 }}
 """
 
@@ -53,11 +60,11 @@ class LegalAnswerRelevancyMetric(BaseMetric):
 
     Args:
         model:     A DeepEval-compatible judge model (OpenAIJudge or GeminiJudge).
-        threshold: Minimum normalised score to pass (default 0.6).
+        threshold: Minimum normalised score to pass (default 0.7).
                    Scores are normalised from 1–5 to 0.0–1.0.
     """
 
-    def __init__(self, model, threshold: float = 0.6) -> None:
+    def __init__(self, model, threshold: float = 0.7) -> None:
         self.model = model
         self.threshold = threshold
         self.score = 0.0
