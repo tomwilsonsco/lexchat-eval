@@ -105,24 +105,21 @@ def audit_capture(client, question, model_name):
 
                 elif event_type == "tool_result":
                     result_text = str(data.get("result", ""))
-                    research_output = result_text
+                    input_params = {}
                     if tool_stack:
                         delegation = tool_stack.pop()
-                        tools_captured.append(
-                            ToolCall(
-                                name=delegation["name"],
-                                input_parameters=delegation["input_parameters"],
-                                output=result_text,
-                            )
+                        input_params = delegation.get("input_parameters", {})
+
+                    if tool_name == "delegate_research":
+                        research_output = result_text
+
+                    tools_captured.append(
+                        ToolCall(
+                            name=tool_name,
+                            input_parameters=input_params,
+                            output=result_text,
                         )
-                    else:
-                        tools_captured.append(
-                            ToolCall(
-                                name=data.get("tool", "delegate_research"),
-                                input_parameters={},
-                                output=result_text,
-                            )
-                        )
+                    )
 
                 elif event_type == "token":
                     actual_output += data.get("content", "")
