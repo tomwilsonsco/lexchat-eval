@@ -169,3 +169,8 @@ lex_eval/
 ├── open_db_ui.py            # opens responses.db in browser UI
 └── run_evals.py             # Step 3 entry point
 ```
+
+## A note on LLM judge models
+The LLM judge models tested so far have been those available from OpenAI or Google. The more expensive models do more thorough judging and this results in lower scores for answer relevancy, response groundedness and research groundedness. 
+
+For OpenAI, o4-mini is a thinking model and will produce lower scores than gpt-4o-mini. However, o4-mini does appear to do a better job and pick-up on subtleties gpt-4o-mini ignores. Google gemini-2.5-flash scores in a similarly thorough way as o4-mini. Researching showed gemini-2.5-flash-lite was too weak for the job so it has not been tested. Larger Google models have also not been tested as gemini-2.5-flash already was using more API credit than OpenAI o4-mini, costing over £2.00 to run the set of 6 question, 4 llm evaluations once.
