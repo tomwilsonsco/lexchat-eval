@@ -18,7 +18,7 @@ _env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=_env_path)
 
 OPENAI_API_KEY: str | None = os.environ.get("OPENAI_API_KEY")
-DEFAULT_JUDGE_MODEL: str = os.environ.get("DEEPEVAL_JUDGE_MODEL", "gpt-4o-mini")
+DEFAULT_OPENAI_MODEL: str = os.environ.get("OPENAI_JUDGE_MODEL", "gpt-4o-mini")
 
 
 class OpenAIJudge(DeepEvalBaseLLM):
@@ -26,7 +26,7 @@ class OpenAIJudge(DeepEvalBaseLLM):
 
     def __init__(
         self,
-        model: str = DEFAULT_JUDGE_MODEL,
+        model: str = DEFAULT_OPENAI_MODEL,
         api_key: str | None = OPENAI_API_KEY,
     ) -> None:
         self.model = model

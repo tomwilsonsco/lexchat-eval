@@ -22,12 +22,17 @@ LEXCHAT_API=http://host.docker.internal:80
 USERNAME=admin
 PASSWORD=admin
 
-# Required only for AI-judge evaluation suites
-OPENAI_API_KEY=sk-...
-# DEEPEVAL_JUDGE_MODEL=gpt-4o-mini   # optional default
+# OpenAI judge (default provider)
+OPENAI_API_KEY=yourkeyhere
+# gpt-4o-mini most cost effective, o4-mini more thorough evals, more costly
+OPENAI_JUDGE_MODEL=gpt-4o-mini
+
+# Gemini judge (alternative provider)
 GEMINI_API_KEY=yourkeyhere
-# GEMINI_JUDGE_MODEL=gemini-2.0-flash
-JUDGE_PROVIDER=openai # Set to 'gemini' to use Gemini as the AI judge
+GEMINI_JUDGE_MODEL=gemini-2.5-flash
+
+# Set to 'gemini' to use Gemini as the AI judge
+JUDGE_PROVIDER=openai
 ```
 
 ## Step 1 Check LLMs are available
