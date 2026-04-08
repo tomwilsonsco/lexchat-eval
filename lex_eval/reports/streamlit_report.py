@@ -50,8 +50,9 @@ METRIC_DISPLAY_ORDER: list[str] = [
     "Reference Links",
     "Consistency (Cosine)",
     "Consistency (AI Judge)",
-    "Answer Relevancy (AI Judge)",
-    "Groundedness (AI Judge)",
+    "Answer Relevancy",
+    "Response Groundedness",
+    "Research Groundedness",
 ]
 
 # hover over tips on app summary tables
@@ -61,8 +62,9 @@ METRIC_TOOLTIPS: dict[str, str] = {
     "Reference Links": "Are reference links included in the answer provided to the user.",
     "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity.",
     "Consistency (AI Judge)": "Use another LLM to decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information.",
-    "Answer Relevancy (AI Judge)": "AI as a judge metric from DeepEval: How relevant is the answer to the question asked.",
-    "Groundedness (AI Judge)": "AI as a judge metric from DeepEval: Has the answer been derived from the information extracted from the Lex API.",
+    "Answer Relevancy": "Custom legal AI judge: does the final response directly and usefully answer the user's legal question.",
+    "Response Groundedness": "Custom legal AI judge: is the final response grounded in the research agent's output, with no hallucinated facts.",
+    "Research Groundedness": "Custom legal AI judge: is the research agent's output grounded in the raw legal text retrieved from the API.",
 }
 
 # do not keep the individual response results of these metrics as only make sense

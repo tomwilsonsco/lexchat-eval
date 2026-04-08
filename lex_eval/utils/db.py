@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS responses (
     actual_output    TEXT     NOT NULL DEFAULT '',
     retrieval_context JSON,
     tools_called     JSON,
+    research_output  TEXT     NOT NULL DEFAULT '',
     is_error         BOOLEAN  NOT NULL DEFAULT FALSE,
     error_message    TEXT
 );
@@ -65,9 +66,9 @@ CREATE TABLE IF NOT EXISTS responses (
 
 _INSERT_RESPONSE = """
 INSERT INTO responses (
-    question_id, question, llm_name, timestamp,
-    actual_output, retrieval_context, tools_called, is_error, error_message
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    question_id, question, llm_name, timestamp, actual_output,
+    retrieval_context, tools_called, research_output, is_error, error_message
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -107,6 +108,7 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             record.get("actual_output", "") if not is_error else "",
             json.dumps(record.get("retrieval_context") or []),
             json.dumps(record.get("tools_called") or []),
+            record.get("research_output", "") if not is_error else "",
             is_error,
             record.get("error") if is_error else None,
         ],
@@ -134,7 +136,7 @@ def load_records(
         where = "" if include_errors else "WHERE NOT is_error"
         rows = conn.execute(f"""
             SELECT question_id, question, llm_name, timestamp,
-                   actual_output, retrieval_context, tools_called
+                   actual_output, retrieval_context, tools_called, research_output
             FROM responses
             {where}
             ORDER BY id
@@ -151,6 +153,7 @@ def load_records(
         actual_output,
         retrieval_context_json,
         tools_called_json,
+        research_output,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -165,6 +168,7 @@ def load_records(
                 "actual_output": actual_output,
                 "retrieval_context": retrieval_context,
                 "tools_called": tools_called,
+                "research_output": research_output or "",
             }
         )
     return records
@@ -458,8 +462,8 @@ def make_deploy_db(
 
         # Copy responses with trimmed retrieval_context
         rows = src.execute(
-            "SELECT question_id, question, llm_name, timestamp, "
-            "actual_output, retrieval_context, tools_called, is_error, error_message "
+            "SELECT question_id, question, llm_name, timestamp, actual_output, "
+            "retrieval_context, tools_called, research_output, is_error, error_message "
             "FROM responses ORDER BY id"
         ).fetchall()
 
@@ -473,6 +477,7 @@ def make_deploy_db(
                 actual_output,
                 ctx_json,
                 tools_json,
+                research_output,
                 is_error,
                 error_message,
             ) = row
@@ -492,6 +497,7 @@ def make_deploy_db(
                     actual_output,
                     json.dumps(trimmed),
                     tools_json,
+                    research_output,
                     is_error,
                     error_message,
                 ],

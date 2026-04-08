@@ -173,12 +173,15 @@ def gather_responses(
         client = get_client()
         for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
-                test_case = audit_capture(
+                capture_result = audit_capture(
                     client=client,
                     question=question_text,
                     model_name=llm_name,
                 )
+                test_case = capture_result["test_case"]
+                research_output = capture_result["research_output"]
                 test_case_data = serialize_test_case(test_case)
+
                 actual_output = test_case_data.get("actual_output", "")
                 if not actual_output or not actual_output.strip():
                     logger.warning(
@@ -194,6 +197,7 @@ def gather_responses(
                     "actual_output": actual_output,
                     "retrieval_context": test_case_data.get("retrieval_context") or [],
                     "tools_called": test_case_data.get("tools_called") or [],
+                    "research_output": research_output,
                 }
                 logger.info(
                     f"✓ Q{question_id} × {llm_name}: "

@@ -22,12 +22,17 @@ LEXCHAT_API=http://host.docker.internal:80
 USERNAME=admin
 PASSWORD=admin
 
-# Required only for AI-judge evaluation suites
-OPENAI_API_KEY=sk-...
-# DEEPEVAL_JUDGE_MODEL=gpt-4o-mini   # optional default
+# OpenAI judge (default provider)
+OPENAI_API_KEY=yourkeyhere
+# gpt-4o-mini most cost effective, o4-mini more thorough evals, more costly
+OPENAI_JUDGE_MODEL=gpt-4o-mini
+
+# Gemini judge (alternative provider)
 GEMINI_API_KEY=yourkeyhere
-# GEMINI_JUDGE_MODEL=gemini-2.0-flash
-JUDGE_PROVIDER=openai # Set to 'gemini' to use Gemini as the AI judge
+GEMINI_JUDGE_MODEL=gemini-2.5-flash
+
+# Set to 'gemini' to use Gemini as the AI judge
+JUDGE_PROVIDER=openai
 ```
 
 ## Step 1 Check LLMs are available
@@ -80,7 +85,8 @@ python lex_eval/run_evals.py
 
 # Specific suite:
 python lex_eval/run_evals.py --suite tool_usage
-python lex_eval/run_evals.py --suite groundedness    # needs OPENAI_API_KEY
+python lex_eval/run_evals.py --suite groundedness    # needs OPENAI_API_KEY or GEMINI_API_KEY
+# (Groundedness measures: answer relevancy, response groundedness, research groundedness)
 python lex_eval/run_evals.py --suite consistency
 python lex_eval/run_evals.py --suite consistency_llm # needs OPENAI_API_KEY
 python lex_eval/run_evals.py --suite structure
@@ -106,7 +112,7 @@ pair — use `--overwrite` to force re-running.
 | `tool_usage` | Fast | Nothing extra |
 | `structure` | Fast | Nothing extra |
 | `consistency` | Fast | ≥2 responses per question/LLM pair |
-| `groundedness` | Slow | `OPENAI_API_KEY` |
+| `groundedness` | Medium (1 LLM call/test) | `OPENAI_API_KEY` or `GEMINI_API_KEY` |
 | `consistency_llm` | Slow | `OPENAI_API_KEY` + ≥2 responses per pair |
 
 ## Step 4 Streamlit dashboard
@@ -163,3 +169,8 @@ lex_eval/
 ├── open_db_ui.py            # opens responses.db in browser UI
 └── run_evals.py             # Step 3 entry point
 ```
+
+## A note on LLM judge models
+The LLM judge models tested so far have been those available from OpenAI or Google. The more expensive models do more thorough judging and this results in lower scores for answer relevancy, response groundedness and research groundedness. 
+
+For OpenAI, o4-mini is a thinking model and will produce lower scores than gpt-4o-mini. However, o4-mini does appear to do a better job and pick up on subtleties that gpt-4o-mini ignores. Google gemini-2.5-flash scores in a similarly thorough way to o4-mini. Research showed that gemini-2.5-flash-lite was too weak for the job, so it has not been tested. Larger Google models have also not been tested, as gemini-2.5-flash already was using more API credit than OpenAI o4-mini, costing over £2.00 to run the set of 6 questions, 4 llm evaluations once.
