@@ -205,7 +205,7 @@ def _render_top_summary(hierarchy: dict) -> None:
             by_metric: dict[str, list[float]] = defaultdict(list)
             thresholds: dict[str, float] = {}
             for m in all_m:
-                name = m["metric_name"]
+                name = m["metric_name"].strip()
                 by_metric[name].append(m["score"])
                 thresholds[name] = m["threshold"]
 
@@ -279,7 +279,7 @@ def _render_metric_summary_table(metrics: list[dict]) -> None:
     """
     rows_html = ""
     for m in metrics:
-        name = m["metric_name"]
+        name = m["metric_name"].strip()
         score = m["score"]
         threshold = m["threshold"]
         passed = m["passed"]
