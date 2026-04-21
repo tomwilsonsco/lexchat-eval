@@ -174,3 +174,16 @@ lex_eval/
 The LLM judge models tested so far have been those available from OpenAI or Google. The more expensive models do more thorough judging and this results in lower scores for answer relevancy, response groundedness and research groundedness. 
 
 For OpenAI, o4-mini is a thinking model and will produce lower scores than gpt-4o-mini. However, o4-mini does appear to do a better job and pick up on subtleties that gpt-4o-mini ignores. Google gemini-2.5-flash scores in a similarly thorough way to o4-mini. Research showed that gemini-2.5-flash-lite was too weak for the job, so it has not been tested. Larger Google models have also not been tested, as gemini-2.5-flash already was using more API credit than OpenAI o4-mini, costing over £2.00 to run the set of 6 questions, 4 llm evaluations once.
+
+## Current evaluations
+
+| Metric | Description |
+|--------|-------------|
+| Tool Usage | Are all of delegate research, search legislation, get legislation text used. |
+| Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. |
+| Reference Links | Are reference links included in the answer provided to the user. |
+| Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. |
+| Consistency (AI Judge) | AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information. |
+| Answer Relevancy | AI as a judge metric: Measures how directly and completely the response addresses the user's question, penalising vague answers and irrelevant content. |
+| Research Groundedness | AI as a judge metric: Measures whether the research summary is grounded exclusively in the legal text retrieved from the Lex API, penalising any external inferences or factual distortions. |
+| Response Groundedness | AI as a judge metric: Evaluates whether the final response is strictly grounded in the research worker's summary, ensuring no new information or contradictions have been introduced. |
