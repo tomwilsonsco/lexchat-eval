@@ -1,26 +1,32 @@
 [
   {
     "id": 1,
-    "question": "What does section 6 of the Data Protection Act say?"
+    "question": "What does section 6 of the Data Protection Act say?",
+    "research_mode": "legislation_only"
   },
   {
     "id": 2,
-    "question": "What powers of direction do the Scottish Ministers have in relation to Health Boards in Scotland?"
+    "question": "What powers of direction do the Scottish Ministers have in relation to Health Boards in Scotland?",
+    "research_mode": "legislation_only"
   },
   {
     "id": 3,
-    "question": "What is the process for making and reviewing an Integration Joint Board's strategic plan?"
+    "question": "What is the process for making and reviewing an Integration Joint Board's strategic plan?",
+    "research_mode": "legislation_only"
   },
   {
     "id": 4,
-    "question": "What powers does the Information Commissioner have to impose penalties for breach of data protection duties?"
+    "question": "What powers does the Information Commissioner have to impose penalties for breach of data protection duties?",
+    "research_mode": "legislation_only"
   },
   {
     "id": 5,
-    "question": "How is the chair of Food Standards Scotland appointed?"
+    "question": "How is the chair of Food Standards Scotland appointed?",
+    "research_mode": "legislation_only"
   },
   {
     "id": 6,
-    "question": "To what extent is regulation of the health professions within the legislative competence of the Scottish Parliament?"
+    "question": "To what extent is regulation of the health professions within the legislative competence of the Scottish Parliament?",
+    "research_mode": "legislation_only"
   }
 ]

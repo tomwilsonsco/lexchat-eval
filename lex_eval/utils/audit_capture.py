@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def audit_capture(client, question, model_name):
+def audit_capture(client, question, model_name, research_mode="legislation_only"):
     chat_payload = {
         "messages": [
             {
@@ -16,13 +16,17 @@ def audit_capture(client, question, model_name):
         ],
         "model": model_name,
         "stream": True,
+        "research_mode": research_mode,
     }
 
-    print(f"\u23f3 Auditing research for: '{question}'")
+    print(f"\u23f3 Auditing research for: '{question}' (mode={research_mode})")
 
     actual_output = ""
     retrieval_context = []
+    case_law_context = []   # structured {title, ncn, court, date, url} dicts
     tools_captured = []
+    tool_sequence = []      # ordered worker tool names (excludes delegate_research)
+    fallback_used = False   # True if get_legislation_text was called
     research_output = ""
     tool_stack = []
 
@@ -76,15 +80,62 @@ def audit_capture(client, question, model_name):
 
                 elif event_type == "api_call_end":
                     resp = data.get("response", {})
+                    current_tool = tool_stack[-1]["name"] if tool_stack else ""
 
                     if "full_text" in resp:
+                        # get_legislation_text fallback — capture the full statutory text
                         retrieval_context.append(resp["full_text"])
+                    elif current_tool == "search_legislation_sections":
+                        # Primary retrieval path — capture actual section text
+                        sections = resp.get("sections") or resp.get("results") or []
+                        for sec in sections:
+                            content = (
+                                sec.get("content")
+                                or sec.get("text")
+                                or sec.get("excerpt")
+                                or ""
+                            )
+                            sec_title = (
+                                sec.get("title") or sec.get("section_title") or ""
+                            )
+                            if content:
+                                retrieval_context.append(
+                                    f"{sec_title}: {content}" if sec_title else content
+                                )
+                    elif current_tool == "search_case_law" or (
+                        "results" in resp
+                        and resp["results"]
+                        and "ncn" in resp["results"][0]
+                    ):
+                        # Case law results — store structured and add plain refs to context
+                        for r in resp.get("results", []):
+                            title = r.get("title", "")
+                            ncn = r.get("ncn", "")
+                            court = r.get("court", "")
+                            date = r.get("date", "")
+                            url = r.get("url", "")
+                            case_law_context.append(
+                                {
+                                    "title": title,
+                                    "ncn": ncn,
+                                    "court": court,
+                                    "date": date,
+                                    "url": url,
+                                }
+                            )
+                            parts = [p for p in [ncn, court, date] if p]
+                            retrieval_context.append(
+                                f"{title} ({' | '.join(parts)})" if parts else title
+                            )
                     elif "results" in resp:
+                        # Legislation search metadata — record title + year/status for context
                         for r in resp["results"]:
                             title = r.get("title", "")
-                            desc = r.get("description", "")
+                            year = str(r.get("year", "")) if r.get("year") else ""
+                            status = r.get("status", "")
+                            parts = [p for p in [year, status] if p]
                             retrieval_context.append(
-                                f"{title}: {desc}" if title else desc
+                                f"{title} ({', '.join(parts)})" if parts else title
                             )
 
                     if tool_stack:
@@ -95,9 +146,15 @@ def audit_capture(client, question, model_name):
                         completed = tool_stack.pop()
                         if not completed["output"]:
                             completed["output"] = str(data.get("result", "Done"))
+                        completed_name = completed["name"]
+                        # Track worker tool order (skip manager-level delegation wrapper)
+                        if completed_name != "delegate_research":
+                            tool_sequence.append(completed_name)
+                            if completed_name == "get_legislation_text":
+                                fallback_used = True
                         tools_captured.append(
                             ToolCall(
-                                name=completed["name"],
+                                name=completed_name,
                                 input_parameters=completed["input_parameters"],
                                 output=completed["output"],
                             )
@@ -155,4 +212,8 @@ def audit_capture(client, question, model_name):
             tools_called=tools_captured,
         ),
         "research_output": research_output,
+        "research_mode": research_mode,
+        "case_law_context": case_law_context,
+        "tool_sequence": tool_sequence,
+        "fallback_used": fallback_used,
     }

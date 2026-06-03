@@ -167,8 +167,9 @@ def gather_responses(
         """
         question_id = question_data.get("id")
         question_text = question_data.get("question")
+        research_mode = question_data.get("research_mode", "legislation_only")
 
-        logger.info(f"[{index}/{total_combinations}] Q{question_id} × {llm_name}")
+        logger.info(f"[{index}/{total_combinations}] Q{question_id} × {llm_name} (mode={research_mode})")
 
         client = get_client()
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -177,6 +178,7 @@ def gather_responses(
                     client=client,
                     question=question_text,
                     model_name=llm_name,
+                    research_mode=research_mode,
                 )
                 test_case = capture_result["test_case"]
                 research_output = capture_result["research_output"]
@@ -198,6 +200,10 @@ def gather_responses(
                     "retrieval_context": test_case_data.get("retrieval_context") or [],
                     "tools_called": test_case_data.get("tools_called") or [],
                     "research_output": research_output,
+                    "research_mode": capture_result.get("research_mode", research_mode),
+                    "case_law_context": capture_result.get("case_law_context") or [],
+                    "tool_sequence": capture_result.get("tool_sequence") or [],
+                    "fallback_used": capture_result.get("fallback_used", False),
                 }
                 logger.info(
                     f"✓ Q{question_id} × {llm_name}: "
