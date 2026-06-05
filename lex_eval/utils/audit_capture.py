@@ -29,6 +29,7 @@ def audit_capture(client, question, model_name, research_mode="legislation_only"
     fallback_used = False   # True if get_legislation_text was called
     research_output = ""
     tool_stack = []
+    _pending_api_entries = []  # LIFO stack matching each api_call_start to its api_call_end
 
     with client.stream("POST", "/api/system/chat", json=chat_payload) as response:
         for line in response.iter_lines():
@@ -77,18 +78,33 @@ def audit_capture(client, question, model_name, research_mode="legislation_only"
                             "method": data.get("method", ""),
                             "payload": data.get("payload", {}),
                         }
+                        # Push the owning entry onto the pending LIFO stack so
+                        # api_call_end pops it back in order, even when multiple
+                        # concurrent calls fire api_call_start before any
+                        # api_call_end arrives (tool_start events may interleave).
+                        _pending_api_entries.append(tool_stack[-1])
 
                 elif event_type == "api_call_end":
                     resp = data.get("response", {})
-                    current_tool = tool_stack[-1]["name"] if tool_stack else ""
+                    api_entry = _pending_api_entries.pop() if _pending_api_entries else (tool_stack[-1] if tool_stack else None)
+                    current_tool = api_entry["name"] if api_entry else ""
 
-                    if "full_text" in resp:
+                    if isinstance(resp, dict) and "full_text" in resp:
                         # get_legislation_text fallback — capture the full statutory text
                         retrieval_context.append(resp["full_text"])
-                    elif current_tool == "search_legislation_sections":
+                    elif "search_legislation_sections" in current_tool:
                         # Primary retrieval path — capture actual section text
-                        sections = resp.get("sections") or resp.get("results") or []
+                        # resp can be a list directly or a dict with "sections"/"results"
+                        if isinstance(resp, list):
+                            sections = resp
+                        elif isinstance(resp, dict):
+                            sections = resp.get("sections") or resp.get("results") or []
+                        else:
+                            sections = []
+                            
                         for sec in sections:
+                            if not isinstance(sec, dict):
+                                continue
                             content = (
                                 sec.get("content")
                                 or sec.get("text")
@@ -102,13 +118,20 @@ def audit_capture(client, question, model_name, research_mode="legislation_only"
                                 retrieval_context.append(
                                     f"{sec_title}: {content}" if sec_title else content
                                 )
-                    elif current_tool == "search_case_law" or (
-                        "results" in resp
-                        and resp["results"]
-                        and "ncn" in resp["results"][0]
+                    elif isinstance(resp, dict) and (
+                        "search_case_law" in current_tool or (
+                            "results" in resp
+                            and resp["results"]
+                            and isinstance(resp["results"], list)
+                            and len(resp["results"]) > 0
+                            and isinstance(resp["results"][0], dict)
+                            and "ncn" in resp["results"][0]
+                        )
                     ):
                         # Case law results — store structured and add plain refs to context
                         for r in resp.get("results", []):
+                            if not isinstance(r, dict):
+                                continue
                             title = r.get("title", "")
                             ncn = r.get("ncn", "")
                             court = r.get("court", "")
@@ -127,9 +150,11 @@ def audit_capture(client, question, model_name, research_mode="legislation_only"
                             retrieval_context.append(
                                 f"{title} ({' | '.join(parts)})" if parts else title
                             )
-                    elif "results" in resp:
+                    elif isinstance(resp, dict) and "results" in resp:
                         # Legislation search metadata — record title + year/status for context
                         for r in resp["results"]:
+                            if not isinstance(r, dict):
+                                continue
                             title = r.get("title", "")
                             year = str(r.get("year", "")) if r.get("year") else ""
                             status = r.get("status", "")
@@ -138,14 +163,21 @@ def audit_capture(client, question, model_name, research_mode="legislation_only"
                                 f"{title} ({', '.join(parts)})" if parts else title
                             )
 
-                    if tool_stack:
-                        tool_stack[-1]["output"] = json.dumps(resp, default=str)
+                    if api_entry is not None:
+                        api_entry["output"] = json.dumps(resp, default=str)
 
                 elif event_type == "tool_end":
                     if tool_stack:
                         completed = tool_stack.pop()
                         if not completed["output"]:
-                            completed["output"] = str(data.get("result", "Done"))
+                            fallback_result = str(data.get("result", "Done")).strip()
+                            if fallback_result.lower() in ("done", "none", "null", ""):
+                                completed["output"] = json.dumps(
+                                    {"status": "no_results", "message": "API returned no results or empty response"}, 
+                                    default=str
+                                )
+                            else:
+                                completed["output"] = fallback_result
                         completed_name = completed["name"]
                         # Track worker tool order (skip manager-level delegation wrapper)
                         if completed_name != "delegate_research":

@@ -239,8 +239,10 @@ def clean_incomplete_responses(
     dry_run: bool = False,
 ) -> int:
     """
-    Delete rows where the actual_output is empty or whitespace-only,
-    and rows that are errors (is_error = TRUE).
+    Delete rows where:
+    - actual_output is empty or whitespace-only,
+    - the row is an error (is_error = TRUE), OR
+    - no context was captured (retrieval_context is '[]' or NULL).
 
     Args:
         path:    Path to the database file. Defaults to DEFAULT_DB.
@@ -253,27 +255,35 @@ def clean_incomplete_responses(
     conn = get_connection(path)
     try:
         count = conn.execute(
-            "SELECT COUNT(*) FROM responses WHERE TRIM(actual_output) = '' OR is_error"
+            "SELECT COUNT(*) FROM responses WHERE TRIM(actual_output) = '' OR is_error "
+            "OR retrieval_context = '[]' OR retrieval_context IS NULL"
         ).fetchone()[0]
 
         if dry_run:
             rows = conn.execute("""
-                SELECT id, question_id, llm_name, is_error, LEFT(actual_output, 40)
+                SELECT id, question_id, llm_name, is_error, retrieval_context
                 FROM responses
-                WHERE TRIM(actual_output) = '' OR is_error
+                WHERE TRIM(actual_output) = '' OR is_error 
+                OR retrieval_context = '[]' OR retrieval_context IS NULL
                 ORDER BY question_id, llm_name
                 """).fetchall()
             print(f"Dry run — {count} row(s) would be deleted:")
             for row in rows:
-                rid, qid, llm, is_err, preview = row
-                tag = "error" if is_err else "empty output"
+                rid, qid, llm, is_err, ctx = row
+                if is_err:
+                    tag = "error"
+                elif ctx in ("[]", None):
+                    tag = "no context"
+                else:
+                    tag = "empty output"
                 print(f"  id={rid}  Q{qid}  {llm}  [{tag}]")
         else:
             conn.execute(
-                "DELETE FROM responses WHERE TRIM(actual_output) = '' OR is_error"
+                "DELETE FROM responses WHERE TRIM(actual_output) = '' OR is_error "
+                "OR retrieval_context = '[]' OR retrieval_context IS NULL"
             )
             conn.commit()
-            print(f"Deleted {count} incomplete/error row(s).")
+            print(f"Deleted {count} incomplete/error/no-context row(s).")
     finally:
         conn.close()
 

@@ -4,7 +4,7 @@ Custom metric to validate that the LLM used all expected legislation tools.
 Scores 1/3 for each of the three required tools:
     - delegate_research
     - Worker: search_legislation
-    - Worker: get_legislation_text
+    - Worker: search_legislation_sections
 
 A score of 1.0 means all three were used; anything less is a fail.
 """
@@ -17,7 +17,7 @@ from typing import Set
 REQUIRED_TOOLS: list[str] = [
     "delegate_research",
     "Worker: search_legislation",
-    "Worker: get_legislation_text",
+    "Worker: search_legislation_sections",
 ]
 
 PER_TOOL_SCORE = round(1 / len(REQUIRED_TOOLS), 10)

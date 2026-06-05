@@ -409,6 +409,27 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
     for tab, rec in zip(run_tabs, records):
         with tab:
+            # --- Execution Metadata ---
+            st.markdown("##### ⚙️ Execution Context")
+            cols = st.columns(3)
+            with cols[0]:
+                st.markdown(
+                    f"**Mode:** `{rec.get('research_mode', 'N/A')}`"
+                )
+            with cols[1]:
+                fallback = rec.get("fallback_used", False)
+                st.markdown(
+                    f"**Fallback Used:** {'Yes' if fallback else 'No'}"
+                )
+            with cols[2]:
+                tool_seq = rec.get("tool_sequence") or []
+                st.markdown(f"**Tool Sequence:** `{len(tool_seq)}` steps")
+                if tool_seq:
+                    st.caption(" → ".join(tool_seq))
+
+            st.divider()
+
+            # --- LLM Answer ---
             st.markdown("#### LLM Answer")
             actual = rec.get("actual_output", "")
             if actual:
@@ -418,6 +439,14 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
             st.divider()
 
+            # --- Research Output ---
+            research_output = rec.get("research_output", "")
+            if research_output:
+                st.markdown("#### 📝 Research Output (Worker Findings)")
+                st.markdown(research_output)
+                st.divider()
+
+            # --- Tools Called ---
             tools_called: list[dict] = rec.get("tools_called") or []
             if tools_called:
                 st.markdown(f"#### Tools Called ({len(tools_called)})")
@@ -460,11 +489,20 @@ def _render_chat_interaction(records: list[dict]) -> None:
                         )
                         with st.container():
                             if isinstance(output_raw, str):
-                                try:
-                                    parsed = json.loads(output_raw)
-                                    st.json(parsed, expanded=False)
-                                except (json.JSONDecodeError, ValueError):
-                                    st.code(output_raw, language="text")
+                                # Check for explicit "no results" fallback indicators
+                                if output_raw.strip().lower() in ("done", "none", "null", ""):
+                                    st.info("⚠️ No results returned from this API call.")
+                                else:
+                                    try:
+                                        parsed = json.loads(output_raw)
+                                        if isinstance(parsed, dict) and parsed.get("status") == "no_results":
+                                            st.info(f"⚠️ {parsed.get('message', 'No results returned from this API call.')}")
+                                        else:
+                                            st.json(parsed, expanded=False)
+                                    except (json.JSONDecodeError, ValueError):
+                                        st.code(output_raw, language="text")
+                            elif isinstance(output_raw, dict) and output_raw.get("status") == "no_results":
+                                st.info(f"⚠️ {output_raw.get('message', 'No results returned from this API call.')}")
                             elif isinstance(output_raw, (dict, list)):
                                 st.json(output_raw, expanded=False)
                             else:
@@ -487,23 +525,47 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
             st.divider()
 
+            # --- Case Law Context ---
+            case_law_ctx: list[dict] = rec.get("case_law_context") or []
+            if case_law_ctx:
+                st.markdown(f"#### ⚖️ Case Law Context ({len(case_law_ctx)} items)")
+                for i, case_data in enumerate(case_law_ctx):
+                    title = case_data.get("title", "Unknown Title")
+                    ncn = case_data.get("ncn", "")
+                    court = case_data.get("court", "")
+                    date = case_data.get("date", "")
+                    url = case_data.get("url", "")
+                    
+                    meta_parts = [p for p in [ncn, court, date] if p]
+                    meta_str = f" ({' | '.join(meta_parts)})" if meta_parts else ""
+                    st.markdown(f"**{i + 1}. {title}{meta_str}**")
+                    if url:
+                        st.markdown(f"   🔗 [Link to judgment]({url})")
+                st.divider()
+
+            # --- Retrieved Context ---
             contexts: list[str] = rec.get("retrieval_context") or []
             if contexts:
-                st.markdown(f"#### Retrieved Context ({len(contexts)} items)")
+                st.markdown(f"#### 📚 Retrieved Context ({len(contexts)} items)")
                 for i, ctx in enumerate(contexts):
-                    st.markdown(f"📄 **Context {i + 1}**")
+                    st.markdown(f"**Context {i + 1}**")
                     with st.container():
-                        st.text(ctx)
+                        st.code(ctx, language="text")
             else:
                 st.caption("No retrieval context captured.")
 
-            st.markdown("ℹ️ **Record metadata**")
+            st.divider()
+            st.markdown("ℹ️ **Full Record Metadata**")
             st.json(
                 {
                     "timestamp": rec.get("timestamp"),
                     "llm_name": rec.get("llm_name"),
                     "question_id": rec.get("question_id"),
-                }
+                    "research_mode": rec.get("research_mode"),
+                    "fallback_used": rec.get("fallback_used"),
+                    "tool_sequence": rec.get("tool_sequence", []),
+                },
+                expanded=False,
             )
 
 

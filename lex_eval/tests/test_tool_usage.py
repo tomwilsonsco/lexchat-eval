@@ -1,7 +1,7 @@
 """
 Test that every captured response used all required legislation tools.
 
-Scores 1/3 per tool (delegate_research, search_legislation, get_legislation_text).
+Scores 1/3 per tool (delegate_research, Worker: search_legislation, Worker: search_legislation_sections).
 Passes only when all three are present (score == 1.0).
 """
 
@@ -33,7 +33,7 @@ def _tools_list(test_case):
 def test_tool_usage(request, record):
     """
     All three required tools must be invoked:
-        delegate_research, Worker: search_legislation, Worker: get_legislation_text.
+        delegate_research, Worker: search_legislation, Worker: search_legislation_sections.
 
     Score = number of tools present / 3 (i.e. 0.33 per tool).
     Passes only when all three are used (score == 1.0).
