@@ -45,8 +45,16 @@ class ToolUsageMetric(BaseMetric):
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
         tools_used: Set[str] = set()
+        # Tools whose completion event was never received from the stream (server-side
+        # stream fault — the LLM did call them, but the result was never streamed back).
+        incomplete_tools: Set[str] = set()
+
         if test_case.tools_called:
-            tools_used = {tool.name for tool in test_case.tools_called}
+            for tool in test_case.tools_called:
+                tools_used.add(tool.name)
+                output = tool.output or ""
+                if isinstance(output, str) and "no_completion_event" in output:
+                    incomplete_tools.add(tool.name)
 
         present = [t for t in REQUIRED_TOOLS if t in tools_used]
         missing = [t for t in REQUIRED_TOOLS if t not in tools_used]
@@ -61,6 +69,12 @@ class ToolUsageMetric(BaseMetric):
         )
         if missing:
             self.reason += f" | Missing: {missing}"
+        if incomplete_tools:
+            self.reason += (
+                f" | WARNING — stream incomplete (no result event received) for: "
+                f"{sorted(incomplete_tools)}. LLM called the tool correctly; "
+                f"server failed to return the completion event."
+            )
 
         return self.score
 

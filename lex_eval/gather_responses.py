@@ -106,6 +106,7 @@ def gather_responses(
     output_file: Path,
     overwrite: bool = False,
     max_workers: int = 10,
+    debug_events_file: Optional[Path] = None,
 ) -> None:
     """
     Gather responses from LLMs for all questions and save to a DuckDB database.
@@ -145,6 +146,21 @@ def gather_responses(
     clients_lock = threading.Lock()
     all_clients: List = []
 
+    # Debug event file writer (thread-safe)
+    debug_lock = threading.Lock() if debug_events_file else None
+    _debug_fh = None
+
+    def _write_debug_event(event_dict: dict) -> None:
+        """Thread-safe append of a single event dict as JSON line to the debug file."""
+        nonlocal _debug_fh
+        if debug_lock:
+            with debug_lock:
+                if _debug_fh is None and debug_events_file:
+                    _debug_fh = open(debug_events_file, "w")
+                if _debug_fh:
+                    _debug_fh.write(json.dumps(event_dict, default=str) + "\n")
+                    _debug_fh.flush()
+
     def get_client():
         """Return (or lazily create) an authenticated client for the current thread."""
         if not hasattr(thread_local, "client"):
@@ -169,7 +185,9 @@ def gather_responses(
         question_text = question_data.get("question")
         research_mode = question_data.get("research_mode", "legislation_only")
 
-        logger.info(f"[{index}/{total_combinations}] Q{question_id} × {llm_name} (mode={research_mode})")
+        logger.info(
+            f"[{index}/{total_combinations}] Q{question_id} × {llm_name} (mode={research_mode})"
+        )
 
         client = get_client()
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -179,6 +197,7 @@ def gather_responses(
                     question=question_text,
                     model_name=llm_name,
                     research_mode=research_mode,
+                    on_event=_write_debug_event if debug_events_file else None,
                 )
                 test_case = capture_result["test_case"]
                 research_output = capture_result["research_output"]
@@ -324,6 +343,18 @@ Examples:
         help="Questions file path (default: data/questions.json)",
     )
 
+    parser.add_argument(
+        "--provider",
+        choices=["ollama", "openrouter"],
+        help="Only use models from this provider (ollama or openrouter)",
+    )
+
+    parser.add_argument(
+        "--debug-events",
+        action="store_true",
+        help="Dump every raw SSE event to lex_eval/data/debug_events.jsonl for inspection",
+    )
+
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
@@ -336,7 +367,7 @@ Examples:
         questions = load_questions(args.questions_file, args.question_id)
 
         logger.info("Fetching available LLMs...")
-        available_llms = get_llms()
+        available_llms, _all_models = get_llms(provider=args.provider)
 
         if args.llm:
             validate_llm(args.llm, available_llms)
@@ -346,12 +377,18 @@ Examples:
             llm_names = available_llms
             logger.info(f"Using all {len(llm_names)} available LLMs")
 
+        debug_events_path = None
+        if args.debug_events:
+            debug_events_path = Path(__file__).parent / "data" / "debug_events.jsonl"
+            logger.info(f"Debug events will be written to: {debug_events_path}")
+
         gather_responses(
             questions=questions,
             llm_names=llm_names,
             output_file=args.output,
             overwrite=args.overwrite,
             max_workers=args.workers,
+            debug_events_file=debug_events_path,
         )
 
         return 0

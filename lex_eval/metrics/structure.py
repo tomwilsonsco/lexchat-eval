@@ -75,7 +75,9 @@ class MandatoryStructureMetric(BaseMetric):
         0.0  — one or more headings missing, or no delegate_research call found
     """
 
-    def __init__(self, threshold: float = 1.0, research_mode: str = "legislation_only") -> None:
+    def __init__(
+        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+    ) -> None:
         self.threshold = threshold
         self.research_mode = research_mode
         self.score = 0.0
@@ -95,7 +97,9 @@ class MandatoryStructureMetric(BaseMetric):
             return self.score
 
         lowered = dr_output.lower()
-        headings = REQUIRED_HEADINGS.get(self.research_mode, REQUIRED_HEADINGS["legislation_only"])
+        headings = REQUIRED_HEADINGS.get(
+            self.research_mode, REQUIRED_HEADINGS["legislation_only"]
+        )
         missing = [h for h in headings if h.lower() not in lowered]
 
         if missing:

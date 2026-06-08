@@ -413,14 +413,10 @@ def _render_chat_interaction(records: list[dict]) -> None:
             st.markdown("##### ⚙️ Execution Context")
             cols = st.columns(3)
             with cols[0]:
-                st.markdown(
-                    f"**Mode:** `{rec.get('research_mode', 'N/A')}`"
-                )
+                st.markdown(f"**Mode:** `{rec.get('research_mode', 'N/A')}`")
             with cols[1]:
                 fallback = rec.get("fallback_used", False)
-                st.markdown(
-                    f"**Fallback Used:** {'Yes' if fallback else 'No'}"
-                )
+                st.markdown(f"**Fallback Used:** {'Yes' if fallback else 'No'}")
             with cols[2]:
                 tool_seq = rec.get("tool_sequence") or []
                 st.markdown(f"**Tool Sequence:** `{len(tool_seq)}` steps")
@@ -490,19 +486,36 @@ def _render_chat_interaction(records: list[dict]) -> None:
                         with st.container():
                             if isinstance(output_raw, str):
                                 # Check for explicit "no results" fallback indicators
-                                if output_raw.strip().lower() in ("done", "none", "null", ""):
-                                    st.info("⚠️ No results returned from this API call.")
+                                if output_raw.strip().lower() in (
+                                    "done",
+                                    "none",
+                                    "null",
+                                    "",
+                                ):
+                                    st.info(
+                                        "⚠️ No results returned from this API call."
+                                    )
                                 else:
                                     try:
                                         parsed = json.loads(output_raw)
-                                        if isinstance(parsed, dict) and parsed.get("status") == "no_results":
-                                            st.info(f"⚠️ {parsed.get('message', 'No results returned from this API call.')}")
+                                        if (
+                                            isinstance(parsed, dict)
+                                            and parsed.get("status") == "no_results"
+                                        ):
+                                            st.info(
+                                                f"⚠️ {parsed.get('message', 'No results returned from this API call.')}"
+                                            )
                                         else:
                                             st.json(parsed, expanded=False)
                                     except (json.JSONDecodeError, ValueError):
                                         st.code(output_raw, language="text")
-                            elif isinstance(output_raw, dict) and output_raw.get("status") == "no_results":
-                                st.info(f"⚠️ {output_raw.get('message', 'No results returned from this API call.')}")
+                            elif (
+                                isinstance(output_raw, dict)
+                                and output_raw.get("status") == "no_results"
+                            ):
+                                st.info(
+                                    f"⚠️ {output_raw.get('message', 'No results returned from this API call.')}"
+                                )
                             elif isinstance(output_raw, (dict, list)):
                                 st.json(output_raw, expanded=False)
                             else:
@@ -535,7 +548,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
                     court = case_data.get("court", "")
                     date = case_data.get("date", "")
                     url = case_data.get("url", "")
-                    
+
                     meta_parts = [p for p in [ncn, court, date] if p]
                     meta_str = f" ({' | '.join(meta_parts)})" if meta_parts else ""
                     st.markdown(f"**{i + 1}. {title}{meta_str}**")

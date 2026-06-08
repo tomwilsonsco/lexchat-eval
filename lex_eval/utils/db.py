@@ -196,9 +196,7 @@ def load_records(
         case_law_context = (
             json.loads(case_law_context_json) if case_law_context_json else []
         )
-        tool_sequence = (
-            json.loads(tool_sequence_json) if tool_sequence_json else []
-        )
+        tool_sequence = json.loads(tool_sequence_json) if tool_sequence_json else []
         records.append(
             {
                 "question_id": qid,
