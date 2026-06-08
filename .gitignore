@@ -214,6 +214,7 @@ __marimo__/
 
 # Local databases (deploy copy is intentionally committed; responses.db is not)
 lex_eval/data/responses.db
+lex_eval/data/debug_events.jsonl
 
 # Python build
 dist/
