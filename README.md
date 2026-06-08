@@ -1,7 +1,7 @@
 # lex-eval
 
 Evaluations for [LexChat](https://github.com/delphium226/lexchat). Runs questions through
-available LLMs (Ollama currently), stores responses in DuckDB, scores them with both coded
+available LLMs (Ollama and OpenRouter), stores responses in DuckDB, scores them with both coded
 and AI-as-judge metrics, and visualises results in a Streamlit dashboard.
 
 ## Prerequisites
@@ -33,22 +33,37 @@ GEMINI_JUDGE_MODEL=gemini-2.5-flash
 
 # Set to 'gemini' to use Gemini as the AI judge
 JUDGE_PROVIDER=openai
+
+# Comma-separated allowlist of OpenRouter models for eval
+# Restricts from 100s of available models to a curated set
+OPENROUTER_EVAL_MODELS=anthropic/claude-sonnet-4-6,anthropic/claude-opus-4-7,...
 ```
 
 ## Step 1 Check LLMs are available
 
 ```bash
+# List all LLMs:
 python -m lex_eval.utils.get_llms
+
+# Filter by provider:
+python -m lex_eval.utils.get_llms --provider ollama
+python -m lex_eval.utils.get_llms --provider openrouter
 ```
 
-Lists all LLMs currently responding on the lexchat API. `gather_responses.py`
-calls this automatically, but it is useful to run first to see the names of the LLMs available to use.
+Lists all LLMs currently responding on the lexchat API. When LexChat is
+configured to use OpenRouter, model names follow the `provider/model-name`
+convention (e.g. `anthropic/claude-sonnet-4-6`). `gather_responses.py`
+calls this automatically, but it is useful to run first to see the names
+of the LLMs available to use.
 
 ## Step 2 Gather responses
 
 ```bash
 # All questions, all LLMs:
 python lex_eval/gather_responses.py
+
+# Only OpenRouter models:
+python lex_eval/gather_responses.py --provider openrouter
 
 # Specific question:
 python lex_eval/gather_responses.py --question-id 1
@@ -58,6 +73,10 @@ python lex_eval/gather_responses.py --llm "model-name"
 
 # Overwrite existing results (start fresh):
 python lex_eval/gather_responses.py --overwrite
+
+# Debug: dump every raw SSE event for inspection:
+python lex_eval/gather_responses.py --question-id 1 --debug-events
+# → writes lex_eval/data/debug_events.jsonl
 ```
 
 Responses are stored in `lex_eval/data/responses.db` (DuckDB).
