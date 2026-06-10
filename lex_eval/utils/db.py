@@ -78,14 +78,17 @@ _MIGRATE_RESPONSES = [
     "ALTER TABLE responses ADD COLUMN IF NOT EXISTS case_law_context JSON",
     "ALTER TABLE responses ADD COLUMN IF NOT EXISTS tool_sequence JSON",
     "ALTER TABLE responses ADD COLUMN IF NOT EXISTS fallback_used BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS summarisation_output JSON",
+    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS summarisation_used BOOLEAN NOT NULL DEFAULT FALSE",
 ]
 
 _INSERT_RESPONSE = """
 INSERT INTO responses (
     question_id, question, llm_name, timestamp, actual_output,
     retrieval_context, tools_called, research_output, is_error, error_message,
-    research_mode, case_law_context, tool_sequence, fallback_used
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    research_mode, case_law_context, tool_sequence, fallback_used,
+    summarisation_output, summarisation_used
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -140,6 +143,8 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             json.dumps(record.get("case_law_context") or []),
             json.dumps(record.get("tool_sequence") or []),
             record.get("fallback_used", False),
+            json.dumps(record.get("summarisation_output") or []),
+            record.get("summarisation_used", False),
         ],
     )
 
@@ -166,7 +171,8 @@ def load_records(
         rows = conn.execute(f"""
             SELECT question_id, question, llm_name, timestamp,
                    actual_output, retrieval_context, tools_called, research_output,
-                   research_mode, case_law_context, tool_sequence, fallback_used
+                   research_mode, case_law_context, tool_sequence, fallback_used,
+                   summarisation_output, summarisation_used
             FROM responses
             {where}
             ORDER BY id
@@ -188,6 +194,8 @@ def load_records(
         case_law_context_json,
         tool_sequence_json,
         fallback_used,
+        summarisation_output_json,
+        summarisation_used,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -197,6 +205,9 @@ def load_records(
             json.loads(case_law_context_json) if case_law_context_json else []
         )
         tool_sequence = json.loads(tool_sequence_json) if tool_sequence_json else []
+        summarisation_output = (
+            json.loads(summarisation_output_json) if summarisation_output_json else []
+        )
         records.append(
             {
                 "question_id": qid,
@@ -211,6 +222,8 @@ def load_records(
                 "case_law_context": case_law_context,
                 "tool_sequence": tool_sequence,
                 "fallback_used": bool(fallback_used),
+                "summarisation_output": summarisation_output,
+                "summarisation_used": bool(summarisation_used),
             }
         )
     return records
@@ -552,6 +565,12 @@ def make_deploy_db(
                     research_output,
                     is_error,
                     error_message,
+                    "legislation_only",
+                    "[]",
+                    "[]",
+                    False,
+                    "[]",
+                    False,
                 ],
             )
 

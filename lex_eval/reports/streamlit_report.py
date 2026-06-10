@@ -411,13 +411,16 @@ def _render_chat_interaction(records: list[dict]) -> None:
         with tab:
             # --- Execution Metadata ---
             st.markdown("##### ⚙️ Execution Context")
-            cols = st.columns(3)
+            cols = st.columns(4)
             with cols[0]:
                 st.markdown(f"**Mode:** `{rec.get('research_mode', 'N/A')}`")
             with cols[1]:
                 fallback = rec.get("fallback_used", False)
                 st.markdown(f"**Fallback Used:** {'Yes' if fallback else 'No'}")
             with cols[2]:
+                summarisation = rec.get("summarisation_used", False)
+                st.markdown(f"**Summarisation:** {'Yes' if summarisation else 'No'}")
+            with cols[3]:
                 tool_seq = rec.get("tool_sequence") or []
                 st.markdown(f"**Tool Sequence:** `{len(tool_seq)}` steps")
                 if tool_seq:
@@ -440,6 +443,19 @@ def _render_chat_interaction(records: list[dict]) -> None:
             if research_output:
                 st.markdown("#### 📝 Research Output (Worker Findings)")
                 st.markdown(research_output)
+                st.divider()
+
+            # --- Summarisation Output ---
+            summarisation_output: list = rec.get("summarisation_output") or []
+            summarisation_used = rec.get("summarisation_used", False)
+            if summarisation_output:
+                st.markdown(f"#### 🔍 Summarised Context ({len(summarisation_output)} passage(s))")
+                for i, summary_text in enumerate(summarisation_output):
+                    with st.expander(f"Summarised Passage {i + 1}", expanded=i == 0):
+                        st.markdown(summary_text)
+                st.divider()
+            elif summarisation_used:
+                st.info("Summarisation was used but no output was captured.")
                 st.divider()
 
             # --- Tools Called ---

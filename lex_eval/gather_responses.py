@@ -223,6 +223,8 @@ def gather_responses(
                     "case_law_context": capture_result.get("case_law_context") or [],
                     "tool_sequence": capture_result.get("tool_sequence") or [],
                     "fallback_used": capture_result.get("fallback_used", False),
+                    "summarisation_output": capture_result.get("summarisation_output") or [],
+                    "summarisation_used": capture_result.get("summarisation_used", False),
                 }
                 logger.info(
                     f"✓ Q{question_id} × {llm_name}: "

@@ -27,6 +27,9 @@ def audit_capture(
     fallback_used = False  # True if get_legislation_text was called
     research_output = ""
     tool_stack = []
+    summarisation_output = []  # ordered list of summarised texts
+    summarisation_used = False  # True if any summarisation occurred
+    _in_summarisation = False  # True while inside a summarisation wrapper
     _pending_api_entries = (
         []
     )  # LIFO stack matching each api_call_start to its api_call_end
@@ -84,9 +87,18 @@ def audit_capture(
                         )
 
                 elif event_type == "tool_start":
+                    tool_name = data.get("tool", "")
+                    # Summarisation wrapper: skip pushing to tool_stack —
+                    # progress events within it have no matching tool_end.
+                    if tool_name == "Extracting the relevant sections from a large document":
+                        _in_summarisation = True
+                        continue
+                    if _in_summarisation:
+                        # Progress message inside summarisation; skip the stack
+                        continue
                     tool_stack.append(
                         {
-                            "name": data.get("tool", "Unknown"),
+                            "name": tool_name,
                             "input_parameters": {},
                             "output": None,
                         }
@@ -193,6 +205,16 @@ def audit_capture(
                         api_entry["output"] = json.dumps(resp, default=str)
 
                 elif event_type == "tool_end":
+                    tool_name = data.get("tool", "")
+                    # Summarisation wrapper: capture the result and skip tool_stack
+                    if tool_name == "Extracting the relevant sections from a large document":
+                        summarised_text = str(data.get("result", "")).strip()
+                        if summarised_text and summarised_text.lower() not in ("done", "none", "null", ""):
+                            summarisation_output.append(summarised_text)
+                            summarisation_used = True
+                        _in_summarisation = False
+                        continue
+
                     if tool_stack:
                         completed = tool_stack.pop()
                         if not completed["output"]:
@@ -347,4 +369,6 @@ def audit_capture(
         "case_law_context": case_law_context,
         "tool_sequence": tool_sequence,
         "fallback_used": fallback_used,
+        "summarisation_output": summarisation_output,
+        "summarisation_used": summarisation_used,
     }
