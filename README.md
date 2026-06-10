@@ -27,42 +27,32 @@ OPENROUTER_API_KEY=yourkeyhere
 # Any OpenRouter model — openai/gpt-4o is the default, o4-mini for more thorough evals
 OPENROUTER_JUDGE_MODEL=openai/gpt-4o
 
-# Comma-separated allowlist of OpenRouter models for response generation
-# Restricts from 100s of available models to a curated set
-OPENROUTER_RESPONSE_MODELS=anthropic/claude-sonnet-4-6,anthropic/claude-opus-4-7,...
 ```
 
-## Step 1 Check LLMs are available
+## Step 1 Check the active LLM
 
 ```bash
-# List all LLMs:
-python -m lex_eval.utils.get_llms
+# Shows the active LLM for the current provider:
+python -m lex_eval.utils.get_llm
 
-# Filter by provider:
-python -m lex_eval.utils.get_llms --provider ollama
-python -m lex_eval.utils.get_llms --provider openrouter
+# With explicit provider:
+python -m lex_eval.utils.get_llm --provider ollama
+python -m lex_eval.utils.get_llm --provider openrouter
 ```
 
-Lists all LLMs currently responding on the lexchat API. When LexChat is
-configured to use OpenRouter, model names follow the `provider/model-name`
-convention (e.g. `anthropic/claude-sonnet-4-6`). `gather_responses.py`
-calls this automatically, but it is useful to run first to see the names
-of the LLMs available to use.
+Queries the LexChat API and prints the single active model (the one configured in the Admin Portal). There is always exactly one active model per provider.
 
 ## Step 2 Gather responses
 
 ```bash
-# All questions, all LLMs:
+# All questions on the active OpenRouter model (default):
 python lex_eval/gather_responses.py
 
-# Only OpenRouter models:
-python lex_eval/gather_responses.py --provider openrouter
+# On the active Ollama model:
+python lex_eval/gather_responses.py --provider ollama
 
 # Specific question:
 python lex_eval/gather_responses.py --question-id 1
-
-# Specific LLM:
-python lex_eval/gather_responses.py --llm "model-name"
 
 # Overwrite existing results (start fresh):
 python lex_eval/gather_responses.py --overwrite
@@ -73,7 +63,9 @@ python lex_eval/gather_responses.py --question-id 1 --debug-events
 ```
 
 Responses are stored in `lex_eval/data/responses.db` (DuckDB).
-Each question/LLM combination is attempted up to 3 times; only complete responses (non-empty `actual_output`) are written to the database.
+Each question is attempted up to 3 times; only complete responses (non-empty `actual_output`) are written to the database.
+
+**The model used for responses is always set in LexChat's Admin Portal.** The eval does not select or override the model — `gather_responses.py` reads the active model from the LexChat API and records it in `responses.db`. There is no `--llm` flag. To evaluate a different model, change it in the Admin Portal first, then re-run.
 
 We need to gather at least two responses per question per llm to evaluate response consistency. So starting from the beginning this is the recommended process.
 

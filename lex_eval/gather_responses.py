@@ -2,8 +2,12 @@
 """
 Gather LexChat responses for evaluation.
 
-This script runs questions through different LLMs and captures their responses
-for later evaluation using DeepEval metrics.
+This script runs questions through the active LLM configured in LexChat's admin
+portal and captures responses for later evaluation using DeepEval metrics.
+
+The model used for responses is always controlled via LexChat's Admin Portal —
+there is no --llm flag. To evaluate a different model, change it in the Admin
+Portal and re-run.
 """
 
 import argparse
@@ -21,9 +25,8 @@ from lex_eval.utils.db import (
     init_db,
     clear_responses,
     insert_response,
-    DEFAULT_DB,
 )
-from lex_eval.utils.get_llms import get_llms
+from lex_eval.utils.get_llm import get_active_model
 from lex_eval.utils.lexchat_client import get_authenticated_client
 
 # Configure logging
@@ -62,23 +65,6 @@ def load_questions(
     return questions
 
 
-def validate_llm(llm_name: str, available_llms: List[str]) -> None:
-    """
-    Validate that the specified LLM is available.
-
-    Args:
-        llm_name: Name of LLM to validate
-        available_llms: List of available LLM names
-
-    Raises:
-        ValueError: If LLM is not in available list
-    """
-    if llm_name not in available_llms:
-        raise ValueError(
-            f"LLM '{llm_name}' not found. Available LLMs: {', '.join(available_llms)}"
-        )
-
-
 def serialize_test_case(test_case) -> Dict[str, Any]:
     """
     Serialize a DeepEval LLMTestCase to a JSON-serializable dictionary.
@@ -102,32 +88,31 @@ def serialize_test_case(test_case) -> Dict[str, Any]:
 
 def gather_responses(
     questions: List[Dict[str, Any]],
-    llm_names: List[str],
+    llm_name: str,
     output_file: Path,
     overwrite: bool = False,
     max_workers: int = 10,
     debug_events_file: Optional[Path] = None,
 ) -> None:
     """
-    Gather responses from LLMs for all questions and save to a DuckDB database.
+    Gather responses from the active LLM for all questions and save to DuckDB.
 
-    Combinations are executed concurrently using a thread pool, with each thread
-    maintaining its own authenticated HTTP client. Results are written
-    incrementally as each combination completes, making the process
-    crash-resilient.
+    Runs concurrently using a thread pool, with each thread maintaining its own
+    authenticated HTTP client. Results are written incrementally as each question
+    completes, making the process crash-resilient.
 
     Args:
         questions: List of question dictionaries
-        llm_names: List of LLM names to test
+        llm_name: Name of the active LLM (from LexChat's admin portal)
         output_file: Path to the DuckDB database file
         overwrite: If True, clear table first; if False, add to existing rows
         max_workers: Maximum number of concurrent threads
     """
-    total_combinations = len(questions) * len(llm_names)
+    total_questions = len(questions)
 
     logger.info(
-        f"Starting evaluation: {len(questions)} questions × {len(llm_names)} LLMs = "
-        f"{total_combinations} combinations (max_workers={max_workers})"
+        f"Starting evaluation: {total_questions} questions × {llm_name} "
+        f"(max_workers={max_workers})"
     )
 
     # Prepare database
@@ -172,10 +157,10 @@ def gather_responses(
 
     MAX_ATTEMPTS = 3
 
-    def process_combination(
-        question_data: Dict[str, Any], llm_name: str, index: int
+    def process_question(
+        question_data: Dict[str, Any], index: int
     ) -> Optional[Dict[str, Any]]:
-        """Run a single question/LLM combination and write the result to the output file.
+        """Run a single question and write the result to the output file.
 
         Retries up to MAX_ATTEMPTS times. Returns None if a complete response
         (non-empty actual_output, no error) is never obtained — nothing is
@@ -186,7 +171,7 @@ def gather_responses(
         research_mode = question_data.get("research_mode", "legislation_only")
 
         logger.info(
-            f"[{index}/{total_combinations}] Q{question_id} × {llm_name} (mode={research_mode})"
+            f"[{index}/{total_questions}] Q{question_id} × {llm_name} (mode={research_mode})"
         )
 
         client = get_client()
@@ -244,12 +229,6 @@ def gather_responses(
         )
         return None
 
-    # Build flat list of all (question, llm, index) combinations
-    combinations = [
-        (q, llm, i + 1)
-        for i, (q, llm) in enumerate((q, llm) for q in questions for llm in llm_names)
-    ]
-
     completed = 0
     success_count = 0
     error_count = 0
@@ -257,8 +236,8 @@ def gather_responses(
     try:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
-                executor.submit(process_combination, q, llm, idx): (q, llm)
-                for q, llm, idx in combinations
+                executor.submit(process_question, q, i + 1): q
+                for i, q in enumerate(questions)
             }
             for future in as_completed(futures):
                 record = future.result()
@@ -271,7 +250,7 @@ def gather_responses(
                     success_count += 1
 
         logger.info(f"\n{'='*80}")
-        logger.info(f"✓ Completed {completed} combinations → {output_file}")
+        logger.info(f"✓ Completed {completed} questions → {output_file}")
         logger.info(f"  Success: {success_count}, Errors: {error_count}")
         logger.info(f"{'='*80}")
 
@@ -292,17 +271,21 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run all questions with all LLMs:
+  # Run all questions on the active OpenRouter model (default):
   python gather_responses.py
-  
-  # Run specific question:
+
+  # Run on the active Ollama model:
+  python gather_responses.py --provider ollama
+
+  # Run a specific question:
   python gather_responses.py --question-id 1
-  
-  # Run with specific LLM:
-  python gather_responses.py --llm "gpt-oss:120b-cloud"
-  
+
   # Overwrite existing results (start fresh):
   python gather_responses.py --overwrite
+
+  # Debug: dump every raw SSE event for inspection:
+  python gather_responses.py --question-id 1 --debug-events
+  # -> writes lex_eval/data/debug_events.jsonl
         """,
     )
 
@@ -310,12 +293,6 @@ Examples:
         "--question-id",
         type=int,
         help="Specific question ID to run (if not specified, runs all questions)",
-    )
-
-    parser.add_argument(
-        "--llm",
-        type=str,
-        help="Specific LLM to use (if not specified, uses all available LLMs)",
     )
 
     parser.add_argument(
@@ -348,7 +325,8 @@ Examples:
     parser.add_argument(
         "--provider",
         choices=["ollama", "openrouter"],
-        help="Only use models from this provider (ollama or openrouter)",
+        default="openrouter",
+        help="Provider to use (default: openrouter). The model is set in LexChat's admin portal.",
     )
 
     parser.add_argument(
@@ -368,16 +346,16 @@ Examples:
     try:
         questions = load_questions(args.questions_file, args.question_id)
 
-        logger.info("Fetching available LLMs...")
-        available_llms, _all_models = get_llms(provider=args.provider)
-
-        if args.llm:
-            validate_llm(args.llm, available_llms)
-            llm_names = [args.llm]
-            logger.info(f"Using specified LLM: {args.llm}")
-        else:
-            llm_names = available_llms
-            logger.info(f"Using all {len(llm_names)} available LLMs")
+        logger.info("Fetching active LLM from LexChat API...")
+        llm_name = get_active_model(args.provider)
+        if not llm_name:
+            raise ValueError(
+                f"No active {args.provider} model found in /api/models. "
+                f"Set a model in LexChat's admin portal."
+            )
+        logger.info(
+            "Using active %s model from admin portal: %s", args.provider, llm_name
+        )
 
         debug_events_path = None
         if args.debug_events:
@@ -386,7 +364,7 @@ Examples:
 
         gather_responses(
             questions=questions,
-            llm_names=llm_names,
+            llm_name=llm_name,
             output_file=args.output,
             overwrite=args.overwrite,
             max_workers=args.workers,
