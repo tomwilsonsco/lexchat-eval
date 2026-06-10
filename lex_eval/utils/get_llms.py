@@ -22,7 +22,7 @@ _OPENROUTER_DEFAULT_ALLOWLIST = ",".join(
 
 def _load_openrouter_allowlist() -> set:
     """Load the OpenRouter model allowlist from env, with a sensible default."""
-    raw = os.getenv("OPENROUTER_EVAL_MODELS", _OPENROUTER_DEFAULT_ALLOWLIST)
+    raw = os.getenv("OPENROUTER_RESPONSE_MODELS", _OPENROUTER_DEFAULT_ALLOWLIST)
     return {m.strip() for m in raw.split(",") if m.strip()}
 
 
@@ -34,7 +34,7 @@ def get_llms(provider: Optional[str] = None) -> tuple[List[str], List[dict]]:
         provider: Optional filter — 'ollama' or 'openrouter'.  If given, only
                   models from that provider are returned.  For 'openrouter',
                   results are additionally restricted to the
-                  OPENROUTER_EVAL_MODELS env var allowlist.
+                  OPENROUTER_RESPONSE_MODELS env var allowlist.
 
     Returns:
         Tuple of (llm_names: List[str], all_models: List[dict]) where
@@ -66,7 +66,7 @@ def get_llms(provider: Optional[str] = None) -> tuple[List[str], List[dict]]:
             excluded = before - len(models)
             if excluded:
                 logger.info(
-                    "OpenRouter allowlist excluded %d model(s) not in OPENROUTER_EVAL_MODELS "
+                    "OpenRouter allowlist excluded %d model(s) not in OPENROUTER_RESPONSE_MODELS "
                     "(allowed: %s)",
                     excluded,
                     ", ".join(sorted(allowlist)),

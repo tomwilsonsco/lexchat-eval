@@ -27,9 +27,9 @@ OPENROUTER_API_KEY=yourkeyhere
 # Any OpenRouter model — openai/gpt-4o is the default, o4-mini for more thorough evals
 OPENROUTER_JUDGE_MODEL=openai/gpt-4o
 
-# Comma-separated allowlist of OpenRouter models for eval
+# Comma-separated allowlist of OpenRouter models for response generation
 # Restricts from 100s of available models to a curated set
-OPENROUTER_EVAL_MODELS=anthropic/claude-sonnet-4-6,anthropic/claude-opus-4-7,...
+OPENROUTER_RESPONSE_MODELS=anthropic/claude-sonnet-4-6,anthropic/claude-opus-4-7,...
 ```
 
 ## Step 1 Check LLMs are available

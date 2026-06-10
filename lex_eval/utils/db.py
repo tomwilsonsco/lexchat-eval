@@ -42,10 +42,13 @@ eval_results
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import duckdb
+
+logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DEFAULT_DB = DATA_DIR / "responses.db"
@@ -68,7 +71,9 @@ CREATE TABLE IF NOT EXISTS responses (
     research_mode     TEXT     NOT NULL DEFAULT 'legislation_only',
     case_law_context  JSON,
     tool_sequence     JSON,
-    fallback_used     BOOLEAN  NOT NULL DEFAULT FALSE
+    fallback_used     BOOLEAN  NOT NULL DEFAULT FALSE,
+    summarisation_output JSON,
+    summarisation_used BOOLEAN DEFAULT FALSE
 );
 """
 
@@ -79,7 +84,7 @@ _MIGRATE_RESPONSES = [
     "ALTER TABLE responses ADD COLUMN IF NOT EXISTS tool_sequence JSON",
     "ALTER TABLE responses ADD COLUMN IF NOT EXISTS fallback_used BOOLEAN NOT NULL DEFAULT FALSE",
     "ALTER TABLE responses ADD COLUMN IF NOT EXISTS summarisation_output JSON",
-    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS summarisation_used BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS summarisation_used BOOLEAN DEFAULT FALSE",
 ]
 
 _INSERT_RESPONSE = """
@@ -108,7 +113,9 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
         try:
             conn.execute(stmt)
         except Exception:
-            pass  # column already exists or DB doesn't support IF NOT EXISTS
+            # Extract the column name from the ALTER statement for a helpful log message
+            col_hint = stmt.split("ADD COLUMN IF NOT EXISTS")[-1].strip() if "ADD COLUMN" in stmt else stmt
+            logger.warning("Migration skipped (column may already exist): %s", col_hint)
 
 
 def clear_responses(conn: duckdb.DuckDBPyConnection) -> None:
