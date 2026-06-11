@@ -169,7 +169,9 @@ def _score_badge(score: float | str, level: str | None = None) -> str:
 
 
 def _status_icon(passed: bool) -> str:
-    return "✅" if passed else "❌"
+    colour = "#3fb950" if passed else "#f85149"
+    text = "Passed" if passed else "Failed"
+    return f'<span style="color:{colour};font-weight:600;">{text}</span>'
 
 
 def _get_llm_pass_rate(llm: str, hierarchy: dict) -> float:
@@ -347,6 +349,7 @@ def _render_metric_detail(metrics: list[dict]) -> None:
 
         st.markdown(
             f"**{name}** {icon} — score: `{m['score']:.3f}`",
+            unsafe_allow_html=True
         )
         with st.container():
             if has_range:
@@ -370,7 +373,7 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
     """one raw eval result entry."""
     passed = r["passed"]
     colour = "#3fb950" if passed else "#f85149"
-    label = "✓ Passed" if passed else "✗ Failed"
+    label = "Passed" if passed else "Failed"
     prefix = f"{run_label} — " if run_label else ""
 
     st.markdown(
@@ -608,11 +611,13 @@ def _render_question_block(
     all_pass = all(m["passed"] for m in metrics)
     n_pass = sum(1 for m in metrics if m["passed"])
     n_total = len(metrics)
-    icon = "✅" if all_pass else ("⚠️" if n_pass > 0 else "❌")
+    
+    # Determine the colour for the metric count
+    count_colour = "red" if n_pass < n_total else "green"
 
     with st.expander(
-        f"{icon}  **Q{qid}** — {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
-        f"*({n_pass}/{n_total} metrics passed)*",
+        f"**Q{qid}** — {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
+        f":{count_colour}[*({n_pass}/{n_total} metrics passed)*]",
         expanded=False,
     ):
         _render_metric_summary_table(metrics)
