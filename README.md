@@ -32,12 +32,7 @@ OPENROUTER_JUDGE_MODEL=openai/gpt-4o
 ## Step 1 Check the active LLM
 
 ```bash
-# Shows the active LLM for the current provider:
 python -m lex_eval.utils.get_llm
-
-# With explicit provider:
-python -m lex_eval.utils.get_llm --provider ollama
-python -m lex_eval.utils.get_llm --provider openrouter
 ```
 
 Queries the LexChat API and prints the single active model (the one configured in the Admin Portal). There is always exactly one active model per provider.
@@ -45,11 +40,8 @@ Queries the LexChat API and prints the single active model (the one configured i
 ## Step 2 Gather responses
 
 ```bash
-# All questions on the active OpenRouter model (default):
+# All questions (model is set in LexChat's admin portal):
 python lex_eval/gather_responses.py
-
-# On the active Ollama model:
-python lex_eval/gather_responses.py --provider ollama
 
 # Specific question:
 python lex_eval/gather_responses.py --question-id 1

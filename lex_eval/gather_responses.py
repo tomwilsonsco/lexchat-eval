@@ -271,11 +271,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run all questions on the active OpenRouter model (default):
+  # Run all questions (model is set in LexChat's admin portal):
   python gather_responses.py
-
-  # Run on the active Ollama model:
-  python gather_responses.py --provider ollama
 
   # Run a specific question:
   python gather_responses.py --question-id 1
@@ -323,13 +320,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--provider",
-        choices=["ollama", "openrouter"],
-        default="openrouter",
-        help="Provider to use (default: openrouter). The model is set in LexChat's admin portal.",
-    )
-
-    parser.add_argument(
         "--debug-events",
         action="store_true",
         help="Dump every raw SSE event to lex_eval/data/debug_events.jsonl for inspection",
@@ -347,14 +337,14 @@ Examples:
         questions = load_questions(args.questions_file, args.question_id)
 
         logger.info("Fetching active LLM from LexChat API...")
-        llm_name = get_active_model(args.provider)
+        llm_name, provider = get_active_model()
         if not llm_name:
             raise ValueError(
-                f"No active {args.provider} model found in /api/models. "
-                f"Set a model in LexChat's admin portal."
+                "No active model found in /api/models. "
+                "Set a model in LexChat's admin portal."
             )
         logger.info(
-            "Using active %s model from admin portal: %s", args.provider, llm_name
+            "Using active model: %s (provider: %s)", llm_name, provider
         )
 
         debug_events_path = None
