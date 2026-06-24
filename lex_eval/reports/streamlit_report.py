@@ -541,6 +541,33 @@ def _render_chat_interaction(records: list[dict]) -> None:
                                 st.json(output_raw, expanded=False)
                             else:
                                 st.text(str(output_raw))
+                    elif tool_name == "delegate_research":
+                        params = (
+                            tool.get("input_parameters")
+                            or tool.get("inputParameters")
+                            or {}
+                        )
+                        query = params.get("query", "")
+                        if query:
+                            st.markdown(
+                                f'<div style="background:#0d1117;border-left:3px solid #d29922;'
+                                f'padding:8px 12px;border-radius:4px;margin:4px 0 2px 0;'
+                                f'font-size:0.85em;font-family:monospace;color:#d29922;">'
+                                f"🎯 Manager asked: {query}</div>",
+                                unsafe_allow_html=True,
+                            )
+                        output_raw = tool.get("output", "")
+                        with st.container():
+                            if isinstance(output_raw, str):
+                                try:
+                                    parsed = json.loads(output_raw)
+                                    st.json(parsed, expanded=False)
+                                except (json.JSONDecodeError, ValueError):
+                                    st.code(output_raw, language="text")
+                            elif isinstance(output_raw, (dict, list)):
+                                st.json(output_raw, expanded=False)
+                            else:
+                                st.text(str(output_raw))
                     else:
                         output_raw = tool.get("output", "")
                         with st.container():
