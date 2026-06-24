@@ -59,14 +59,32 @@ class OpenRouterJudge:
         kwargs: dict[str, Any] = {
             "model": self._model,
             "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.0,
+            "max_tokens": 4096,
         }
 
         if schema is not None:
-            kwargs["response_format"] = {"type": "json_object"}
+            # Use structured output (JSON Schema mode) when a schema is provided.
+            # This is more reliable than {"type": "json_object"} because it
+            # constrains the output to the exact schema shape, preventing models
+            # from returning empty or malformed JSON.
+            kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema.__name__,
+                    "strict": True,
+                    "schema": schema.model_json_schema(),
+                },
+            }
 
         try:
             response = self._client.chat.completions.create(**kwargs)
             content = response.choices[0].message.content or ""
+
+            if not content.strip():
+                raise ValueError(
+                    f"Judge returned empty content for prompt (model={self._model})"
+                )
 
             if schema is not None:
                 data = json.loads(content)
