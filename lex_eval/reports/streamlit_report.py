@@ -397,6 +397,11 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         st.error(r["error"])
 
 
+def _strip_worker_prefix(name: str) -> str:
+    """Remove the 'Worker: ' prefix from tool names for display."""
+    return name.removeprefix("Worker: ")
+
+
 def _render_chat_interaction(records: list[dict]) -> None:
     """
     raw chat interaction(s) for an LLM/question pair.
@@ -427,7 +432,8 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 tool_seq = rec.get("tool_sequence") or []
                 st.markdown(f"**Tool Sequence:** `{len(tool_seq)}` steps")
                 if tool_seq:
-                    st.caption(" → ".join(tool_seq))
+                    display_seq = [_strip_worker_prefix(t) for t in tool_seq]
+                    st.caption(" → ".join(display_seq))
 
             st.divider()
 
@@ -461,14 +467,20 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 st.info("Summarisation was used but no output was captured.")
                 st.divider()
 
-            # --- Tools Called ---
+            # --- Tools Called (sorted by tool_sequence start order) ---
             tools_called: list[dict] = (
                 [t for t in (rec.get("tools_called") or []) if t.get("name") != "Research Agent"]
             )
             if tools_called:
+                # Sort tools_called by their position in tool_sequence
+                tool_seq = rec.get("tool_sequence") or []
+                order_map = {name: i for i, name in enumerate(tool_seq)}
+                tools_called.sort(key=lambda t: order_map.get(t.get("name", ""), 999))
+
                 st.markdown(f"#### Tools Called ({len(tools_called)})")
                 for i, tool in enumerate(tools_called):
                     tool_name = tool.get("name", f"tool_{i}")
+                    display_name = _strip_worker_prefix(tool_name)
                     is_lex_api = any(
                         k in tool_name
                         for k in (
@@ -477,7 +489,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
                             "get_legislation",
                         )
                     )
-                    st.markdown(f"🔧 **{tool_name}**")
+                    st.markdown(f"🔧 **{display_name}**")
                     if is_lex_api:
                         params = (
                             tool.get("input_parameters")
