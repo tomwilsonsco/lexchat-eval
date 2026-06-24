@@ -462,7 +462,9 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 st.divider()
 
             # --- Tools Called ---
-            tools_called: list[dict] = rec.get("tools_called") or []
+            tools_called: list[dict] = (
+                [t for t in (rec.get("tools_called") or []) if t.get("name") != "Research Agent"]
+            )
             if tools_called:
                 st.markdown(f"#### Tools Called ({len(tools_called)})")
                 for i, tool in enumerate(tools_called):

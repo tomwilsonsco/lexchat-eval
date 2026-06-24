@@ -217,6 +217,11 @@ def audit_capture(
 
                     if tool_stack:
                         completed = tool_stack.pop()
+                        # Skip "Research Agent" completion signals — the
+                        # meaningful output is already captured via the
+                        # tool_result handler (renamed to delegate_research).
+                        if completed["name"] == "Research Agent":
+                            continue
                         if not completed["output"]:
                             fallback_result = str(data.get("result", "Done")).strip()
                             if fallback_result.lower() in ("done", "none", "null", ""):
