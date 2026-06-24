@@ -78,13 +78,19 @@ def audit_capture(
                                 raw_args = {}
                         elif not isinstance(raw_args, dict):
                             raw_args = {}
+                        func_name = func.get("name", "Unknown")
                         tool_stack.append(
                             {
-                                "name": func.get("name", "Unknown"),
+                                "name": func_name,
                                 "input_parameters": raw_args,
                                 "output": None,
                             }
                         )
+                        # Record tool invocation in start order.
+                        # tool_call fires first with the real function name
+                        # (e.g. "delegate_research"), before any tool_start
+                        # event.
+                        tool_sequence.append(func_name)
 
                 elif event_type == "tool_start":
                     tool_name = data.get("tool", "")
@@ -103,6 +109,12 @@ def audit_capture(
                             "output": None,
                         }
                     )
+                    # Record Worker tool invocations in start order.
+                    # Skip "Research Agent" — it's the server-internal wrapper
+                    # for "delegate_research", which was already recorded via
+                    # the tool_call event.
+                    if tool_name != "Research Agent":
+                        tool_sequence.append(tool_name)
 
                 elif event_type == "api_call_start":
                     if tool_stack:
@@ -235,11 +247,9 @@ def audit_capture(
                             else:
                                 completed["output"] = fallback_result
                         completed_name = completed["name"]
-                        # Track worker tool order (skip manager-level delegation wrapper)
-                        if completed_name != "delegate_research":
-                            tool_sequence.append(completed_name)
-                            if completed_name == "get_legislation_text":
-                                fallback_used = True
+                        # Track whether the fallback get_legislation_text was used
+                        if completed_name == "get_legislation_text":
+                            fallback_used = True
                         tools_captured.append(
                             ToolCall(
                                 name=completed_name,
