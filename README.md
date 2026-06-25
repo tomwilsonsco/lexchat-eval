@@ -52,6 +52,34 @@ python lex_eval/gather_responses.py --overwrite
 # Debug: dump every raw SSE event for inspection:
 python lex_eval/gather_responses.py --question-id 1 --debug-events
 # → writes lex_eval/data/debug_events.jsonl
+
+# Debug: write a per-question annotated audit log:
+python lex_eval/gather_responses.py --question-id 1 --verbose-capture
+# → writes lex_eval/data/verbose_logs/Q1_YYYYMMDD_HHMMSS.log
+
+# Both flags can be combined:
+python lex_eval/gather_responses.py --question-id 1 --debug-events --verbose-capture
+```
+
+### Diagnosing capture issues
+
+Two flags are available when a response looks wrong — empty fields, missing tools, zero retrieval context, etc.:
+
+| Flag | Output | Use when… |
+|---|---|---|
+| `--debug-events` | `data/debug_events.jsonl` — one JSON line per raw SSE event, appended | You suspect the **server sent unexpected data** — field renamed, event type missing or added, payload structure changed |
+| `--verbose-capture` | `data/verbose_logs/Q{id}_{YYYYMMDD}_{HHMMSS}.log` — one file per question | You got a **wrong capture result** — `research_output` empty, `tool_sequence` incomplete, zero `retrieval_context` items |
+
+`--debug-events` shows what arrived **over the wire** before `audit_capture` processes it. `--verbose-capture` shows what `audit_capture` **decided to do** with each event — stack state before/after, action taken, and a final state summary.
+
+Because `--debug-events` appends all questions into a single file, it is cleanest when combined with `--question-id`. `--verbose-capture` always writes one file per question so it is safe to use across all questions concurrently.
+
+To diff two runs of the same question:
+
+```bash
+diff \
+  lex_eval/data/verbose_logs/Q5_20260625_091600.log \
+  lex_eval/data/verbose_logs/Q5_20260625_091740.log
 ```
 
 Responses are stored in `lex_eval/data/responses.db` (DuckDB).
@@ -155,7 +183,8 @@ python -m lex_eval.utils.db --dry-run
 lex_eval/
 ├── data/
 │   ├── questions.json       # evaluation questions
-│   └── deploy.db            # committed compact database for Streamlit Cloud
+│   ├── deploy.db            # committed compact database for Streamlit Cloud
+│   └── verbose_logs/        # per-question capture audit logs (gitignored)
 ├── metrics/                 # custom DeepEval metric classes
 ├── reports/
 │   └── streamlit_report.py  # Streamlit dashboard
