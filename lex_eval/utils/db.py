@@ -78,13 +78,18 @@ CREATE TABLE IF NOT EXISTS responses (
 """
 
 # Columns added after the initial schema; applied to existing databases via init_db.
+# NOTE: Do NOT use IF NOT EXISTS here. DuckDB's ADD COLUMN IF NOT EXISTS silently
+# resets all existing row values to the column DEFAULT instead of raising an error.
+# Without IF NOT EXISTS, DuckDB raises CatalogException when the column already
+# exists, which the exception handler in init_db catches and skips. This preserves
+# existing data.
 _MIGRATE_RESPONSES = [
-    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS research_mode TEXT NOT NULL DEFAULT 'legislation_only'",
-    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS case_law_context JSON",
-    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS tool_sequence JSON",
-    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS fallback_used BOOLEAN NOT NULL DEFAULT FALSE",
-    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS summarisation_output JSON",
-    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS summarisation_used BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE responses ADD COLUMN research_mode TEXT NOT NULL DEFAULT 'legislation_only'",
+    "ALTER TABLE responses ADD COLUMN case_law_context JSON",
+    "ALTER TABLE responses ADD COLUMN tool_sequence JSON",
+    "ALTER TABLE responses ADD COLUMN fallback_used BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE responses ADD COLUMN summarisation_output JSON",
+    "ALTER TABLE responses ADD COLUMN summarisation_used BOOLEAN DEFAULT FALSE",
 ]
 
 _INSERT_RESPONSE = """
@@ -113,8 +118,13 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
         try:
             conn.execute(stmt)
         except Exception:
-            # Extract the column name from the ALTER statement for a helpful log message
-            col_hint = stmt.split("ADD COLUMN IF NOT EXISTS")[-1].strip() if "ADD COLUMN" in stmt else stmt
+            # Column already exists — roll back the aborted statement so the
+            # connection remains usable, then skip.
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            col_hint = stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
             logger.warning("Migration skipped (column may already exist): %s", col_hint)
 
 
@@ -150,7 +160,12 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             json.dumps(record.get("case_law_context") or []),
             json.dumps(record.get("tool_sequence") or []),
             record.get("fallback_used", False),
-            json.dumps(record.get("summarisation_output") or []),
+            # Pass None through as SQL NULL; only JSON-encode when there is real content.
+            (
+                json.dumps(record["summarisation_output"])
+                if record.get("summarisation_output") is not None
+                else None
+            ),
             record.get("summarisation_used", False),
         ],
     )

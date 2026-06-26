@@ -416,6 +416,28 @@ def audit_capture(
                     # Summarisation wrapper: capture result and skip tool_stack
                     if tool_name == "Extracting the relevant sections from a large document":
                         summarised_text = str(data.get("result", "")).strip()
+
+                        # Principled fallback detection: summarise_for_query (server-side)
+                        # returns the LLM's prose summary on success, or the raw original
+                        # tool result string (json.dumps of the API response) if the LLM
+                        # call fails.  Raw API data always parses as a JSON dict or list;
+                        # LLM-generated legal prose never does.  If the result is valid
+                        # JSON data, the summarisation LLM failed — discard it.  The
+                        # underlying section/full-text data is already captured in
+                        # retrieval_context from the preceding api_call_end event.
+                        try:
+                            _parsed = json.loads(summarised_text)
+                            if isinstance(_parsed, (dict, list)):
+                                _vlog(_vf, f"[SEQ {seq_n:03d}] tool_end")
+                                _vlog(_vf, f"  tool:            {tool_name!r}")
+                                _vlog(_vf, f"  result:          JSON data ({type(_parsed).__name__}) — summarisation LLM failed, fallback discarded")
+                                _vlog(_vf, f"  _in_summarisation: True → False")
+                                _vlog(_vf, "")
+                                _in_summarisation = False
+                                continue
+                        except (json.JSONDecodeError, TypeError):
+                            pass  # Not JSON → real LLM prose — fall through to capture
+
                         excluded = summarised_text.lower() in ("done", "none", "null", "")
                         if summarised_text and not excluded:
                             summarisation_output.append(summarised_text)
@@ -690,7 +712,9 @@ def audit_capture(
         "case_law_context": case_law_context,
         "tool_sequence": tool_sequence,
         "fallback_used": fallback_used,
-        "summarisation_output": summarisation_output,
+        # Return None (→ SQL NULL) when summarisation was not invoked, so the DB
+        # column is unambiguously null rather than an empty list.
+        "summarisation_output": summarisation_output if summarisation_used else None,
         "summarisation_used": summarisation_used,
         "is_error": is_error,
         "error_message": error_message,
