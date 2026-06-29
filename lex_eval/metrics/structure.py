@@ -24,22 +24,28 @@ _URL_RE = re.compile(r"https?://[^\s\)\]>,\"']+")
 #   "### **1. Summary Answer (BLUF):**" ✓
 #   "### 1. **Summary Answer (BLUF):**" ✓
 #   "### **3. Jurisdiction & Status**"  ✓  (no colon)
+#
+# Each entry may be either a single string or a list of acceptable
+# alternatives. The summary heading accepts both "Summary Answer (BLUF)"
+# and "Summary Answer" — the (BLUF) qualifier is a stylistic hint in the
+# Worker system prompt (see LexChat/server_py/src/config.py), not a
+# semantic requirement, so either form passes.
 REQUIRED_HEADINGS = {
     "legislation_only": [
-        "Summary Answer (BLUF)",
+        ["Summary Answer (BLUF)", "Summary Answer"],
         "Detailed Analysis",
         "Jurisdiction & Status",
         "References",
     ],
     "case_law_only": [
-        "Summary Answer (BLUF)",
+        ["Summary Answer (BLUF)", "Summary Answer"],
         "Key Cases",
         "Analysis",
         "Jurisdiction & Currency",
         "References",
     ],
     "legislation_and_case_law": [
-        "Summary Answer (BLUF)",
+        ["Summary Answer (BLUF)", "Summary Answer"],
         "Statutory Framework",
         "Key Cases",
         "Jurisdiction & Status",
@@ -100,12 +106,18 @@ class MandatoryStructureMetric(BaseMetric):
         headings = REQUIRED_HEADINGS.get(
             self.research_mode, REQUIRED_HEADINGS["legislation_only"]
         )
-        missing = [h for h in headings if h.lower() not in lowered]
+
+        def _heading_present(heading) -> bool:
+            variants = heading if isinstance(heading, list) else [heading]
+            return any(v.lower() in lowered for v in variants)
+
+        missing = [h for h in headings if not _heading_present(h)]
 
         if missing:
             self.score = 0.0
             self.success = False
-            self.reason = f"Missing mandatory headings: {', '.join(missing)}"
+            display = [h[0] if isinstance(h, list) else h for h in missing]
+            self.reason = f"Missing mandatory headings: {', '.join(display)}"
         else:
             self.score = 1.0
             self.success = True
