@@ -222,3 +222,7 @@ dist/
 *.egg-info/
 .venv/
 *.db
+
+.clinerules
+docs/
+lexchat/
