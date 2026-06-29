@@ -124,7 +124,9 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
                 conn.execute("ROLLBACK")
             except Exception:
                 pass
-            col_hint = stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
+            col_hint = (
+                stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
+            )
             logger.warning("Migration skipped (column may already exist): %s", col_hint)
 
 

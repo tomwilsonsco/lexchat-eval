@@ -65,10 +65,13 @@ def process_question(
             # Set up debug event callback if requested
             on_event = None
             if debug_events_file:
+
                 def _make_callback(fh):
                     def _callback(data):
                         fh.write(json.dumps(data, default=str) + "\n")
+
                     return _callback
+
                 on_event = _make_callback(debug_events_file)
 
             # Build per-attempt verbose log path (retries get separate files)
@@ -107,8 +110,12 @@ def process_question(
                     "case_law_context": capture_result.get("case_law_context", []),
                     "tool_sequence": capture_result.get("tool_sequence", []),
                     "fallback_used": capture_result.get("fallback_used", False),
-                    "summarisation_output": capture_result.get("summarisation_output", []),
-                    "summarisation_used": capture_result.get("summarisation_used", False),
+                    "summarisation_output": capture_result.get(
+                        "summarisation_output", []
+                    ),
+                    "summarisation_used": capture_result.get(
+                        "summarisation_used", False
+                    ),
                     "is_error": False,
                     "error_message": "",
                 }
@@ -272,16 +279,18 @@ def main() -> None:
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                     verbose_log_path = verbose_logs_dir / f"Q{q['id']}_{ts}.log"
 
-                futures[executor.submit(
-                    process_question,
-                    q["id"],
-                    q["question"],
-                    q.get("research_mode", "legislation_only"),
-                    model_name,
-                    args.retries,
-                    debug_fh,
-                    verbose_log_path,
-                )] = q
+                futures[
+                    executor.submit(
+                        process_question,
+                        q["id"],
+                        q["question"],
+                        q.get("research_mode", "legislation_only"),
+                        model_name,
+                        args.retries,
+                        debug_fh,
+                        verbose_log_path,
+                    )
+                ] = q
 
             for future in as_completed(futures):
                 q = futures[future]

@@ -122,7 +122,7 @@ def audit_capture(
     summarisation_output: List[str] = []
     summarisation_used: bool = False
     _in_summarisation: bool = False
-    # LIFO stack matching each api_call_start to its api_call_end
+    # stack matching each api_call_start to its api_call_end
     _pending_api_entries: List[Dict[str, Any]] = []
     is_error: bool = False
     error_message: str = ""
@@ -135,7 +135,9 @@ def audit_capture(
         return seq
 
     try:
-        with client.stream("POST", "/api/system/chat", json=chat_payload, timeout=300) as response:
+        with client.stream(
+            "POST", "/api/system/chat", json=chat_payload, timeout=300
+        ) as response:
             response.raise_for_status()
 
             for line in response.iter_lines():
@@ -194,11 +196,13 @@ def audit_capture(
                             raw_args = {}
                         func_name = func.get("name", "Unknown")
                         func_names.append(func_name)
-                        tool_stack.append({
-                            "name": func_name,
-                            "input_parameters": raw_args,
-                            "output": None,
-                        })
+                        tool_stack.append(
+                            {
+                                "name": func_name,
+                                "input_parameters": raw_args,
+                                "output": None,
+                            }
+                        )
                         # tool_call fires first with the real function name
                         # (e.g. "delegate_research"), before any tool_start event.
                         tool_sequence.append(func_name)
@@ -208,7 +212,10 @@ def audit_capture(
                     _vlog(_vf, f"  raw (truncated): {_trunc(data_str)}")
                     _vlog(_vf, f"  func_names:      {func_names}")
                     _vlog(_vf, f"  stack_before:    {stack_before}")
-                    _vlog(_vf, f"  action:          push {func_names} → tool_stack; append to tool_sequence")
+                    _vlog(
+                        _vf,
+                        f"  action:          push {func_names} → tool_stack; append to tool_sequence",
+                    )
                     _vlog(_vf, f"  stack_after:     {[t['name'] for t in tool_stack]}")
                     _vlog(_vf, "")
 
@@ -219,34 +226,44 @@ def audit_capture(
                     stack_before = [t["name"] for t in tool_stack]
                     seq_n = _seq()
 
-                    # Summarisation wrapper: skip pushing to tool_stack
-                    if tool_name == "Extracting the relevant sections from a large document":
+                    # Summarisation wrapper
+                    if (
+                        tool_name
+                        == "Extracting the relevant sections from a large document"
+                    ):
                         _vlog(_vf, f"[SEQ {seq_n:03d}] tool_start")
                         _vlog(_vf, f"  tool:            {tool_name!r}")
                         _vlog(_vf, f"  _in_summarisation: {_in_summarisation} → True")
                         _vlog(_vf, f"  stack_before:    {stack_before}")
-                        _vlog(_vf, f"  action:          SET _in_summarisation=True; skip stack push (continue)")
-                        _vlog(_vf, f"  stack_after:     {[t['name'] for t in tool_stack]}")
+                        _vlog(
+                            _vf,
+                            f"  action:          SET _in_summarisation=True; skip stack push (continue)",
+                        )
+                        _vlog(
+                            _vf, f"  stack_after:     {[t['name'] for t in tool_stack]}"
+                        )
                         _vlog(_vf, "")
                         _in_summarisation = True
                         continue
 
                     if _in_summarisation:
-                        # Progress message inside summarisation; skip the stack
-                        _vlog(_vf, f"[SEQ {seq_n:03d}] tool_start (inside summarisation — skip)")
+                        # progress message inside summarisation; skip the stack
+                        _vlog(
+                            _vf,
+                            f"[SEQ {seq_n:03d}] tool_start (inside summarisation — skip)",
+                        )
                         _vlog(_vf, f"  tool:            {tool_name!r}")
                         _vlog(_vf, "")
                         continue
 
                     seq_before_seq = list(tool_sequence)
-                    tool_stack.append({
-                        "name": tool_name,
-                        "input_parameters": {},
-                        "output": None,
-                    })
-                    # Record Worker tool invocations in start order.
-                    # Skip "Research Agent" — it's the server-internal wrapper
-                    # for "delegate_research", already recorded via tool_call.
+                    tool_stack.append(
+                        {
+                            "name": tool_name,
+                            "input_parameters": {},
+                            "output": None,
+                        }
+                    )
                     if tool_name != "Research Agent":
                         tool_sequence.append(tool_name)
 
@@ -256,9 +273,15 @@ def audit_capture(
                     _vlog(_vf, f"  stack_before:    {stack_before}")
                     _vlog(_vf, f"  action:          push {tool_name!r} → tool_stack")
                     if tool_name != "Research Agent":
-                        _vlog(_vf, f"  tool_sequence:   {seq_before_seq} → {list(tool_sequence)}")
+                        _vlog(
+                            _vf,
+                            f"  tool_sequence:   {seq_before_seq} → {list(tool_sequence)}",
+                        )
                     else:
-                        _vlog(_vf, f"  note:            Research Agent — NOT added to tool_sequence")
+                        _vlog(
+                            _vf,
+                            f"  note:            Research Agent — NOT added to tool_sequence",
+                        )
                     _vlog(_vf, f"  stack_after:     {[t['name'] for t in tool_stack]}")
                     _vlog(_vf, "")
 
@@ -276,7 +299,7 @@ def audit_capture(
                             "method": method,
                             "payload": data.get("payload", {}),
                         }
-                        # Push onto pending LIFO stack so api_call_end pops in order
+                        # Push onto pending stack so api_call_end pops in order
                         _pending_api_entries.append(tool_stack[-1])
                         action_desc = f"set input_parameters on {tool_stack[-1]['name']!r}; pushed to _pending_api_entries"
                     else:
@@ -285,7 +308,10 @@ def audit_capture(
                     _vlog(_vf, f"[SEQ {seq_n:03d}] api_call_start")
                     _vlog(_vf, f"  url:             {url}")
                     _vlog(_vf, f"  method:          {method}")
-                    _vlog(_vf, f"  top_of_stack:    {tool_stack[-1]['name'] if tool_stack else '(empty)'}")
+                    _vlog(
+                        _vf,
+                        f"  top_of_stack:    {tool_stack[-1]['name'] if tool_stack else '(empty)'}",
+                    )
                     _vlog(_vf, f"  action:          {action_desc}")
                     _vlog(_vf, f"  _pending_api_cnt: {len(_pending_api_entries)}")
                     _vlog(_vf, "")
@@ -316,7 +342,7 @@ def audit_capture(
                         resp_type = "get_legislation_text (full_text)"
 
                     elif "search_legislation_sections" in current_tool:
-                        # Primary retrieval path — capture actual section text
+                        # primary retrieval path capture actual section text
                         if isinstance(resp, list):
                             sections = resp
                         elif isinstance(resp, dict):
@@ -333,7 +359,9 @@ def audit_capture(
                                 or sec.get("excerpt")
                                 or ""
                             )
-                            sec_title = sec.get("title") or sec.get("section_title") or ""
+                            sec_title = (
+                                sec.get("title") or sec.get("section_title") or ""
+                            )
                             if content:
                                 retrieval_context.append(
                                     f"{sec_title}: {content}" if sec_title else content
@@ -352,7 +380,7 @@ def audit_capture(
                             and "ncn" in resp["results"][0]
                         )
                     ):
-                        # Case law results
+                        # case law results
                         for r in resp.get("results", []):
                             if not isinstance(r, dict):
                                 continue
@@ -361,13 +389,15 @@ def audit_capture(
                             court = r.get("court", "")
                             date = r.get("date", "")
                             url_r = r.get("url", "")
-                            case_law_context.append({
-                                "title": title,
-                                "ncn": ncn,
-                                "court": court,
-                                "date": date,
-                                "url": url_r,
-                            })
+                            case_law_context.append(
+                                {
+                                    "title": title,
+                                    "ncn": ncn,
+                                    "court": court,
+                                    "date": date,
+                                    "url": url_r,
+                                }
+                            )
                             parts = [p for p in [ncn, court, date] if p]
                             retrieval_context.append(
                                 f"{title} ({' | '.join(parts)})" if parts else title
@@ -376,7 +406,7 @@ def audit_capture(
                         resp_type = f"case_law ({items_added_case_law} results)"
 
                     elif isinstance(resp, dict) and "results" in resp:
-                        # Legislation search metadata
+                        # legislation search metadata
                         for r in resp["results"]:
                             if not isinstance(r, dict):
                                 continue
@@ -388,7 +418,9 @@ def audit_capture(
                                 f"{title} ({', '.join(parts)})" if parts else title
                             )
                             items_added_ctx += 1
-                        resp_type = f"legislation search metadata ({items_added_ctx} items)"
+                        resp_type = (
+                            f"legislation search metadata ({items_added_ctx} items)"
+                        )
 
                     else:
                         resp_type = f"other / unrecognised ({type(resp).__name__})"
@@ -413,32 +445,35 @@ def audit_capture(
                     stack_before = [t["name"] for t in tool_stack]
                     seq_n = _seq()
 
-                    # Summarisation wrapper: capture result and skip tool_stack
-                    if tool_name == "Extracting the relevant sections from a large document":
+                    # summarisation wrapper: capture result and skip tool_stack
+                    if (
+                        tool_name
+                        == "Extracting the relevant sections from a large document"
+                    ):
                         summarised_text = str(data.get("result", "")).strip()
 
-                        # Principled fallback detection: summarise_for_query (server-side)
-                        # returns the LLM's prose summary on success, or the raw original
-                        # tool result string (json.dumps of the API response) if the LLM
-                        # call fails.  Raw API data always parses as a JSON dict or list;
-                        # LLM-generated legal prose never does.  If the result is valid
-                        # JSON data, the summarisation LLM failed — discard it.  The
-                        # underlying section/full-text data is already captured in
-                        # retrieval_context from the preceding api_call_end event.
                         try:
                             _parsed = json.loads(summarised_text)
                             if isinstance(_parsed, (dict, list)):
                                 _vlog(_vf, f"[SEQ {seq_n:03d}] tool_end")
                                 _vlog(_vf, f"  tool:            {tool_name!r}")
-                                _vlog(_vf, f"  result:          JSON data ({type(_parsed).__name__}) — summarisation LLM failed, fallback discarded")
+                                _vlog(
+                                    _vf,
+                                    f"  result:          JSON data ({type(_parsed).__name__}) — summarisation LLM failed, fallback discarded",
+                                )
                                 _vlog(_vf, f"  _in_summarisation: True → False")
                                 _vlog(_vf, "")
                                 _in_summarisation = False
                                 continue
                         except (json.JSONDecodeError, TypeError):
-                            pass  # Not JSON → real LLM prose — fall through to capture
+                            pass
 
-                        excluded = summarised_text.lower() in ("done", "none", "null", "")
+                        excluded = summarised_text.lower() in (
+                            "done",
+                            "none",
+                            "null",
+                            "",
+                        )
                         if summarised_text and not excluded:
                             summarisation_output.append(summarised_text)
                             summarisation_used = True
@@ -446,13 +481,19 @@ def audit_capture(
                             _vlog(_vf, f"  tool:            {tool_name!r}")
                             _vlog(_vf, f"  result_len:      {len(summarised_text)}")
                             _vlog(_vf, f"  result_preview:  {_trunc(summarised_text)}")
-                            _vlog(_vf, f"  action:          summarisation_output.append(text)  [now {len(summarisation_output)} item(s)]")
+                            _vlog(
+                                _vf,
+                                f"  action:          summarisation_output.append(text)  [now {len(summarisation_output)} item(s)]",
+                            )
                             _vlog(_vf, f"  _in_summarisation: True → False")
                             _vlog(_vf, "")
                         else:
                             _vlog(_vf, f"[SEQ {seq_n:03d}] tool_end")
                             _vlog(_vf, f"  tool:            {tool_name!r}")
-                            _vlog(_vf, f"  result:          {'excluded value' if excluded else 'None/empty'} — skipped")
+                            _vlog(
+                                _vf,
+                                f"  result:          {'excluded value' if excluded else 'None/empty'} — skipped",
+                            )
                             _vlog(_vf, f"  _in_summarisation: True → False")
                             _vlog(_vf, "")
                         _in_summarisation = False
@@ -461,14 +502,20 @@ def audit_capture(
                     if tool_stack:
                         completed = tool_stack.pop()
 
-                        # Skip "Research Agent" completion — meaningful output is
+                        # skip "Research Agent" completion meaningful output is
                         # already captured via the tool_result handler.
                         if completed["name"] == "Research Agent":
                             _vlog(_vf, f"[SEQ {seq_n:03d}] tool_end")
                             _vlog(_vf, f"  tool:            {tool_name!r}")
                             _vlog(_vf, f"  popped:          {completed['name']!r}")
-                            _vlog(_vf, f"  action:          SKIP — Research Agent handled by tool_result")
-                            _vlog(_vf, f"  stack_after:     {[t['name'] for t in tool_stack]}")
+                            _vlog(
+                                _vf,
+                                f"  action:          SKIP — Research Agent handled by tool_result",
+                            )
+                            _vlog(
+                                _vf,
+                                f"  stack_after:     {[t['name'] for t in tool_stack]}",
+                            )
                             _vlog(_vf, "")
                             continue
 
@@ -476,10 +523,13 @@ def audit_capture(
                         if not completed["output"]:
                             fallback_result = str(data.get("result", "Done")).strip()
                             if fallback_result.lower() in ("done", "none", "null", ""):
-                                completed["output"] = json.dumps({
-                                    "status": "no_results",
-                                    "message": "API returned no results or empty response",
-                                }, default=str)
+                                completed["output"] = json.dumps(
+                                    {
+                                        "status": "no_results",
+                                        "message": "API returned no results or empty response",
+                                    },
+                                    default=str,
+                                )
                                 output_source = "fallback no_results sentinel"
                             else:
                                 completed["output"] = fallback_result
@@ -489,24 +539,34 @@ def audit_capture(
                         if completed_name == "get_legislation_text":
                             fallback_used = True
 
-                        tools_captured.append(ToolCall(
-                            name=completed_name,
-                            input_parameters=completed["input_parameters"],
-                            output=completed["output"],
-                        ))
+                        tools_captured.append(
+                            ToolCall(
+                                name=completed_name,
+                                input_parameters=completed["input_parameters"],
+                                output=completed["output"],
+                            )
+                        )
 
                         _vlog(_vf, f"[SEQ {seq_n:03d}] tool_end")
                         _vlog(_vf, f"  tool:            {tool_name!r}")
                         _vlog(_vf, f"  stack_before:    {stack_before}")
                         _vlog(_vf, f"  popped:          {completed_name!r}")
                         _vlog(_vf, f"  output_source:   {output_source}")
-                        output_str = str(completed["output"]) if completed["output"] is not None else ""
+                        output_str = (
+                            str(completed["output"])
+                            if completed["output"] is not None
+                            else ""
+                        )
                         _vlog(_vf, f"  output_len:      {len(output_str)}")
                         _vlog(_vf, f"  tools_captured:  {len(tools_captured)} total")
-                        _vlog(_vf, f"  stack_after:     {[t['name'] for t in tool_stack]}")
+                        _vlog(
+                            _vf, f"  stack_after:     {[t['name'] for t in tool_stack]}"
+                        )
                         _vlog(_vf, "")
                     else:
-                        _vlog(_vf, f"[SEQ {seq_n:03d}] tool_end (stack empty — skipped)")
+                        _vlog(
+                            _vf, f"[SEQ {seq_n:03d}] tool_end (stack empty — skipped)"
+                        )
                         _vlog(_vf, f"  tool:            {tool_name!r}")
                         _vlog(_vf, "")
 
@@ -519,7 +579,7 @@ def audit_capture(
                     stack_before = [t["name"] for t in tool_stack]
                     seq_n = _seq()
 
-                    # Determine the effective tool name by popping from tool_stack
+                    # determine the effective tool name by popping from tool_stack
                     if tool_stack:
                         delegation = tool_stack.pop()
                         input_params = delegation.get("input_parameters", {})
@@ -527,7 +587,7 @@ def audit_capture(
                     else:
                         effective_tool_name = tool_name
 
-                    # Fix 1: the server may label Worker output as "Research Agent"
+                    # the server may label Worker output as "Research Agent"
                     # in tool_result events — treat it as delegate_research.
                     _is_research_agent = (
                         effective_tool_name == "Research Agent"
@@ -539,18 +599,24 @@ def audit_capture(
                     elif effective_tool_name == "delegate_research":
                         research_output = result_text
 
-                    tools_captured.append(ToolCall(
-                        name=effective_tool_name,
-                        input_parameters=input_params,
-                        output=result_text,
-                    ))
+                    tools_captured.append(
+                        ToolCall(
+                            name=effective_tool_name,
+                            input_parameters=input_params,
+                            output=result_text,
+                        )
+                    )
 
                     _vlog(_vf, f"[SEQ {seq_n:03d}] tool_result")
                     _vlog(_vf, f"  tool (event):    {tool_name!r}")
                     _vlog(_vf, f"  stack_before:    {stack_before}")
                     _vlog(_vf, f"  effective_name:  {effective_tool_name!r}")
                     _vlog(_vf, f"  is_research_agent: {_is_research_agent}")
-                    _vlog(_vf, f"  research_output_set: {bool(research_output)}" + (f" ({len(result_text)} chars)" if research_output else ""))
+                    _vlog(
+                        _vf,
+                        f"  research_output_set: {bool(research_output)}"
+                        + (f" ({len(result_text)} chars)" if research_output else ""),
+                    )
                     _vlog(_vf, f"  stack_after:     {[t['name'] for t in tool_stack]}")
                     _vlog(_vf, "")
 
@@ -560,7 +626,6 @@ def audit_capture(
                 elif event_type == "token":
                     actual_output += data.get("content", "")
                     _token_count += 1
-                    # Don't log per-token — too noisy; summarised in 'result' block
 
                 # ----------------------------------------------------------
                 # result  — final complete message
@@ -621,19 +686,20 @@ def audit_capture(
             "tool_stack not empty at stream end — '%s' started but no completion event received",
             leftover_name,
         )
-        tools_captured.append(ToolCall(
-            name=leftover_name,
-            input_parameters=leftover.get("input_parameters", {}),
-            output=json.dumps({
-                "status": "no_completion_event",
-                "message": "Tool started but its result event was never received from the stream",
-            }, default=str),
-        ))
+        tools_captured.append(
+            ToolCall(
+                name=leftover_name,
+                input_parameters=leftover.get("input_parameters", {}),
+                output=json.dumps(
+                    {
+                        "status": "no_completion_event",
+                        "message": "Tool started but its result event was never received from the stream",
+                    },
+                    default=str,
+                ),
+            )
+        )
 
-    # ------------------------------------------------------------------
-    # Fix 2: retroactive repair — if research_output is still empty, scan
-    # tools_captured for any entry whose output contains the research signature.
-    # ------------------------------------------------------------------
     retroactive_repair = False
     if not research_output:
         _RESEARCH_SIGNATURE = "[Research Agent Result]"
@@ -654,7 +720,9 @@ def audit_capture(
                 research_output = tc_output
                 tools_captured[i] = ToolCall(
                     name="delegate_research",
-                    input_parameters=tc.input_parameters if hasattr(tc, "input_parameters") else {},
+                    input_parameters=(
+                        tc.input_parameters if hasattr(tc, "input_parameters") else {}
+                    ),
                     output=tc_output,
                 )
                 retroactive_repair = True
@@ -672,11 +740,21 @@ def audit_capture(
     _ended_ts = datetime.now(timezone.utc)
     _vlog(_vf, "=== FINAL STATE ===")
     _vlog(_vf, f"actual_output:          {len(actual_output)} chars")
-    _vlog(_vf, f"research_output:        {len(research_output)} chars" if research_output else "research_output:        (empty)")
+    _vlog(
+        _vf,
+        (
+            f"research_output:        {len(research_output)} chars"
+            if research_output
+            else "research_output:        (empty)"
+        ),
+    )
     _vlog(_vf, f"retrieval_context:      {len(retrieval_context)} items")
     _vlog(_vf, f"tools_captured:         {[t.name for t in tools_captured]}")
     _vlog(_vf, f"tool_sequence:          {list(tool_sequence)}")
-    _vlog(_vf, f"summarisation_output:   {len(summarisation_output)} item(s)  (total {sum(len(s) for s in summarisation_output)} chars)")
+    _vlog(
+        _vf,
+        f"summarisation_output:   {len(summarisation_output)} item(s)  (total {sum(len(s) for s in summarisation_output)} chars)",
+    )
     _vlog(_vf, f"summarisation_used:     {summarisation_used}")
     _vlog(_vf, f"fallback_used:          {fallback_used}")
     _vlog(_vf, f"case_law_context:       {len(case_law_context)} items")
@@ -687,13 +765,15 @@ def audit_capture(
     if error_message:
         _vlog(_vf, f"error_message:          {error_message}")
     _vlog(_vf, f"ended:                  {_ended_ts.isoformat()}")
-    _vlog(_vf, f"duration_s:             {(_ended_ts - _started_ts).total_seconds():.1f}")
+    _vlog(
+        _vf, f"duration_s:             {(_ended_ts - _started_ts).total_seconds():.1f}"
+    )
     _vlog(_vf, "==================")
 
     if _vf:
         _vf.close()
 
-    # Deduplicate retrieval_context (preserving order)
+    # deduplicate retrieval_context (preserving order)
     retrieval_context = list(dict.fromkeys(retrieval_context))
 
     return {
@@ -702,7 +782,9 @@ def audit_capture(
         "tools_called": [
             {
                 "name": tc.name,
-                "input_parameters": tc.input_parameters if hasattr(tc, "input_parameters") else {},
+                "input_parameters": (
+                    tc.input_parameters if hasattr(tc, "input_parameters") else {}
+                ),
                 "output": tc.output,
             }
             for tc in tools_captured
@@ -712,8 +794,7 @@ def audit_capture(
         "case_law_context": case_law_context,
         "tool_sequence": tool_sequence,
         "fallback_used": fallback_used,
-        # Return None (→ SQL NULL) when summarisation was not invoked, so the DB
-        # column is unambiguously null rather than an empty list.
+        # return None (SQL NULL) when summarisation was not invoked
         "summarisation_output": summarisation_output if summarisation_used else None,
         "summarisation_used": summarisation_used,
         "is_error": is_error,

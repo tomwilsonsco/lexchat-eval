@@ -348,8 +348,7 @@ def _render_metric_detail(metrics: list[dict]) -> None:
         icon = _status_icon(m["passed"])
 
         st.markdown(
-            f"**{name}** {icon} — score: `{m['score']:.3f}`",
-            unsafe_allow_html=True
+            f"**{name}** {icon} — score: `{m['score']:.3f}`", unsafe_allow_html=True
         )
         with st.container():
             if has_range:
@@ -458,7 +457,9 @@ def _render_chat_interaction(records: list[dict]) -> None:
             summarisation_output: list = rec.get("summarisation_output") or []
             summarisation_used = rec.get("summarisation_used", False)
             if summarisation_output:
-                st.markdown(f"#### 🔍 Summarised Context ({len(summarisation_output)} passage(s))")
+                st.markdown(
+                    f"#### 🔍 Summarised Context ({len(summarisation_output)} passage(s))"
+                )
                 for i, summary_text in enumerate(summarisation_output):
                     with st.expander(f"Summarised Passage {i + 1}", expanded=i == 0):
                         st.markdown(summary_text)
@@ -468,9 +469,11 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 st.divider()
 
             # --- Tools Called (sorted by tool_sequence start order) ---
-            tools_called: list[dict] = (
-                [t for t in (rec.get("tools_called") or []) if t.get("name") != "Research Agent"]
-            )
+            tools_called: list[dict] = [
+                t
+                for t in (rec.get("tools_called") or [])
+                if t.get("name") != "Research Agent"
+            ]
             if tools_called:
                 # Sort tools_called by their position in tool_sequence
                 tool_seq = rec.get("tool_sequence") or []
@@ -563,7 +566,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
                         if query:
                             st.markdown(
                                 f'<div style="background:#0d1117;border-left:3px solid #d29922;'
-                                f'padding:8px 12px;border-radius:4px;margin:4px 0 2px 0;'
+                                f"padding:8px 12px;border-radius:4px;margin:4px 0 2px 0;"
                                 f'font-size:0.85em;font-family:monospace;color:#d29922;">'
                                 f"🎯 Manager asked: {query}</div>",
                                 unsafe_allow_html=True,
@@ -652,7 +655,7 @@ def _render_question_block(
     all_pass = all(m["passed"] for m in metrics)
     n_pass = sum(1 for m in metrics if m["passed"])
     n_total = len(metrics)
-    
+
     # Determine the colour for the metric count
     count_colour = "red" if n_pass < n_total else "green"
 
