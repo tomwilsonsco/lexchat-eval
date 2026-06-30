@@ -1,8 +1,23 @@
 """
-Test that every captured response used all required legislation tools.
+Test that every captured response used all required legislation tools *and*
+invoked them in the correct phase order.
 
-Scores 1/3 per tool (delegate_research, Worker: search_legislation, Worker: search_legislation_sections).
-Passes only when all three are present (score == 1.0).
+Presence — 1/3 per required tool (delegate_research, Worker: search_legislation,
+Worker: search_legislation_sections).
+
+Order (legislation_only only) — Worker tools must appear in the phase order
+mandated by the Worker system prompt:
+
+    1. Worker: search_legislation          (Phase 1 — DISCOVER)
+    2. Worker: search_legislation_sections (Phase 2 — RETRIEVE PROVISIONS)
+    3. Worker: get_legislation_text        (Phase 3 — FALLBACK, optional)
+
+Score:
+    - 1.0  all three required tools present AND correct order
+    - 0.5  all three required tools present BUT wrong order
+    - <1.0 one or more required tools missing (proportional)
+
+Passes only when score == 1.0.
 """
 
 import pytest
@@ -32,14 +47,24 @@ def _tools_list(test_case):
 )
 def test_tool_usage(request, record):
     """
-    All three required tools must be invoked:
-        delegate_research, Worker: search_legislation, Worker: search_legislation_sections.
+    All three required tools must be invoked, in the correct order:
 
-    Score = number of tools present / 3 (i.e. 0.33 per tool).
-    Passes only when all three are used (score == 1.0).
+        delegate_research, Worker: search_legislation,
+        Worker: search_legislation_sections,
+        Worker: get_legislation_text (optional fallback)
+
+    Score = 1.0 only when all three required tools are present AND the Worker
+    tools appear in the expected phase order. Wrong order caps the score at
+    0.5 (fail). Missing tools score proportionally (fail).
     """
     test_case = record_to_test_case(record)
-    metric = ToolUsageMetric(threshold=1.0)
+    research_mode = record.get("research_mode", "legislation_only")
+    tool_sequence = record.get("tool_sequence") or []
+    metric = ToolUsageMetric(
+        threshold=1.0,
+        research_mode=research_mode,
+        tool_sequence=tool_sequence,
+    )
     metric.measure(test_case)
 
     attach_metric(

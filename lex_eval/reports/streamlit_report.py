@@ -57,7 +57,7 @@ METRIC_DISPLAY_ORDER: list[str] = [
 
 # hover over tips on app summary tables
 METRIC_TOOLTIPS: dict[str, str] = {
-    "Tool Usage": "Are all of delegate research, search legislation, get legislation text used.",
+    "Tool Usage": "Are all of delegate research, search legislation and search legislation sections used, in the correct order (search legislation - search legislation sections - get legislation text if needed).",
     "Research Output Structure": "Does the worker agent return the findings to the manager with the requested headers.",
     "Reference Links": "Are reference links included in the answer provided to the user.",
     "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity.",
