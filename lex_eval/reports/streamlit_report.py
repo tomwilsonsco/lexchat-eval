@@ -658,13 +658,21 @@ def _render_question_block(
     n_total = len(metrics)
 
     # Determine the colour for the metric count
-    count_colour = "red" if n_pass < n_total else "green"
+    count_colour = "#3fb950" if n_pass == n_total else "#f85149"
+    status_text = "All passed" if n_pass == n_total else "Some failed"
 
+    # Expander labels render as plain text (no Markdown/color markup), so keep
+    # the label unstyled and surface the colored status inside the expander body.
     with st.expander(
-        f"**Q{qid}** — {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
-        f":{count_colour}[*({n_pass}/{n_total} metrics passed)*]",
+        f"Q{qid} — {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
+        f"({n_pass}/{n_total} metrics passed)",
         expanded=False,
     ):
+        st.markdown(
+            f'<span style="color:{count_colour};font-weight:600;">'
+            f"{n_pass}/{n_total} metrics passed</span>",
+            unsafe_allow_html=True,
+        )
         _render_metric_summary_table(metrics)
 
         st.markdown("")  # spacer
