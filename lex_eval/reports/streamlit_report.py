@@ -349,7 +349,7 @@ def _render_metric_detail(metrics: list[dict]) -> None:
         icon = _status_icon(m["passed"])
 
         st.markdown(
-            f"**{name}** {icon} — score: `{m['score']:.3f}`", unsafe_allow_html=True
+            f"**{name}** {icon} - score: `{m['score']:.3f}`", unsafe_allow_html=True
         )
         with st.container():
             if has_range:
@@ -364,7 +364,7 @@ def _render_metric_detail(metrics: list[dict]) -> None:
                 for idx, raw in enumerate(m.get("raw_results", []), 1):
                     _render_single_eval_result(raw, run_label=f"Run {idx}")
             else:
-                # Consistency — single aggregated result, no per-run breakdown
+                # Consistency - single aggregated result, no per-run breakdown
                 _render_single_eval_result(m)
         st.divider()
 
@@ -374,7 +374,7 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
     passed = r["passed"]
     colour = "#3fb950" if passed else "#f85149"
     label = "Passed" if passed else "Failed"
-    prefix = f"{run_label} — " if run_label else ""
+    prefix = f"{run_label}: " if run_label else ""
 
     st.markdown(
         f'<div style="background:#0d1117;border-left:3px solid {colour};'
@@ -664,7 +664,7 @@ def _render_question_block(
     # Expander labels render as plain text (no Markdown/color markup), so keep
     # the label unstyled and surface the colored status inside the expander body.
     with st.expander(
-        f"Q{qid} — {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
+        f"Q{qid}: {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
         f"({n_pass}/{n_total} metrics passed)",
         expanded=False,
     ):
@@ -710,14 +710,14 @@ def main() -> None:
 
     raw_results = load_eval_results(_db_mtime=_db_mtime)
     if not raw_results:
-        st.warning("eval_results table is empty — run evaluations first.")
+        st.warning("eval_results table is empty - run evaluations first.")
 
     hierarchy = _build_hierarchy(raw_results)
     responses = load_responses(_mtime=_db_mtime) if RESPONSES_DB.exists() else {}
 
     if not responses:
         st.warning(
-            f"responses.db not found at {RESPONSES_DB} — chat interaction tab will be empty."
+            f"responses.db not found at {RESPONSES_DB} - chat interaction tab will be empty."
         )
 
     st.markdown(
