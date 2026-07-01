@@ -552,7 +552,9 @@ def make_deploy_db(
         # Copy responses with trimmed retrieval_context
         rows = src.execute(
             "SELECT question_id, question, llm_name, timestamp, actual_output, "
-            "retrieval_context, tools_called, research_output, is_error, error_message "
+            "retrieval_context, tools_called, research_output, is_error, error_message, "
+            "research_mode, case_law_context, tool_sequence, fallback_used, "
+            "summarisation_output, summarisation_used "
             "FROM responses ORDER BY id"
         ).fetchall()
 
@@ -569,6 +571,12 @@ def make_deploy_db(
                 research_output,
                 is_error,
                 error_message,
+                research_mode,
+                case_law_context_json,
+                tool_sequence_json,
+                fallback_used,
+                summarisation_output_json,
+                summarisation_used,
             ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
@@ -589,12 +597,12 @@ def make_deploy_db(
                     research_output,
                     is_error,
                     error_message,
-                    "legislation_only",
-                    "[]",
-                    "[]",
-                    False,
-                    "[]",
-                    False,
+                    research_mode or "legislation_only",
+                    case_law_context_json if case_law_context_json is not None else "[]",
+                    tool_sequence_json if tool_sequence_json is not None else "[]",
+                    bool(fallback_used),
+                    summarisation_output_json,
+                    bool(summarisation_used),
                 ],
             )
 
