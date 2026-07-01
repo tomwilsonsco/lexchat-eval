@@ -85,7 +85,7 @@ diff \
 Responses are stored in `lex_eval/data/responses.db` (DuckDB).
 Each question is attempted up to 3 times; only complete responses (non-empty `actual_output`) are written to the database.
 
-**The model used for responses is always set in LexChat's Admin Portal.** The eval does not select or override the model — `gather_responses.py` reads the active model from the LexChat API and records it in `responses.db`. There is no `--llm` flag. To evaluate a different model, change it in the Admin Portal first, then re-run.
+**The model used for responses is always set in LexChat's Admin Portal.** The eval does not select or override the model — `gather_responses.py` reads the active model from the LexChat API and records it in `responses.db`. To evaluate a different model, change it in the Admin Portal first, then re-run.
 
 We need to gather at least two responses per question per llm to evaluate response consistency. So starting from the beginning this is the recommended process.
 
