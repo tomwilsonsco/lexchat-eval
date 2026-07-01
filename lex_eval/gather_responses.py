@@ -303,7 +303,10 @@ def main() -> None:
                 try:
                     result = future.result()
                     insert_response(db_conn, result)
-                    status = "OK" if not result.get("is_error") else "ERROR"
+                    # Error records are signalled by an "error" key (and may not
+                    # set is_error), so check both to avoid logging failures as OK.
+                    is_error = result.get("is_error") or "error" in result
+                    status = "ERROR" if is_error else "OK"
                     logger.info(
                         "Q%d (%s): %s [actual_output=%d chars]",
                         q["id"],
