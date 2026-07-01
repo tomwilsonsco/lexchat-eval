@@ -1,8 +1,11 @@
 """
-Test that the Worker Agent response contains all four mandatory Markdown
-headings required by its system prompt:
+Test that the Worker Agent response contains all mandatory Markdown
+headings required by its system prompt for the given research mode.
 
-    **Summary Answer (BLUF):**
+For ``legislation_only`` the expected headings are:
+
+    **Summary Answer (BLUF):**   (or **Summary Answer:** — the (BLUF)
+                                  qualifier is optional)
     **Detailed Analysis:**
     **Jurisdiction & Status:**
     **References:**
@@ -37,12 +40,13 @@ records = load_records()
 def test_mandatory_structure(request, record):
     """
     The Worker Agent output (returned via ``delegate_research``) must contain
-    all four mandatory Markdown headings.
+    all mandatory Markdown headings based on the research mode.
 
     Records without a ``delegate_research`` tool call automatically score 0.0.
     """
     test_case = record_to_test_case(record)
-    metric = MandatoryStructureMetric(threshold=1.0)
+    research_mode = record.get("research_mode", "legislation_only")
+    metric = MandatoryStructureMetric(threshold=1.0, research_mode=research_mode)
     metric.measure(test_case)
 
     attach_metric(

@@ -214,9 +214,15 @@ __marimo__/
 
 # Local databases (deploy copy is intentionally committed; responses.db is not)
 lex_eval/data/responses.db
+lex_eval/data/debug_events.jsonl
+lex_eval/data/verbose_logs/
 
 # Python build
 dist/
 *.egg-info/
 .venv/
 *.db
+
+.clinerules
+docs/
+lexchat/

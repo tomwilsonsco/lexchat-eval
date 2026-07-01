@@ -1,7 +1,7 @@
 # lex-eval
 
 Evaluations for [LexChat](https://github.com/delphium226/lexchat). Runs questions through
-available LLMs (Ollama currently), stores responses in DuckDB, scores them with both coded
+available LLMs (Ollama and OpenRouter), stores responses in DuckDB, scores them with both coded
 and AI-as-judge metrics, and visualises results in a Streamlit dashboard.
 
 ## Prerequisites
@@ -22,46 +22,70 @@ LEXCHAT_API=http://host.docker.internal:80
 USERNAME=admin
 PASSWORD=admin
 
-# OpenAI judge (default provider)
-OPENAI_API_KEY=yourkeyhere
-# gpt-4o-mini most cost effective, o4-mini more thorough evals, more costly
-OPENAI_JUDGE_MODEL=gpt-4o-mini
+# OpenRouter judge (judge LLM for AI-as-judge metrics)
+OPENROUTER_API_KEY=yourkeyhere
+# Any OpenRouter model — openai/gpt-4o is the default, o4-mini for more thorough evals
+OPENROUTER_JUDGE_MODEL=openai/gpt-4o
 
-# Gemini judge (alternative provider)
-GEMINI_API_KEY=yourkeyhere
-GEMINI_JUDGE_MODEL=gemini-2.5-flash
-
-# Set to 'gemini' to use Gemini as the AI judge
-JUDGE_PROVIDER=openai
 ```
 
-## Step 1 Check LLMs are available
+## Step 1 Check the active LLM
 
 ```bash
-python -m lex_eval.utils.get_llms
+python -m lex_eval.utils.get_llm
 ```
 
-Lists all LLMs currently responding on the lexchat API. `gather_responses.py`
-calls this automatically, but it is useful to run first to see the names of the LLMs available to use.
+Queries the LexChat API and prints the single active model (the one configured in the Admin Portal). There is always exactly one active model per provider.
 
 ## Step 2 Gather responses
 
 ```bash
-# All questions, all LLMs:
+# All questions (model is set in LexChat's admin portal):
 python lex_eval/gather_responses.py
 
 # Specific question:
 python lex_eval/gather_responses.py --question-id 1
 
-# Specific LLM:
-python lex_eval/gather_responses.py --llm "model-name"
-
 # Overwrite existing results (start fresh):
 python lex_eval/gather_responses.py --overwrite
+
+# Debug: dump every raw SSE event for inspection:
+python lex_eval/gather_responses.py --question-id 1 --debug-events
+# → writes lex_eval/data/debug_events.jsonl
+
+# Debug: write a per-question annotated audit log:
+python lex_eval/gather_responses.py --question-id 1 --verbose-capture
+# → writes lex_eval/data/verbose_logs/Q1_YYYYMMDD_HHMMSS.log
+
+# Both flags can be combined:
+python lex_eval/gather_responses.py --question-id 1 --debug-events --verbose-capture
+```
+
+### Diagnosing capture issues
+
+Two flags are available when a response looks wrong — empty fields, missing tools, zero retrieval context, etc.:
+
+| Flag | Output | Use when… |
+|---|---|---|
+| `--debug-events` | `data/debug_events.jsonl` — one JSON line per raw SSE event, appended | You suspect the **server sent unexpected data** — field renamed, event type missing or added, payload structure changed |
+| `--verbose-capture` | `data/verbose_logs/Q{id}_{YYYYMMDD}_{HHMMSS}.log` — one file per question | You got a **wrong capture result** — `research_output` empty, `tool_sequence` incomplete, zero `retrieval_context` items |
+
+`--debug-events` shows what arrived **over the wire** before `audit_capture` processes it. `--verbose-capture` shows what `audit_capture` **decided to do** with each event — stack state before/after, action taken, and a final state summary.
+
+Because `--debug-events` appends all questions into a single file, it is cleanest when combined with `--question-id`. `--verbose-capture` always writes one file per question so it is safe to use across all questions concurrently.
+
+To diff two runs of the same question:
+
+```bash
+diff \
+  lex_eval/data/verbose_logs/Q5_20260625_091600.log \
+  lex_eval/data/verbose_logs/Q5_20260625_091740.log
 ```
 
 Responses are stored in `lex_eval/data/responses.db` (DuckDB).
-Each question/LLM combination is attempted up to 3 times; only complete responses (non-empty `actual_output`) are written to the database.
+Each question is attempted up to 3 times; only complete responses (non-empty `actual_output`) are written to the database.
+
+**The model used for responses is always set in LexChat's Admin Portal.** The eval does not select or override the model — `gather_responses.py` reads the active model from the LexChat API and records it in `responses.db`. To evaluate a different model, change it in the Admin Portal first, then re-run.
 
 We need to gather at least two responses per question per llm to evaluate response consistency. So starting from the beginning this is the recommended process.
 
@@ -85,10 +109,10 @@ python lex_eval/run_evals.py
 
 # Specific suite:
 python lex_eval/run_evals.py --suite tool_usage
-python lex_eval/run_evals.py --suite groundedness    # needs OPENAI_API_KEY or GEMINI_API_KEY
+python lex_eval/run_evals.py --suite groundedness    # needs OPENROUTER_API_KEY
 # (Groundedness measures: answer relevancy, response groundedness, research groundedness)
 python lex_eval/run_evals.py --suite consistency
-python lex_eval/run_evals.py --suite consistency_llm # needs OPENAI_API_KEY
+python lex_eval/run_evals.py --suite consistency_llm # needs OPENROUTER_API_KEY
 python lex_eval/run_evals.py --suite structure
 
 # Force re-run (overwrite existing results):
@@ -112,8 +136,8 @@ pair — use `--overwrite` to force re-running.
 | `tool_usage` | Fast | Nothing extra |
 | `structure` | Fast | Nothing extra |
 | `consistency` | Fast | ≥2 responses per question/LLM pair |
-| `groundedness` | Medium (1 LLM call/test) | `OPENAI_API_KEY` or `GEMINI_API_KEY` |
-| `consistency_llm` | Slow | `OPENAI_API_KEY` + ≥2 responses per pair |
+| `groundedness` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
+| `consistency_llm` | Slow | `OPENROUTER_API_KEY` + ≥2 responses per pair |
 
 ## Step 4 Streamlit dashboard
 
@@ -159,7 +183,8 @@ python -m lex_eval.utils.db --dry-run
 lex_eval/
 ├── data/
 │   ├── questions.json       # evaluation questions
-│   └── deploy.db            # committed compact database for Streamlit Cloud
+│   ├── deploy.db            # committed compact database for Streamlit Cloud
+│   └── verbose_logs/        # per-question capture audit logs (gitignored)
 ├── metrics/                 # custom DeepEval metric classes
 ├── reports/
 │   └── streamlit_report.py  # Streamlit dashboard
@@ -171,15 +196,17 @@ lex_eval/
 ```
 
 ## A note on LLM judge models
-The LLM judge models tested so far have been those available from OpenAI or Google. The more expensive models do more thorough judging and this results in lower scores for answer relevancy, response groundedness and research groundedness. 
+The judge LLM is accessed via OpenRouter, which provides access to hundreds of models from many providers. The default model is `openai/gpt-4o`, which offers a good balance of thoroughness and cost. More expensive or capable models may produce more critical judgments, leading to lower scores for answer relevancy, response groundedness, and research groundedness.
 
-For OpenAI, o4-mini is a thinking model and will produce lower scores than gpt-4o-mini. However, o4-mini does appear to do a better job and pick up on subtleties that gpt-4o-mini ignores. Google gemini-2.5-flash scores in a similarly thorough way to o4-mini. Research showed that gemini-2.5-flash-lite was too weak for the job, so it has not been tested. Larger Google models have also not been tested, as gemini-2.5-flash already was using more API credit than OpenAI o4-mini, costing over £2.00 to run the set of 6 questions, 4 llm evaluations once.
+For example, `openai/o4-mini` is a thinking model available through OpenRouter and will produce lower scores than `openai/gpt-4o-mini`. However, o4-mini does a better job picking up on subtleties that smaller models may ignore. You can change `OPENROUTER_JUDGE_MODEL` in your `.env` file to any model available on OpenRouter (e.g. `google/gemini-2.5-flash`, `openai/o4-mini`, `anthropic/claude-sonnet-4-6`).
+
+Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks, so it has not been used. Larger models like `google/gemini-2.5-pro` can be more thorough but may cost significantly more, as they run more analysis per evaluation.
 
 ## Current evaluations
 
 | Metric | Description |
 |--------|-------------|
-| Tool Usage | Are all of delegate research, search legislation, get legislation text used. |
+| Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed). |
 | Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. |
 | Reference Links | Are reference links included in the answer provided to the user. |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. |

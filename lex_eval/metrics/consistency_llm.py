@@ -3,7 +3,7 @@ AI-judge consistency metric.
 
 Uses an LLM to detect substantive contradictions or omissions between
 repeated responses to the same question, going beyond surface-level token
-overlap (cf. the Jaccard-based ConsistencyMetric in consistency.py).
+overlap (cf. the cosine similarity-based ConsistencyMetric in consistency.py).
 
 The judge is prompted to ignore stylistic differences and focus only on
 material factual or legal divergences.

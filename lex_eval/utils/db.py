@@ -8,16 +8,20 @@ proper columns; complex nested structures are stored as JSON columns.
 Schema
 ------
 responses
-    id               SEQUENCE primary key
-    question_id      INTEGER
-    question         TEXT
-    llm_name         TEXT
-    timestamp        TEXT
-    actual_output    TEXT        (empty string if not captured)
-    retrieval_context JSON       (list of context strings)
-    tools_called     JSON        (list of tool-call dicts)
-    is_error         BOOLEAN     (True when the capture failed)
-    error_message    TEXT        (error description, NULL on success)
+    id                SEQUENCE primary key
+    question_id       INTEGER
+    question          TEXT
+    llm_name          TEXT
+    timestamp         TEXT
+    actual_output     TEXT        (empty string if not captured)
+    retrieval_context JSON       (list of context strings; includes legislation section text and case law references)
+    tools_called      JSON        (list of tool-call dicts)
+    is_error          BOOLEAN     (True when the capture failed)
+    error_message     TEXT        (error description, NULL on success)
+    research_mode     TEXT        (legislation_only | case_law_only | legislation_and_case_law)
+    case_law_context  JSON       (list of {title, ncn, court, date, url} dicts from search_case_law)
+    tool_sequence     JSON       (ordered list of worker tool names called, e.g. [search_legislation, search_legislation_sections])
+    fallback_used     BOOLEAN     (True when get_legislation_text was invoked)
 
 eval_results
     id          SEQUENCE primary key
@@ -38,10 +42,13 @@ eval_results
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import duckdb
+
+logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DEFAULT_DB = DATA_DIR / "responses.db"
@@ -50,25 +57,48 @@ _CREATE_TABLE = """
 CREATE SEQUENCE IF NOT EXISTS responses_id_seq START 1;
 
 CREATE TABLE IF NOT EXISTS responses (
-    id               INTEGER DEFAULT nextval('responses_id_seq') PRIMARY KEY,
-    question_id      INTEGER  NOT NULL,
-    question         TEXT     NOT NULL,
-    llm_name         TEXT     NOT NULL,
-    timestamp        TEXT     NOT NULL,
-    actual_output    TEXT     NOT NULL DEFAULT '',
+    id                INTEGER DEFAULT nextval('responses_id_seq') PRIMARY KEY,
+    question_id       INTEGER  NOT NULL,
+    question          TEXT     NOT NULL,
+    llm_name          TEXT     NOT NULL,
+    timestamp         TEXT     NOT NULL,
+    actual_output     TEXT     NOT NULL DEFAULT '',
     retrieval_context JSON,
-    tools_called     JSON,
-    research_output  TEXT     NOT NULL DEFAULT '',
-    is_error         BOOLEAN  NOT NULL DEFAULT FALSE,
-    error_message    TEXT
+    tools_called      JSON,
+    research_output   TEXT     NOT NULL DEFAULT '',
+    is_error          BOOLEAN  NOT NULL DEFAULT FALSE,
+    error_message     TEXT,
+    research_mode     TEXT     NOT NULL DEFAULT 'legislation_only',
+    case_law_context  JSON,
+    tool_sequence     JSON,
+    fallback_used     BOOLEAN  NOT NULL DEFAULT FALSE,
+    summarisation_output JSON,
+    summarisation_used BOOLEAN DEFAULT FALSE
 );
 """
+
+# Columns added after the initial schema; applied to existing databases via init_db.
+# NOTE: Do NOT use IF NOT EXISTS here. DuckDB's ADD COLUMN IF NOT EXISTS silently
+# resets all existing row values to the column DEFAULT instead of raising an error.
+# Without IF NOT EXISTS, DuckDB raises CatalogException when the column already
+# exists, which the exception handler in init_db catches and skips. This preserves
+# existing data.
+_MIGRATE_RESPONSES = [
+    "ALTER TABLE responses ADD COLUMN research_mode TEXT NOT NULL DEFAULT 'legislation_only'",
+    "ALTER TABLE responses ADD COLUMN case_law_context JSON",
+    "ALTER TABLE responses ADD COLUMN tool_sequence JSON",
+    "ALTER TABLE responses ADD COLUMN fallback_used BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE responses ADD COLUMN summarisation_output JSON",
+    "ALTER TABLE responses ADD COLUMN summarisation_used BOOLEAN DEFAULT FALSE",
+]
 
 _INSERT_RESPONSE = """
 INSERT INTO responses (
     question_id, question, llm_name, timestamp, actual_output,
-    retrieval_context, tools_called, research_output, is_error, error_message
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    retrieval_context, tools_called, research_output, is_error, error_message,
+    research_mode, case_law_context, tool_sequence, fallback_used,
+    summarisation_output, summarisation_used
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -79,8 +109,25 @@ def get_connection(path: Path = DEFAULT_DB) -> duckdb.DuckDBPyConnection:
 
 
 def init_db(conn: duckdb.DuckDBPyConnection) -> None:
-    """Create the responses table and sequence if they don't already exist."""
+    """Create the responses table and sequence if they don't already exist.
+
+    Also applies column migrations so existing databases gain new fields.
+    """
     conn.execute(_CREATE_TABLE)
+    for stmt in _MIGRATE_RESPONSES:
+        try:
+            conn.execute(stmt)
+        except Exception:
+            # Column already exists — roll back the aborted statement so the
+            # connection remains usable, then skip.
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            col_hint = (
+                stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
+            )
+            logger.warning("Migration skipped (column may already exist): %s", col_hint)
 
 
 def clear_responses(conn: duckdb.DuckDBPyConnection) -> None:
@@ -111,6 +158,17 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             record.get("research_output", "") if not is_error else "",
             is_error,
             record.get("error") if is_error else None,
+            record.get("research_mode", "legislation_only"),
+            json.dumps(record.get("case_law_context") or []),
+            json.dumps(record.get("tool_sequence") or []),
+            record.get("fallback_used", False),
+            # Pass None through as SQL NULL; only JSON-encode when there is real content.
+            (
+                json.dumps(record["summarisation_output"])
+                if record.get("summarisation_output") is not None
+                else None
+            ),
+            record.get("summarisation_used", False),
         ],
     )
 
@@ -136,7 +194,9 @@ def load_records(
         where = "" if include_errors else "WHERE NOT is_error"
         rows = conn.execute(f"""
             SELECT question_id, question, llm_name, timestamp,
-                   actual_output, retrieval_context, tools_called, research_output
+                   actual_output, retrieval_context, tools_called, research_output,
+                   research_mode, case_law_context, tool_sequence, fallback_used,
+                   summarisation_output, summarisation_used
             FROM responses
             {where}
             ORDER BY id
@@ -154,11 +214,24 @@ def load_records(
         retrieval_context_json,
         tools_called_json,
         research_output,
+        research_mode,
+        case_law_context_json,
+        tool_sequence_json,
+        fallback_used,
+        summarisation_output_json,
+        summarisation_used,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
         )
         tools_called = json.loads(tools_called_json) if tools_called_json else []
+        case_law_context = (
+            json.loads(case_law_context_json) if case_law_context_json else []
+        )
+        tool_sequence = json.loads(tool_sequence_json) if tool_sequence_json else []
+        summarisation_output = (
+            json.loads(summarisation_output_json) if summarisation_output_json else []
+        )
         records.append(
             {
                 "question_id": qid,
@@ -169,6 +242,12 @@ def load_records(
                 "retrieval_context": retrieval_context,
                 "tools_called": tools_called,
                 "research_output": research_output or "",
+                "research_mode": research_mode or "legislation_only",
+                "case_law_context": case_law_context,
+                "tool_sequence": tool_sequence,
+                "fallback_used": bool(fallback_used),
+                "summarisation_output": summarisation_output,
+                "summarisation_used": bool(summarisation_used),
             }
         )
     return records
@@ -195,8 +274,10 @@ def clean_incomplete_responses(
     dry_run: bool = False,
 ) -> int:
     """
-    Delete rows where the actual_output is empty or whitespace-only,
-    and rows that are errors (is_error = TRUE).
+    Delete rows where:
+    - actual_output is empty or whitespace-only,
+    - the row is an error (is_error = TRUE), OR
+    - no context was captured (retrieval_context is '[]' or NULL).
 
     Args:
         path:    Path to the database file. Defaults to DEFAULT_DB.
@@ -209,27 +290,35 @@ def clean_incomplete_responses(
     conn = get_connection(path)
     try:
         count = conn.execute(
-            "SELECT COUNT(*) FROM responses WHERE TRIM(actual_output) = '' OR is_error"
+            "SELECT COUNT(*) FROM responses WHERE TRIM(actual_output) = '' OR is_error "
+            "OR retrieval_context = '[]' OR retrieval_context IS NULL"
         ).fetchone()[0]
 
         if dry_run:
             rows = conn.execute("""
-                SELECT id, question_id, llm_name, is_error, LEFT(actual_output, 40)
+                SELECT id, question_id, llm_name, is_error, retrieval_context
                 FROM responses
-                WHERE TRIM(actual_output) = '' OR is_error
+                WHERE TRIM(actual_output) = '' OR is_error 
+                OR retrieval_context = '[]' OR retrieval_context IS NULL
                 ORDER BY question_id, llm_name
                 """).fetchall()
             print(f"Dry run — {count} row(s) would be deleted:")
             for row in rows:
-                rid, qid, llm, is_err, preview = row
-                tag = "error" if is_err else "empty output"
+                rid, qid, llm, is_err, ctx = row
+                if is_err:
+                    tag = "error"
+                elif ctx in ("[]", None):
+                    tag = "no context"
+                else:
+                    tag = "empty output"
                 print(f"  id={rid}  Q{qid}  {llm}  [{tag}]")
         else:
             conn.execute(
-                "DELETE FROM responses WHERE TRIM(actual_output) = '' OR is_error"
+                "DELETE FROM responses WHERE TRIM(actual_output) = '' OR is_error "
+                "OR retrieval_context = '[]' OR retrieval_context IS NULL"
             )
             conn.commit()
-            print(f"Deleted {count} incomplete/error row(s).")
+            print(f"Deleted {count} incomplete/error/no-context row(s).")
     finally:
         conn.close()
 
@@ -463,7 +552,9 @@ def make_deploy_db(
         # Copy responses with trimmed retrieval_context
         rows = src.execute(
             "SELECT question_id, question, llm_name, timestamp, actual_output, "
-            "retrieval_context, tools_called, research_output, is_error, error_message "
+            "retrieval_context, tools_called, research_output, is_error, error_message, "
+            "research_mode, case_law_context, tool_sequence, fallback_used, "
+            "summarisation_output, summarisation_used "
             "FROM responses ORDER BY id"
         ).fetchall()
 
@@ -480,6 +571,12 @@ def make_deploy_db(
                 research_output,
                 is_error,
                 error_message,
+                research_mode,
+                case_law_context_json,
+                tool_sequence_json,
+                fallback_used,
+                summarisation_output_json,
+                summarisation_used,
             ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
@@ -500,6 +597,12 @@ def make_deploy_db(
                     research_output,
                     is_error,
                     error_message,
+                    research_mode or "legislation_only",
+                    case_law_context_json if case_law_context_json is not None else "[]",
+                    tool_sequence_json if tool_sequence_json is not None else "[]",
+                    bool(fallback_used),
+                    summarisation_output_json,
+                    bool(summarisation_used),
                 ],
             )
 

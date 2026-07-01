@@ -24,12 +24,34 @@ _URL_RE = re.compile(r"https?://[^\s\)\]>,\"']+")
 #   "### **1. Summary Answer (BLUF):**" ✓
 #   "### 1. **Summary Answer (BLUF):**" ✓
 #   "### **3. Jurisdiction & Status**"  ✓  (no colon)
-REQUIRED_HEADINGS: list[str] = [
-    "Summary Answer (BLUF)",
-    "Detailed Analysis",
-    "Jurisdiction & Status",
-    "References",
-]
+#
+# Each entry may be either a single string or a list of acceptable
+# alternatives. The summary heading accepts both "Summary Answer (BLUF)"
+# and "Summary Answer" — the (BLUF) qualifier is a stylistic hint in the
+# Worker system prompt (see LexChat/server_py/src/config.py), not a
+# semantic requirement, so either form passes.
+REQUIRED_HEADINGS = {
+    "legislation_only": [
+        ["Summary Answer (BLUF)", "Summary Answer"],
+        "Detailed Analysis",
+        "Jurisdiction & Status",
+        "References",
+    ],
+    "case_law_only": [
+        ["Summary Answer (BLUF)", "Summary Answer"],
+        "Key Cases",
+        "Analysis",
+        "Jurisdiction & Currency",
+        "References",
+    ],
+    "legislation_and_case_law": [
+        ["Summary Answer (BLUF)", "Summary Answer"],
+        "Statutory Framework",
+        "Key Cases",
+        "Jurisdiction & Status",
+        "References",
+    ],
+}
 
 
 def _get_delegate_output(test_case: LLMTestCase) -> str | None:
@@ -44,8 +66,8 @@ def _get_delegate_output(test_case: LLMTestCase) -> str | None:
 
 class MandatoryStructureMetric(BaseMetric):
     """
-    Ensures the Worker Agent strictly adhered to the 4-part Markdown structure
-    mandated by its system prompt.
+    Ensures the Worker Agent strictly adhered to the mandatory Markdown structure
+    mandated by its system prompt for the given research mode.
 
     Looks for the headings inside the ``delegate_research`` tool-call output
     rather than the top-level actual_output, because the Worker's response is
@@ -55,12 +77,15 @@ class MandatoryStructureMetric(BaseMetric):
     numbering so minor formatting variations don't cause false failures.
 
     Score:
-        1.0  — all four headings present  (pass)
+        1.0  — all mandatory headings present (pass)
         0.0  — one or more headings missing, or no delegate_research call found
     """
 
-    def __init__(self, threshold: float = 1.0) -> None:
+    def __init__(
+        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+    ) -> None:
         self.threshold = threshold
+        self.research_mode = research_mode
         self.score = 0.0
         self.success = False
         self.reason = ""
@@ -78,12 +103,21 @@ class MandatoryStructureMetric(BaseMetric):
             return self.score
 
         lowered = dr_output.lower()
-        missing = [h for h in REQUIRED_HEADINGS if h.lower() not in lowered]
+        headings = REQUIRED_HEADINGS.get(
+            self.research_mode, REQUIRED_HEADINGS["legislation_only"]
+        )
+
+        def _heading_present(heading) -> bool:
+            variants = heading if isinstance(heading, list) else [heading]
+            return any(v.lower() in lowered for v in variants)
+
+        missing = [h for h in headings if not _heading_present(h)]
 
         if missing:
             self.score = 0.0
             self.success = False
-            self.reason = f"Missing mandatory headings: {', '.join(missing)}"
+            display = [h[0] if isinstance(h, list) else h for h in missing]
+            self.reason = f"Missing mandatory headings: {', '.join(display)}"
         else:
             self.score = 1.0
             self.success = True

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import sys
 from collections import defaultdict
@@ -57,7 +58,7 @@ METRIC_DISPLAY_ORDER: list[str] = [
 
 # hover over tips on app summary tables
 METRIC_TOOLTIPS: dict[str, str] = {
-    "Tool Usage": "Are all of delegate research, search legislation, get legislation text used.",
+    "Tool Usage": "Are all of delegate research, search legislation and search legislation sections used, in the correct order (search legislation - search legislation sections - get legislation text if needed).",
     "Research Output Structure": "Does the worker agent return the findings to the manager with the requested headers.",
     "Reference Links": "Are reference links included in the answer provided to the user.",
     "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity.",
@@ -169,7 +170,9 @@ def _score_badge(score: float | str, level: str | None = None) -> str:
 
 
 def _status_icon(passed: bool) -> str:
-    return "✅" if passed else "❌"
+    colour = "#3fb950" if passed else "#f85149"
+    text = "Passed" if passed else "Failed"
+    return f'<span style="color:{colour};font-weight:600;">{text}</span>'
 
 
 def _get_llm_pass_rate(llm: str, hierarchy: dict) -> float:
@@ -346,7 +349,7 @@ def _render_metric_detail(metrics: list[dict]) -> None:
         icon = _status_icon(m["passed"])
 
         st.markdown(
-            f"**{name}** {icon} — score: `{m['score']:.3f}`",
+            f"**{name}** {icon} - score: `{m['score']:.3f}`", unsafe_allow_html=True
         )
         with st.container():
             if has_range:
@@ -361,7 +364,7 @@ def _render_metric_detail(metrics: list[dict]) -> None:
                 for idx, raw in enumerate(m.get("raw_results", []), 1):
                     _render_single_eval_result(raw, run_label=f"Run {idx}")
             else:
-                # Consistency — single aggregated result, no per-run breakdown
+                # Consistency - single aggregated result, no per-run breakdown
                 _render_single_eval_result(m)
         st.divider()
 
@@ -370,8 +373,8 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
     """one raw eval result entry."""
     passed = r["passed"]
     colour = "#3fb950" if passed else "#f85149"
-    label = "✓ Passed" if passed else "✗ Failed"
-    prefix = f"{run_label} — " if run_label else ""
+    label = "Passed" if passed else "Failed"
+    prefix = f"{run_label}: " if run_label else ""
 
     st.markdown(
         f'<div style="background:#0d1117;border-left:3px solid {colour};'
@@ -394,6 +397,11 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         st.error(r["error"])
 
 
+def _strip_worker_prefix(name: str) -> str:
+    """Remove the 'Worker: ' prefix from tool names for display."""
+    return name.removeprefix("Worker: ")
+
+
 def _render_chat_interaction(records: list[dict]) -> None:
     """
     raw chat interaction(s) for an LLM/question pair.
@@ -409,6 +417,27 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
     for tab, rec in zip(run_tabs, records):
         with tab:
+            # --- Execution Metadata ---
+            st.markdown("##### ⚙️ Execution Context")
+            cols = st.columns(4)
+            with cols[0]:
+                st.markdown(f"**Mode:** `{rec.get('research_mode', 'N/A')}`")
+            with cols[1]:
+                fallback = rec.get("fallback_used", False)
+                st.markdown(f"**Fallback Used:** {'Yes' if fallback else 'No'}")
+            with cols[2]:
+                summarisation = rec.get("summarisation_used", False)
+                st.markdown(f"**Summarisation:** {'Yes' if summarisation else 'No'}")
+            with cols[3]:
+                tool_seq = rec.get("tool_sequence") or []
+                st.markdown(f"**Tool Sequence:** `{len(tool_seq)}` steps")
+                if tool_seq:
+                    display_seq = [_strip_worker_prefix(t) for t in tool_seq]
+                    st.caption(" → ".join(display_seq))
+
+            st.divider()
+
+            # --- LLM Answer ---
             st.markdown("#### LLM Answer")
             actual = rec.get("actual_output", "")
             if actual:
@@ -418,11 +447,44 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
             st.divider()
 
-            tools_called: list[dict] = rec.get("tools_called") or []
+            # --- Research Output ---
+            research_output = rec.get("research_output", "")
+            if research_output:
+                st.markdown("#### 📝 Research Output (Worker Findings)")
+                st.markdown(research_output)
+                st.divider()
+
+            # --- Summarisation Output ---
+            summarisation_output: list = rec.get("summarisation_output") or []
+            summarisation_used = rec.get("summarisation_used", False)
+            if summarisation_output:
+                st.markdown(
+                    f"#### 🔍 Summarised Context ({len(summarisation_output)} passage(s))"
+                )
+                for i, summary_text in enumerate(summarisation_output):
+                    with st.expander(f"Summarised Passage {i + 1}", expanded=i == 0):
+                        st.markdown(summary_text)
+                st.divider()
+            elif summarisation_used:
+                st.info("Summarisation was used but no output was captured.")
+                st.divider()
+
+            # --- Tools Called (sorted by tool_sequence start order) ---
+            tools_called: list[dict] = [
+                t
+                for t in (rec.get("tools_called") or [])
+                if t.get("name") != "Research Agent"
+            ]
             if tools_called:
+                # Sort tools_called by their position in tool_sequence
+                tool_seq = rec.get("tool_sequence") or []
+                order_map = {name: i for i, name in enumerate(tool_seq)}
+                tools_called.sort(key=lambda t: order_map.get(t.get("name", ""), 999))
+
                 st.markdown(f"#### Tools Called ({len(tools_called)})")
                 for i, tool in enumerate(tools_called):
                     tool_name = tool.get("name", f"tool_{i}")
+                    display_name = _strip_worker_prefix(tool_name)
                     is_lex_api = any(
                         k in tool_name
                         for k in (
@@ -431,7 +493,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
                             "get_legislation",
                         )
                     )
-                    st.markdown(f"🔧 **{tool_name}**")
+                    st.markdown(f"🔧 **{display_name}**")
                     if is_lex_api:
                         params = (
                             tool.get("input_parameters")
@@ -458,6 +520,59 @@ def _render_chat_interaction(records: list[dict]) -> None:
                             "↩ Response</div>",
                             unsafe_allow_html=True,
                         )
+                        with st.container():
+                            if isinstance(output_raw, str):
+                                # Check for explicit "no results" fallback indicators
+                                if output_raw.strip().lower() in (
+                                    "done",
+                                    "none",
+                                    "null",
+                                    "",
+                                ):
+                                    st.info(
+                                        "⚠️ No results returned from this API call."
+                                    )
+                                else:
+                                    try:
+                                        parsed = json.loads(output_raw)
+                                        if (
+                                            isinstance(parsed, dict)
+                                            and parsed.get("status") == "no_results"
+                                        ):
+                                            st.info(
+                                                f"⚠️ {parsed.get('message', 'No results returned from this API call.')}"
+                                            )
+                                        else:
+                                            st.json(parsed, expanded=False)
+                                    except (json.JSONDecodeError, ValueError):
+                                        st.code(output_raw, language="text")
+                            elif (
+                                isinstance(output_raw, dict)
+                                and output_raw.get("status") == "no_results"
+                            ):
+                                st.info(
+                                    f"⚠️ {output_raw.get('message', 'No results returned from this API call.')}"
+                                )
+                            elif isinstance(output_raw, (dict, list)):
+                                st.json(output_raw, expanded=False)
+                            else:
+                                st.text(str(output_raw))
+                    elif tool_name == "delegate_research":
+                        params = (
+                            tool.get("input_parameters")
+                            or tool.get("inputParameters")
+                            or {}
+                        )
+                        query = params.get("query", "")
+                        if query:
+                            st.markdown(
+                                f'<div style="background:#0d1117;border-left:3px solid #d29922;'
+                                f"padding:8px 12px;border-radius:4px;margin:4px 0 2px 0;"
+                                f'font-size:0.85em;font-family:monospace;color:#d29922;">'
+                                f"🎯 Manager asked: {html.escape(query)}</div>",
+                                unsafe_allow_html=True,
+                            )
+                        output_raw = tool.get("output", "")
                         with st.container():
                             if isinstance(output_raw, str):
                                 try:
@@ -487,23 +602,47 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
             st.divider()
 
+            # --- Case Law Context ---
+            case_law_ctx: list[dict] = rec.get("case_law_context") or []
+            if case_law_ctx:
+                st.markdown(f"#### ⚖️ Case Law Context ({len(case_law_ctx)} items)")
+                for i, case_data in enumerate(case_law_ctx):
+                    title = case_data.get("title", "Unknown Title")
+                    ncn = case_data.get("ncn", "")
+                    court = case_data.get("court", "")
+                    date = case_data.get("date", "")
+                    url = case_data.get("url", "")
+
+                    meta_parts = [p for p in [ncn, court, date] if p]
+                    meta_str = f" ({' | '.join(meta_parts)})" if meta_parts else ""
+                    st.markdown(f"**{i + 1}. {title}{meta_str}**")
+                    if url:
+                        st.markdown(f"   🔗 [Link to judgment]({url})")
+                st.divider()
+
+            # --- Retrieved Context ---
             contexts: list[str] = rec.get("retrieval_context") or []
             if contexts:
-                st.markdown(f"#### Retrieved Context ({len(contexts)} items)")
+                st.markdown(f"#### 📚 Retrieved Context ({len(contexts)} items)")
                 for i, ctx in enumerate(contexts):
-                    st.markdown(f"📄 **Context {i + 1}**")
+                    st.markdown(f"**Context {i + 1}**")
                     with st.container():
-                        st.text(ctx)
+                        st.code(ctx, language="text")
             else:
                 st.caption("No retrieval context captured.")
 
-            st.markdown("ℹ️ **Record metadata**")
+            st.divider()
+            st.markdown("ℹ️ **Full Record Metadata**")
             st.json(
                 {
                     "timestamp": rec.get("timestamp"),
                     "llm_name": rec.get("llm_name"),
                     "question_id": rec.get("question_id"),
-                }
+                    "research_mode": rec.get("research_mode"),
+                    "fallback_used": rec.get("fallback_used"),
+                    "tool_sequence": rec.get("tool_sequence", []),
+                },
+                expanded=False,
             )
 
 
@@ -517,13 +656,23 @@ def _render_question_block(
     all_pass = all(m["passed"] for m in metrics)
     n_pass = sum(1 for m in metrics if m["passed"])
     n_total = len(metrics)
-    icon = "✅" if all_pass else ("⚠️" if n_pass > 0 else "❌")
 
+    # Determine the colour for the metric count
+    count_colour = "#3fb950" if n_pass == n_total else "#f85149"
+    status_text = "All passed" if n_pass == n_total else "Some failed"
+
+    # Expander labels render as plain text (no Markdown/color markup), so keep
+    # the label unstyled and surface the colored status inside the expander body.
     with st.expander(
-        f"{icon}  **Q{qid}** — {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
-        f"*({n_pass}/{n_total} metrics passed)*",
+        f"Q{qid}: {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
+        f"({n_pass}/{n_total} metrics passed)",
         expanded=False,
     ):
+        st.markdown(
+            f'<span style="color:{count_colour};font-weight:600;">'
+            f"{n_pass}/{n_total} metrics passed</span>",
+            unsafe_allow_html=True,
+        )
         _render_metric_summary_table(metrics)
 
         st.markdown("")  # spacer
@@ -561,14 +710,14 @@ def main() -> None:
 
     raw_results = load_eval_results(_db_mtime=_db_mtime)
     if not raw_results:
-        st.warning("eval_results table is empty — run evaluations first.")
+        st.warning("eval_results table is empty - run evaluations first.")
 
     hierarchy = _build_hierarchy(raw_results)
     responses = load_responses(_mtime=_db_mtime) if RESPONSES_DB.exists() else {}
 
     if not responses:
         st.warning(
-            f"responses.db not found at {RESPONSES_DB} — chat interaction tab will be empty."
+            f"responses.db not found at {RESPONSES_DB} - chat interaction tab will be empty."
         )
 
     st.markdown(

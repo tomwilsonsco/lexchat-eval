@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 class _RelevancyJudgement(BaseModel):
     analysis: str
-    score: int   # 1–5
+    score: int  # 1–5
     reason: str
 
 
@@ -89,7 +89,7 @@ class LegalAnswerRelevancyMetric(BaseMetric):
             raw_score = 1.0
             self.reason = f"Judge error: {exc}"
 
-        self.score = (raw_score - 1) / 4   # normalise 1–5 → 0.0–1.0
+        self.score = (raw_score - 1) / 4  # normalise 1–5 → 0.0–1.0
         self.success = self.score >= self.threshold
         return self.score
 

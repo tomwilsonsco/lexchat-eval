@@ -18,7 +18,7 @@ _MAX_CONTEXT_CHARS: int = (128_000 - 30_000) * 4  # ≈ 392 000 chars
 
 class _GroundednessJudgement(BaseModel):
     analysis: str
-    score: int   # 1–5
+    score: int  # 1–5
     reason: str
 
 
@@ -66,9 +66,7 @@ class ResearchGroundednessMetric(BaseMetric):
         threshold:       Minimum normalised score to pass (default 0.7).
     """
 
-    def __init__(
-        self, research_output: str, model, threshold: float = 0.7
-    ) -> None:
+    def __init__(self, research_output: str, model, threshold: float = 0.7) -> None:
         self.research_output = research_output
         self.model = model
         self.threshold = threshold
@@ -105,7 +103,7 @@ class ResearchGroundednessMetric(BaseMetric):
             raw_score = 1.0
             self.reason = f"Judge error: {exc}"
 
-        self.score = (raw_score - 1) / 4   # normalise 1–5 → 0.0–1.0
+        self.score = (raw_score - 1) / 4  # normalise 1–5 → 0.0–1.0
         self.success = self.score >= self.threshold
         return self.score
 

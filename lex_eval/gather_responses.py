@@ -1,365 +1,348 @@
-#!/usr/bin/env python3
 """
-Gather LexChat responses for evaluation.
+gather_responses.py
 
-This script runs questions through different LLMs and captures their responses
-for later evaluation using DeepEval metrics.
+Sends every question from questions.json through the LexChat /api/system/chat
+SSE endpoint and writes the structured results to responses.db.
+
+This is Step 2 of the eval pipeline.
+
+Usage:
+    python -m lex_eval.gather_responses
+    python -m lex_eval.gather_responses --overwrite
+    python -m lex_eval.gather_responses --debug-events
+    python -m lex_eval.gather_responses --verbose-capture
 """
+
+from __future__ import annotations
 
 import argparse
 import json
 import logging
-import threading
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, IO, List, Optional
 
 from lex_eval.utils.audit_capture import audit_capture
-from lex_eval.utils.db import (
-    get_connection,
-    init_db,
-    clear_responses,
-    insert_response,
-    DEFAULT_DB,
-)
-from lex_eval.utils.get_llms import get_llms
+from lex_eval.utils.db import get_connection, insert_response, init_db, clear_responses
+from lex_eval.utils.get_llm import get_active_model
 from lex_eval.utils.lexchat_client import get_authenticated_client
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-def load_questions(
-    questions_file: Path, question_id: Optional[int] = None
-) -> List[Dict[str, Any]]:
+
+def load_questions(path: Path) -> List[Dict[str, Any]]:
+    """Load questions from the JSON file."""
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def process_question(
+    question_id: int,
+    question: str,
+    research_mode: str,
+    model_name: str,
+    max_retries: int,
+    debug_events_file: Optional[IO[str]] = None,
+    verbose_log_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Run a single question through audit_capture.
+
+    Returns a dict suitable for passing to ``save_record``.
     """
-    Load questions from JSON file, optionally filtering by question_id.
-
-    Args:
-        questions_file: Path to questions.json file
-        question_id: Optional question ID to filter for
-
-    Returns:
-        List of question dictionaries
-    """
-    logger.info(f"Loading questions from {questions_file}")
-
-    with open(questions_file, "r") as f:
-        questions = json.load(f)
-
-    if question_id is not None:
-        questions = [q for q in questions if q.get("id") == question_id]
-        if not questions:
-            raise ValueError(f"Question with id={question_id} not found")
-        logger.info(f"Filtered to question {question_id}")
-    else:
-        logger.info(f"Loaded {len(questions)} questions")
-
-    return questions
-
-
-def validate_llm(llm_name: str, available_llms: List[str]) -> None:
-    """
-    Validate that the specified LLM is available.
-
-    Args:
-        llm_name: Name of LLM to validate
-        available_llms: List of available LLM names
-
-    Raises:
-        ValueError: If LLM is not in available list
-    """
-    if llm_name not in available_llms:
-        raise ValueError(
-            f"LLM '{llm_name}' not found. Available LLMs: {', '.join(available_llms)}"
-        )
-
-
-def serialize_test_case(test_case) -> Dict[str, Any]:
-    """
-    Serialize a DeepEval LLMTestCase to a JSON-serializable dictionary.
-
-    Args:
-        test_case: LLMTestCase object from audit_capture
-
-    Returns:
-        Dictionary representation of the test case
-    """
+    client = get_authenticated_client()
     try:
-        # Use Pydantic's model_dump method
-        return test_case.model_dump(mode="json", exclude_none=True)
-    except Exception as e:
-        logger.warning(f"Failed to use model_dump, falling back to dict(): {e}")
-        # Fallback to dict() method
-        data = test_case.dict()
-        # Convert any non-serializable objects
-        return json.loads(json.dumps(data, default=str))
+        for attempt in range(1, max_retries + 1):
+            if attempt > 1:
+                logger.info("Retry %d/%d for Q%d", attempt, max_retries, question_id)
 
+            # Set up debug event callback if requested
+            on_event = None
+            if debug_events_file:
 
-def gather_responses(
-    questions: List[Dict[str, Any]],
-    llm_names: List[str],
-    output_file: Path,
-    overwrite: bool = False,
-    max_workers: int = 10,
-) -> None:
-    """
-    Gather responses from LLMs for all questions and save to a DuckDB database.
+                def _make_callback(fh):
+                    def _callback(data):
+                        fh.write(json.dumps(data, default=str) + "\n")
 
-    Combinations are executed concurrently using a thread pool, with each thread
-    maintaining its own authenticated HTTP client. Results are written
-    incrementally as each combination completes, making the process
-    crash-resilient.
+                    return _callback
 
-    Args:
-        questions: List of question dictionaries
-        llm_names: List of LLM names to test
-        output_file: Path to the DuckDB database file
-        overwrite: If True, clear table first; if False, add to existing rows
-        max_workers: Maximum number of concurrent threads
-    """
-    total_combinations = len(questions) * len(llm_names)
+                on_event = _make_callback(debug_events_file)
 
-    logger.info(
-        f"Starting evaluation: {len(questions)} questions × {len(llm_names)} LLMs = "
-        f"{total_combinations} combinations (max_workers={max_workers})"
-    )
-
-    # Prepare database
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    conn = get_connection(output_file)
-    init_db(conn)
-
-    if overwrite:
-        clear_responses(conn)
-        logger.info(f"Cleared existing responses, writing fresh to: {output_file}")
-    else:
-        logger.info(f"Appending to existing database: {output_file}")
-
-    # Per-thread client management
-    thread_local = threading.local()
-    clients_lock = threading.Lock()
-    all_clients: List = []
-
-    def get_client():
-        """Return (or lazily create) an authenticated client for the current thread."""
-        if not hasattr(thread_local, "client"):
-            client = get_authenticated_client()
-            thread_local.client = client
-            with clients_lock:
-                all_clients.append(client)
-        return thread_local.client
-
-    MAX_ATTEMPTS = 3
-
-    def process_combination(
-        question_data: Dict[str, Any], llm_name: str, index: int
-    ) -> Optional[Dict[str, Any]]:
-        """Run a single question/LLM combination and write the result to the output file.
-
-        Retries up to MAX_ATTEMPTS times. Returns None if a complete response
-        (non-empty actual_output, no error) is never obtained — nothing is
-        written to the database in that case.
-        """
-        question_id = question_data.get("id")
-        question_text = question_data.get("question")
-
-        logger.info(f"[{index}/{total_combinations}] Q{question_id} × {llm_name}")
-
-        client = get_client()
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            try:
-                capture_result = audit_capture(
-                    client=client,
-                    question=question_text,
-                    model_name=llm_name,
-                )
-                test_case = capture_result["test_case"]
-                research_output = capture_result["research_output"]
-                test_case_data = serialize_test_case(test_case)
-
-                actual_output = test_case_data.get("actual_output", "")
-                if not actual_output or not actual_output.strip():
-                    logger.warning(
-                        f"↻ Q{question_id} × {llm_name} attempt {attempt}/{MAX_ATTEMPTS}: "
-                        "empty actual_output, retrying…"
-                    )
-                    continue
-                result = {
-                    "question_id": question_id,
-                    "question": question_text,
-                    "llm_name": llm_name,
-                    "timestamp": datetime.now().isoformat(),
-                    "actual_output": actual_output,
-                    "retrieval_context": test_case_data.get("retrieval_context") or [],
-                    "tools_called": test_case_data.get("tools_called") or [],
-                    "research_output": research_output,
-                }
-                logger.info(
-                    f"✓ Q{question_id} × {llm_name}: "
-                    f"{len(test_case_data.get('tools_called', []))} tools, "
-                    f"{len(test_case_data.get('retrieval_context', []))} context items"
-                )
-                return result
-            except Exception as e:
-                logger.warning(
-                    f"↻ Q{question_id} × {llm_name} attempt {attempt}/{MAX_ATTEMPTS}: {e}",
-                    exc_info=attempt == MAX_ATTEMPTS,
-                )
-
-        logger.error(
-            f"✗ Q{question_id} × {llm_name}: no complete response after "
-            f"{MAX_ATTEMPTS} attempts — skipping"
-        )
-        return None
-
-    # Build flat list of all (question, llm, index) combinations
-    combinations = [
-        (q, llm, i + 1)
-        for i, (q, llm) in enumerate((q, llm) for q in questions for llm in llm_names)
-    ]
-
-    completed = 0
-    success_count = 0
-    error_count = 0
-
-    try:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(process_combination, q, llm, idx): (q, llm)
-                for q, llm, idx in combinations
-            }
-            for future in as_completed(futures):
-                record = future.result()
-                completed += 1
-                if record is None:
-                    error_count += 1
+            # Build per-attempt verbose log path (retries get separate files)
+            attempt_log_path = None
+            if verbose_log_path:
+                if attempt == 1:
+                    attempt_log_path = verbose_log_path
                 else:
-                    insert_response(conn, record)
-                    conn.commit()
-                    success_count += 1
+                    # Insert _retryN before the extension
+                    stem = verbose_log_path.stem
+                    attempt_log_path = verbose_log_path.with_stem(
+                        f"{stem}_retry{attempt - 1}"
+                    )
 
-        logger.info(f"\n{'='*80}")
-        logger.info(f"✓ Completed {completed} combinations → {output_file}")
-        logger.info(f"  Success: {success_count}, Errors: {error_count}")
-        logger.info(f"{'='*80}")
+            capture_result = audit_capture(
+                client,
+                question,
+                model_name,
+                research_mode=research_mode,
+                on_event=on_event,
+                verbose_log_path=attempt_log_path,
+            )
 
+            actual_output = capture_result.get("actual_output", "")
+            if actual_output:
+                return {
+                    "question_id": question_id,
+                    "question": question,
+                    "llm_name": model_name,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "actual_output": actual_output,
+                    "retrieval_context": capture_result.get("retrieval_context", []),
+                    "tools_called": capture_result.get("tools_called", []),
+                    "research_output": capture_result.get("research_output", ""),
+                    "research_mode": research_mode,
+                    "case_law_context": capture_result.get("case_law_context", []),
+                    "tool_sequence": capture_result.get("tool_sequence", []),
+                    "fallback_used": capture_result.get("fallback_used", False),
+                    "summarisation_output": capture_result.get(
+                        "summarisation_output", []
+                    ),
+                    "summarisation_used": capture_result.get(
+                        "summarisation_used", False
+                    ),
+                    "is_error": False,
+                    "error_message": "",
+                }
+            else:
+                logger.warning(
+                    "Empty actual_output for Q%d on attempt %d", question_id, attempt
+                )
+                if attempt == max_retries:
+                    return {
+                        "question_id": question_id,
+                        "question": question,
+                        "llm_name": model_name,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "actual_output": "",
+                        "retrieval_context": [],
+                        "tools_called": [],
+                        "research_output": "",
+                        "research_mode": research_mode,
+                        "case_law_context": [],
+                        "tool_sequence": [],
+                        "fallback_used": False,
+                        "summarisation_output": [],
+                        "summarisation_used": False,
+                        "error": "Empty actual_output after retries",
+                    }
     finally:
-        conn.close()
-        for client in all_clients:
-            try:
-                client.close()
-            except Exception:
-                pass
-        logger.info(f"Closed {len(all_clients)} client connection(s)")
+        client.close()
 
 
-def main():
-    """Main entry point for the script."""
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Gather LexChat responses for evaluation",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Run all questions with all LLMs:
-  python gather_responses.py
-  
-  # Run specific question:
-  python gather_responses.py --question-id 1
-  
-  # Run with specific LLM:
-  python gather_responses.py --llm "gpt-oss:120b-cloud"
-  
-  # Overwrite existing results (start fresh):
-  python gather_responses.py --overwrite
-        """,
+        description="Gather evaluation responses from LexChat"
     )
-
-    parser.add_argument(
-        "--question-id",
-        type=int,
-        help="Specific question ID to run (if not specified, runs all questions)",
-    )
-
-    parser.add_argument(
-        "--llm",
-        type=str,
-        help="Specific LLM to use (if not specified, uses all available LLMs)",
-    )
-
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path(__file__).parent / "data" / "responses.db",
-        help="Output DuckDB database path (default: data/responses.db)",
-    )
-
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Clear existing responses in the output database before writing new ones",
+        help="Clear existing responses before gathering (default: append)",
     )
-
     parser.add_argument(
-        "--workers",
+        "--debug-events",
+        action="store_true",
+        help="Write raw SSE events to lex_eval/data/debug_events.jsonl",
+    )
+    parser.add_argument(
+        "--verbose-capture",
+        action="store_true",
+        help="Write per-question verbose audit logs to lex_eval/data/verbose_logs/",
+    )
+    parser.add_argument(
+        "--threads",
         type=int,
         default=10,
-        help="Maximum number of concurrent threads (default: 10)",
+        help="Number of concurrent threads (default: 10)",
     )
-
     parser.add_argument(
-        "--questions-file",
-        type=Path,
-        default=Path(__file__).parent / "data" / "questions.json",
-        help="Questions file path (default: data/questions.json)",
+        "--retries",
+        type=int,
+        default=3,
+        help="Retries per question if actual_output is empty (default: 3)",
     )
-
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
-
+    parser.add_argument(
+        "--question-id",
+        type=int,
+        default=None,
+        help="Run only the question with this ID (default: all questions)",
+    )
     args = parser.parse_args()
 
-    # Set logging level
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # ------------------------------------------------------------------
+    # Paths
+    # ------------------------------------------------------------------
+    base = Path(__file__).parent
+    questions_path = base / "data" / "questions.json"
+    db_path = base / "data" / "responses.db"
+    debug_events_path = base / "data" / "debug_events.jsonl"
+    verbose_logs_dir = base / "data" / "verbose_logs"
+
+    if not questions_path.exists():
+        logger.error("questions.json not found at %s", questions_path)
+        sys.exit(1)
+
+    # ------------------------------------------------------------------
+    # init DB
+    # ------------------------------------------------------------------
+    db_conn = get_connection(db_path)
+    init_db(db_conn)
+
+    if args.overwrite:
+        clear_responses(db_conn)
+        logger.info("Cleared existing responses (--overwrite)")
+
+    # ------------------------------------------------------------------
+    # Get active LLM from LexChat API
+    # ------------------------------------------------------------------
+    model_name, _ = get_active_model()
+    if model_name is None:
+        logger.error(
+            "No active model found in LexChat. Set one in the admin portal before "
+            "running the eval."
+        )
+        sys.exit(1)
+    logger.info("Active LLM: %s", model_name)
+
+    # ------------------------------------------------------------------
+    # Load questions
+    # ------------------------------------------------------------------
+    questions = load_questions(questions_path)
+    logger.info("Loaded %d questions", len(questions))
+
+    if args.question_id is not None:
+        questions = [q for q in questions if q["id"] == args.question_id]
+        if not questions:
+            logger.error("No question found with id=%d", args.question_id)
+            sys.exit(1)
+        logger.info("Filtered to question ID %d", args.question_id)
+
+    # Filter out already-gathered questions (unless --overwrite)
+    pending = []
+    # Simple skip logic - just add all questions since should_skip is not available
+    for q in questions:
+        if not args.overwrite:
+            logger.info("Processing Q%d (skipping existing check)", q["id"])
+        pending.append(q)
+
+    if not pending:
+        logger.info("All questions already gathered. Use --overwrite to re-gather.")
+        return
+
+    logger.info("Gathering responses for %d pending questions", len(pending))
+
+    # ------------------------------------------------------------------
+    # Open debug events file if requested
+    # ------------------------------------------------------------------
+    debug_fh = None
+    if args.debug_events:
+        debug_fh = open(str(debug_events_path), "a", encoding="utf-8")
+        logger.info("Writing debug events to %s", debug_events_path)
+
+    # ------------------------------------------------------------------
+    # Create verbose logs directory if requested
+    # ------------------------------------------------------------------
+    if args.verbose_capture:
+        verbose_logs_dir.mkdir(exist_ok=True)
+        logger.info("Writing verbose capture logs to %s", verbose_logs_dir)
 
     try:
-        questions = load_questions(args.questions_file, args.question_id)
+        # ------------------------------------------------------------------
+        # Gather responses concurrently
+        # ------------------------------------------------------------------
+        with ThreadPoolExecutor(max_workers=args.threads) as executor:
+            futures = {}
+            for q in pending:
+                # Build verbose log path for this question (per-question, not per-attempt)
+                verbose_log_path = None
+                if args.verbose_capture:
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    verbose_log_path = verbose_logs_dir / f"Q{q['id']}_{ts}.log"
 
-        logger.info("Fetching available LLMs...")
-        available_llms = get_llms()
+                futures[
+                    executor.submit(
+                        process_question,
+                        q["id"],
+                        q["question"],
+                        q.get("research_mode", "legislation_only"),
+                        model_name,
+                        args.retries,
+                        debug_fh,
+                        verbose_log_path,
+                    )
+                ] = q
 
-        if args.llm:
-            validate_llm(args.llm, available_llms)
-            llm_names = [args.llm]
-            logger.info(f"Using specified LLM: {args.llm}")
-        else:
-            llm_names = available_llms
-            logger.info(f"Using all {len(llm_names)} available LLMs")
+            for future in as_completed(futures):
+                q = futures[future]
+                try:
+                    result = future.result()
+                    insert_response(db_conn, result)
+                    # Error records are signalled by an "error" key (and may not
+                    # set is_error), so check both to avoid logging failures as OK.
+                    is_error = result.get("is_error") or "error" in result
+                    status = "ERROR" if is_error else "OK"
+                    logger.info(
+                        "Q%d (%s): %s [actual_output=%d chars]",
+                        q["id"],
+                        q.get("research_mode", "legislation_only"),
+                        status,
+                        len(result.get("actual_output", "")),
+                    )
+                except Exception as exc:
+                    logger.error("Q%d failed: %s", q["id"], exc)
+                    insert_response(
+                        db_conn,
+                        {
+                            "question_id": q["id"],
+                            "question": q["question"],
+                            "llm_name": model_name,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "actual_output": "",
+                            "retrieval_context": [],
+                            "tools_called": [],
+                            "research_output": "",
+                            "research_mode": q.get("research_mode", "legislation_only"),
+                            "case_law_context": [],
+                            "tool_sequence": [],
+                            "fallback_used": False,
+                            "summarisation_output": [],
+                            "summarisation_used": False,
+                            "error": str(exc),
+                        },
+                    )
+    finally:
+        if debug_fh:
+            debug_fh.close()
+        db_conn.close()
 
-        gather_responses(
-            questions=questions,
-            llm_names=llm_names,
-            output_file=args.output,
-            overwrite=args.overwrite,
-            max_workers=args.workers,
-        )
-
-        return 0
-
-    except FileNotFoundError as e:
-        logger.error(f"File not found: {e}")
-        return 1
-    except ValueError as e:
-        logger.error(f"Invalid input: {e}")
-        return 1
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}", exc_info=True)
-        return 1
+    logger.info("Done gathering responses.")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
