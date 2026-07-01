@@ -23,7 +23,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, IO, List, Optional
 
 from lex_eval.utils.audit_capture import audit_capture
 from lex_eval.utils.db import get_connection, insert_response, init_db, clear_responses
@@ -49,7 +49,7 @@ def process_question(
     research_mode: str,
     model_name: str,
     max_retries: int,
-    debug_events_file: Optional[Path] = None,
+    debug_events_file: Optional[IO[str]] = None,
     verbose_log_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Run a single question through audit_capture.
