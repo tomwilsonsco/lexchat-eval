@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import sys
 from collections import defaultdict
@@ -568,7 +569,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
                                 f'<div style="background:#0d1117;border-left:3px solid #d29922;'
                                 f"padding:8px 12px;border-radius:4px;margin:4px 0 2px 0;"
                                 f'font-size:0.85em;font-family:monospace;color:#d29922;">'
-                                f"🎯 Manager asked: {query}</div>",
+                                f"🎯 Manager asked: {html.escape(query)}</div>",
                                 unsafe_allow_html=True,
                             )
                         output_raw = tool.get("output", "")
