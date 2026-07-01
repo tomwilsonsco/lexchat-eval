@@ -222,6 +222,12 @@ def main() -> None:
     # Get active LLM from LexChat API
     # ------------------------------------------------------------------
     model_name, _ = get_active_model()
+    if model_name is None:
+        logger.error(
+            "No active model found in LexChat. Set one in the admin portal before "
+            "running the eval."
+        )
+        sys.exit(1)
     logger.info("Active LLM: %s", model_name)
 
     # ------------------------------------------------------------------
