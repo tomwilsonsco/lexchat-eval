@@ -604,7 +604,11 @@ def make_deploy_db(
                     is_error,
                     error_message,
                     research_mode or "legislation_only",
-                    case_law_context_json if case_law_context_json is not None else "[]",
+                    (
+                        case_law_context_json
+                        if case_law_context_json is not None
+                        else "[]"
+                    ),
                     tool_sequence_json if tool_sequence_json is not None else "[]",
                     bool(fallback_used),
                     summarisation_output_json,

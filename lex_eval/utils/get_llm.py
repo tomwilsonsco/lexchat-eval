@@ -67,7 +67,9 @@ def get_summarisation_model() -> Tuple[Optional[str], Optional[str]]:
         data = cfg_response.json()
 
         provider_key = active_provider or data.get("active_provider", "ollama")
-        provider_cfgs = {p["id"]: p.get("config", {}) for p in data.get("providers", [])}
+        provider_cfgs = {
+            p["id"]: p.get("config", {}) for p in data.get("providers", [])
+        }
         cfg = provider_cfgs.get(provider_key, {})
 
         # Match server-side: cfg.get("summarisation_model") or model
@@ -93,4 +95,6 @@ if __name__ == "__main__":
                 "  (same as active model — no separate summarisation model configured)"
             )
         else:
-            print(f"Summarisation model:           {summ_model}  (provider: {summ_provider})")
+            print(
+                f"Summarisation model:           {summ_model}  (provider: {summ_provider})"
+            )
