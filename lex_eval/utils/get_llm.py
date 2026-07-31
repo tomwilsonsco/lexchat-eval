@@ -62,10 +62,19 @@ def get_summarisation_model() -> Tuple[Optional[str], Optional[str]]:
             return None, None
 
         # Read the full provider config (admin endpoint).
-        cfg_response = client.get("/api/developer/provider-config")
-        cfg_response.raise_for_status()
-        data = cfg_response.json()
+        # Fall back to the main model gracefully if the endpoint is unavailable.
+        try:
+            cfg_response = client.get("/api/developer/provider-config")
+            cfg_response.raise_for_status()
+            data = cfg_response.json()
+        except Exception as exc:
+            logger.warning(
+                "Could not read provider config (%s); summarisation model defaults to main model.",
+                exc,
+            )
+            return main_model, active_provider
 
+        # Use the resolved provider_key for both config lookup and return value.
         provider_key = active_provider or data.get("active_provider", "ollama")
         provider_cfgs = {
             p["id"]: p.get("config", {}) for p in data.get("providers", [])
@@ -74,7 +83,7 @@ def get_summarisation_model() -> Tuple[Optional[str], Optional[str]]:
 
         # Match server-side: cfg.get("summarisation_model") or model
         summ_model = cfg.get("summarisation_model") or main_model
-        return summ_model, active_provider
+        return summ_model, provider_key
     finally:
         client.close()
 
