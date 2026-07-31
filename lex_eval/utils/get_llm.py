@@ -32,10 +32,78 @@ def get_active_model() -> Tuple[Optional[str], Optional[str]]:
         client.close()
 
 
+def get_summarisation_model() -> Tuple[Optional[str], Optional[str]]:
+    """
+    Return the summarisation model configured in LexChat's admin portal.
+
+    Calls the admin-only /api/developer/provider-config endpoint to read
+    summarisation_model from the active provider's config blob.  Mirrors the
+    server-side fallback: if summarisation_model is blank, the main model is
+    returned (because that is what LexChat actually uses for summarisation).
+
+    Returns:
+        Tuple of (model_name, provider).  Both are None only when the active
+        model itself cannot be resolved.
+    """
+    client = get_authenticated_client()
+    try:
+        # Resolve the main model and active provider first (needed for fallback).
+        models_response = client.get("/api/models")
+        models_response.raise_for_status()
+        main_model: Optional[str] = None
+        active_provider: Optional[str] = None
+        for m in models_response.json():
+            if m.get("active") is True:
+                main_model = m.get("name")
+                active_provider = m.get("provider", "").lower()
+                break
+
+        if main_model is None:
+            return None, None
+
+        # Read the full provider config (admin endpoint).
+        # Fall back to the main model gracefully if the endpoint is unavailable.
+        try:
+            cfg_response = client.get("/api/developer/provider-config")
+            cfg_response.raise_for_status()
+            data = cfg_response.json()
+        except Exception as exc:
+            logger.warning(
+                "Could not read provider config (%s); summarisation model defaults to main model.",
+                exc,
+            )
+            return main_model, active_provider
+
+        # Use the resolved provider_key for both config lookup and return value.
+        provider_key = active_provider or data.get("active_provider", "ollama")
+        provider_cfgs = {
+            p["id"]: p.get("config", {}) for p in data.get("providers", [])
+        }
+        cfg = provider_cfgs.get(provider_key, {})
+
+        # Match server-side: cfg.get("summarisation_model") or model
+        summ_model = cfg.get("summarisation_model") or main_model
+        return summ_model, provider_key
+    finally:
+        client.close()
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     model, provider = get_active_model()
     if model:
-        print(f"\nActive model: {model} (provider: {provider})")
+        print(f"\nActive model (manager/worker): {model}  (provider: {provider})")
     else:
         print("\nNo active model found. Set one in LexChat's admin portal.")
+
+    summ_model, summ_provider = get_summarisation_model()
+    if summ_model:
+        if summ_model == model:
+            print(
+                f"Summarisation model:           {summ_model}"
+                "  (same as active model — no separate summarisation model configured)"
+            )
+        else:
+            print(
+                f"Summarisation model:           {summ_model}  (provider: {summ_provider})"
+            )

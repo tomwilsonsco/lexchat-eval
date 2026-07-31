@@ -427,7 +427,15 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 st.markdown(f"**Fallback Used:** {'Yes' if fallback else 'No'}")
             with cols[2]:
                 summarisation = rec.get("summarisation_used", False)
-                st.markdown(f"**Summarisation:** {'Yes' if summarisation else 'No'}")
+                summ_llm = rec.get("summarisation_llm", "")
+                main_llm = rec.get("llm_name", "")
+                if summarisation and summ_llm and summ_llm != main_llm:
+                    st.markdown("**Summarisation:** Yes")
+                    st.caption(f"Model: `{summ_llm}`")
+                elif summarisation:
+                    st.markdown("**Summarisation:** Yes *(main model)*")
+                else:
+                    st.markdown("**Summarisation:** No")
             with cols[3]:
                 tool_seq = rec.get("tool_sequence") or []
                 st.markdown(f"**Tool Sequence:** `{len(tool_seq)}` steps")
@@ -637,9 +645,11 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 {
                     "timestamp": rec.get("timestamp"),
                     "llm_name": rec.get("llm_name"),
+                    "summarisation_llm": rec.get("summarisation_llm", ""),
                     "question_id": rec.get("question_id"),
                     "research_mode": rec.get("research_mode"),
                     "fallback_used": rec.get("fallback_used"),
+                    "summarisation_used": rec.get("summarisation_used"),
                     "tool_sequence": rec.get("tool_sequence", []),
                 },
                 expanded=False,

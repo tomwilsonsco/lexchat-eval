@@ -27,7 +27,7 @@ from typing import Any, Dict, IO, List, Optional
 
 from lex_eval.utils.audit_capture import audit_capture
 from lex_eval.utils.db import get_connection, insert_response, init_db, clear_responses
-from lex_eval.utils.get_llm import get_active_model
+from lex_eval.utils.get_llm import get_active_model, get_summarisation_model
 from lex_eval.utils.lexchat_client import get_authenticated_client
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ def process_question(
     question: str,
     research_mode: str,
     model_name: str,
+    summarisation_llm: str,
     max_retries: int,
     debug_events_file: Optional[IO[str]] = None,
     verbose_log_path: Optional[Path] = None,
@@ -116,6 +117,7 @@ def process_question(
                     "summarisation_used": capture_result.get(
                         "summarisation_used", False
                     ),
+                    "summarisation_llm": summarisation_llm,
                     "is_error": False,
                     "error_message": "",
                 }
@@ -139,6 +141,7 @@ def process_question(
                         "fallback_used": False,
                         "summarisation_output": [],
                         "summarisation_used": False,
+                        "summarisation_llm": summarisation_llm,
                         "error": "Empty actual_output after retries",
                     }
     finally:
@@ -228,7 +231,15 @@ def main() -> None:
             "running the eval."
         )
         sys.exit(1)
-    logger.info("Active LLM: %s", model_name)
+    logger.info("Active LLM (manager/worker): %s", model_name)
+
+    summ_model_name, _ = get_summarisation_model()
+    if summ_model_name is None:
+        summ_model_name = model_name
+    if summ_model_name == model_name:
+        logger.info("Summarisation LLM: %s (same as active model)", summ_model_name)
+    else:
+        logger.info("Summarisation LLM: %s", summ_model_name)
 
     # ------------------------------------------------------------------
     # Load questions
@@ -292,6 +303,7 @@ def main() -> None:
                         q["question"],
                         q.get("research_mode", "legislation_only"),
                         model_name,
+                        summ_model_name,
                         args.retries,
                         debug_fh,
                         verbose_log_path,
@@ -333,6 +345,7 @@ def main() -> None:
                             "fallback_used": False,
                             "summarisation_output": [],
                             "summarisation_used": False,
+                            "summarisation_llm": summ_model_name,
                             "error": str(exc),
                         },
                     )

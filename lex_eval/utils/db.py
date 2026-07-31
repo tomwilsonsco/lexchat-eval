@@ -22,6 +22,7 @@ responses
     case_law_context  JSON       (list of {title, ncn, court, date, url} dicts from search_case_law)
     tool_sequence     JSON       (ordered list of worker tool names called, e.g. [search_legislation, search_legislation_sections])
     fallback_used     BOOLEAN     (True when get_legislation_text was invoked)
+    summarisation_llm TEXT        (model used for summarisation; equals llm_name when no separate model is configured)
 
 eval_results
     id          SEQUENCE primary key
@@ -73,7 +74,8 @@ CREATE TABLE IF NOT EXISTS responses (
     tool_sequence     JSON,
     fallback_used     BOOLEAN  NOT NULL DEFAULT FALSE,
     summarisation_output JSON,
-    summarisation_used BOOLEAN DEFAULT FALSE
+    summarisation_used BOOLEAN DEFAULT FALSE,
+    summarisation_llm  TEXT
 );
 """
 
@@ -90,6 +92,7 @@ _MIGRATE_RESPONSES = [
     "ALTER TABLE responses ADD COLUMN fallback_used BOOLEAN NOT NULL DEFAULT FALSE",
     "ALTER TABLE responses ADD COLUMN summarisation_output JSON",
     "ALTER TABLE responses ADD COLUMN summarisation_used BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE responses ADD COLUMN summarisation_llm TEXT",
 ]
 
 _INSERT_RESPONSE = """
@@ -97,8 +100,8 @@ INSERT INTO responses (
     question_id, question, llm_name, timestamp, actual_output,
     retrieval_context, tools_called, research_output, is_error, error_message,
     research_mode, case_law_context, tool_sequence, fallback_used,
-    summarisation_output, summarisation_used
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    summarisation_output, summarisation_used, summarisation_llm
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -169,6 +172,7 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
                 else None
             ),
             record.get("summarisation_used", False),
+            record.get("summarisation_llm") or None,
         ],
     )
 
@@ -196,7 +200,7 @@ def load_records(
             SELECT question_id, question, llm_name, timestamp,
                    actual_output, retrieval_context, tools_called, research_output,
                    research_mode, case_law_context, tool_sequence, fallback_used,
-                   summarisation_output, summarisation_used
+                   summarisation_output, summarisation_used, summarisation_llm
             FROM responses
             {where}
             ORDER BY id
@@ -220,6 +224,7 @@ def load_records(
         fallback_used,
         summarisation_output_json,
         summarisation_used,
+        summarisation_llm,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -248,6 +253,7 @@ def load_records(
                 "fallback_used": bool(fallback_used),
                 "summarisation_output": summarisation_output,
                 "summarisation_used": bool(summarisation_used),
+                "summarisation_llm": summarisation_llm or "",
             }
         )
     return records
@@ -598,7 +604,11 @@ def make_deploy_db(
                     is_error,
                     error_message,
                     research_mode or "legislation_only",
-                    case_law_context_json if case_law_context_json is not None else "[]",
+                    (
+                        case_law_context_json
+                        if case_law_context_json is not None
+                        else "[]"
+                    ),
                     tool_sequence_json if tool_sequence_json is not None else "[]",
                     bool(fallback_used),
                     summarisation_output_json,
