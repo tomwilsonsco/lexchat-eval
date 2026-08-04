@@ -21,7 +21,6 @@ import pytest
 
 from lex_eval.utils.audit_capture import audit_capture
 
-
 # ---------------------------------------------------------------------------
 # Mock SSE client
 # ---------------------------------------------------------------------------
@@ -114,9 +113,7 @@ AUDIT_LEGISLATION = {
                             "request": {},
                             "status": 200,
                             "response": {
-                                "results": [
-                                    {"title": "Housing Act 1985", "year": 1985}
-                                ]
+                                "results": [{"title": "Housing Act 1985", "year": 1985}]
                             },
                         }
                     ],

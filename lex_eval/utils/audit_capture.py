@@ -261,9 +261,7 @@ def audit_capture(
 
     # research_output — join all delegation reports
     research_output = "\n\n".join(
-        d.get("report", "")
-        for d in audit.get("delegations", [])
-        if d.get("report")
+        d.get("report", "") for d in audit.get("delegations", []) if d.get("report")
     )
 
     # tools_called and tool_sequence — built together to preserve ordering
@@ -324,9 +322,7 @@ def audit_capture(
                             or sec.get("excerpt")
                             or ""
                         )
-                        sec_title = (
-                            sec.get("title") or sec.get("section_title") or ""
-                        )
+                        sec_title = sec.get("title") or sec.get("section_title") or ""
                         if content:
                             retrieval_context.append(
                                 f"{sec_title}: {content}" if sec_title else content
@@ -347,7 +343,9 @@ def audit_capture(
                             }
                         )
                         parts = [
-                            p for p in [r.get("ncn"), r.get("court"), r.get("date")] if p
+                            p
+                            for p in [r.get("ncn"), r.get("court"), r.get("date")]
+                            if p
                         ]
                         title = r.get("title", "")
                         retrieval_context.append(
@@ -404,9 +402,7 @@ def audit_capture(
         for t in d.get("tools", [])
         if t.get("memo_hit")
     )
-    reformatted = any(
-        d.get("reformatted", False) for d in audit.get("delegations", [])
-    )
+    reformatted = any(d.get("reformatted", False) for d in audit.get("delegations", []))
     audit_schema_version = audit.get("schema_version")
 
     # ------------------------------------------------------------------
