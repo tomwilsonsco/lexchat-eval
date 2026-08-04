@@ -27,18 +27,56 @@ load_dotenv(dotenv_path=_env_path)
 
 OPENROUTER_API_KEY: str | None = os.getenv("OPENROUTER_API_KEY")
 _DEFAULT_MODEL = "openai/gpt-4o"
+_DEFAULT_TEMPERATURE = 0.0
 OPENROUTER_JUDGE_MODEL: str = os.getenv("OPENROUTER_JUDGE_MODEL", _DEFAULT_MODEL)
+
+
+def _parse_temperature(raw: str | None) -> float:
+    """Parse the OPENROUTER_JUDGE_TEMPERATURE env var.
+
+    Returns 0.0 on missing/invalid input, logging a warning so misconfigurations
+    are visible without crashing the eval run.
+    """
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_TEMPERATURE
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "OPENROUTER_JUDGE_TEMPERATURE=%r is not a valid float; "
+            "falling back to %s",
+            raw,
+            _DEFAULT_TEMPERATURE,
+        )
+        return _DEFAULT_TEMPERATURE
+    if value < 0.0 or value > 2.0:
+        logger.warning(
+            "OPENROUTER_JUDGE_TEMPERATURE=%s is outside the typical "
+            "0.0–2.0 range; using it anyway but results may be unpredictable",
+            value,
+        )
+    return value
+
+
+OPENROUTER_JUDGE_TEMPERATURE: float = _parse_temperature(
+    os.getenv("OPENROUTER_JUDGE_TEMPERATURE")
+)
 
 
 class OpenRouterJudge:
     """A lightweight judge that calls OpenRouter's chat completions API."""
 
-    def __init__(self, model: str | None = None) -> None:
+    def __init__(
+        self, model: str | None = None, temperature: float | None = None
+    ) -> None:
         if not OPENROUTER_API_KEY:
             raise ValueError(
                 "OPENROUTER_API_KEY is not set; cannot create OpenRouterJudge"
             )
         self._model = model or OPENROUTER_JUDGE_MODEL
+        self._temperature = (
+            temperature if temperature is not None else OPENROUTER_JUDGE_TEMPERATURE
+        )
         self._client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
@@ -59,7 +97,7 @@ class OpenRouterJudge:
         kwargs: dict[str, Any] = {
             "model": self._model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.0,
+            "temperature": self._temperature,
             "max_tokens": 4096,
         }
 
