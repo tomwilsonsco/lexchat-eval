@@ -75,7 +75,16 @@ CREATE TABLE IF NOT EXISTS responses (
     fallback_used     BOOLEAN  NOT NULL DEFAULT FALSE,
     summarisation_output JSON,
     summarisation_used BOOLEAN DEFAULT FALSE,
-    summarisation_llm  TEXT
+    summarisation_llm  TEXT,
+    chat_mode         TEXT     NOT NULL DEFAULT 'research',
+    provider          TEXT,
+    total_cost_usd    DOUBLE,
+    total_ms          INTEGER,
+    reformatted       BOOLEAN  NOT NULL DEFAULT FALSE,
+    local_cache_hits  INTEGER  NOT NULL DEFAULT 0,
+    memo_hits         INTEGER  NOT NULL DEFAULT 0,
+    audit_schema_version INTEGER,
+    audit_json        JSON
 );
 """
 
@@ -93,6 +102,19 @@ _MIGRATE_RESPONSES = [
     "ALTER TABLE responses ADD COLUMN summarisation_output JSON",
     "ALTER TABLE responses ADD COLUMN summarisation_used BOOLEAN DEFAULT FALSE",
     "ALTER TABLE responses ADD COLUMN summarisation_llm TEXT",
+    # --- audit event migration (LexChat commit da3070d) ---
+    # NOTE: DuckDB does not support ADD COLUMN with NOT NULL/DEFAULT
+    # constraints. Columns are added without constraints; the application
+    # code provides defaults via dict.get() with fallback values.
+    "ALTER TABLE responses ADD COLUMN chat_mode TEXT",
+    "ALTER TABLE responses ADD COLUMN provider TEXT",
+    "ALTER TABLE responses ADD COLUMN total_cost_usd DOUBLE",
+    "ALTER TABLE responses ADD COLUMN total_ms INTEGER",
+    "ALTER TABLE responses ADD COLUMN reformatted BOOLEAN",
+    "ALTER TABLE responses ADD COLUMN local_cache_hits INTEGER",
+    "ALTER TABLE responses ADD COLUMN memo_hits INTEGER",
+    "ALTER TABLE responses ADD COLUMN audit_schema_version INTEGER",
+    "ALTER TABLE responses ADD COLUMN audit_json JSON",
 ]
 
 _INSERT_RESPONSE = """
@@ -100,8 +122,10 @@ INSERT INTO responses (
     question_id, question, llm_name, timestamp, actual_output,
     retrieval_context, tools_called, research_output, is_error, error_message,
     research_mode, case_law_context, tool_sequence, fallback_used,
-    summarisation_output, summarisation_used, summarisation_llm
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    summarisation_output, summarisation_used, summarisation_llm,
+    chat_mode, provider, total_cost_usd, total_ms, reformatted,
+    local_cache_hits, memo_hits, audit_schema_version, audit_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -130,7 +154,7 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
             col_hint = (
                 stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
             )
-            logger.warning("Migration skipped (column may already exist): %s", col_hint)
+            logger.debug("Migration skipped (column may already exist): %s", col_hint)
 
 
 def clear_responses(conn: duckdb.DuckDBPyConnection) -> None:
@@ -173,6 +197,15 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             ),
             record.get("summarisation_used", False),
             record.get("summarisation_llm") or None,
+            record.get("chat_mode", "research"),
+            record.get("provider") or None,
+            record.get("total_cost_usd") or None,
+            record.get("total_ms") or None,
+            record.get("reformatted", False),
+            record.get("local_cache_hits", 0),
+            record.get("memo_hits", 0),
+            record.get("audit_schema_version") or None,
+            record.get("audit_json") or None,
         ],
     )
 
@@ -195,12 +228,16 @@ def load_records(
 
     conn = get_connection(path)
     try:
+        # Ensure the schema is migrated (adds new columns to existing DBs)
+        init_db(conn)
         where = "" if include_errors else "WHERE NOT is_error"
         rows = conn.execute(f"""
             SELECT question_id, question, llm_name, timestamp,
                    actual_output, retrieval_context, tools_called, research_output,
                    research_mode, case_law_context, tool_sequence, fallback_used,
-                   summarisation_output, summarisation_used, summarisation_llm
+                   summarisation_output, summarisation_used, summarisation_llm,
+                   chat_mode, provider, total_cost_usd, total_ms, reformatted,
+                   local_cache_hits, memo_hits, audit_schema_version, audit_json
             FROM responses
             {where}
             ORDER BY id
@@ -225,6 +262,15 @@ def load_records(
         summarisation_output_json,
         summarisation_used,
         summarisation_llm,
+        chat_mode,
+        provider,
+        total_cost_usd,
+        total_ms,
+        reformatted,
+        local_cache_hits,
+        memo_hits,
+        audit_schema_version,
+        audit_json,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -254,6 +300,15 @@ def load_records(
                 "summarisation_output": summarisation_output,
                 "summarisation_used": bool(summarisation_used),
                 "summarisation_llm": summarisation_llm or "",
+                "chat_mode": chat_mode or "research",
+                "provider": provider,
+                "total_cost_usd": total_cost_usd,
+                "total_ms": total_ms,
+                "reformatted": bool(reformatted),
+                "local_cache_hits": local_cache_hits or 0,
+                "memo_hits": memo_hits or 0,
+                "audit_schema_version": audit_schema_version,
+                "audit_json": audit_json,
             }
         )
     return records
@@ -551,6 +606,8 @@ def make_deploy_db(
     src = get_connection(source_path)
     dst = get_connection(output_path)
     try:
+        # Ensure source schema is migrated (adds new columns to existing DBs)
+        init_db(src)
         # Recreate schema in the destination
         init_db(dst)
         init_eval_results(dst)
@@ -560,7 +617,9 @@ def make_deploy_db(
             "SELECT question_id, question, llm_name, timestamp, actual_output, "
             "retrieval_context, tools_called, research_output, is_error, error_message, "
             "research_mode, case_law_context, tool_sequence, fallback_used, "
-            "summarisation_output, summarisation_used "
+            "summarisation_output, summarisation_used, summarisation_llm, "
+            "chat_mode, provider, total_cost_usd, total_ms, reformatted, "
+            "local_cache_hits, memo_hits, audit_schema_version, audit_json "
             "FROM responses ORDER BY id"
         ).fetchall()
 
@@ -583,6 +642,16 @@ def make_deploy_db(
                 fallback_used,
                 summarisation_output_json,
                 summarisation_used,
+                summarisation_llm,
+                chat_mode,
+                provider,
+                total_cost_usd,
+                total_ms,
+                reformatted,
+                local_cache_hits,
+                memo_hits,
+                audit_schema_version,
+                audit_json,
             ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
@@ -613,6 +682,16 @@ def make_deploy_db(
                     bool(fallback_used),
                     summarisation_output_json,
                     bool(summarisation_used),
+                    summarisation_llm,
+                    chat_mode or "research",
+                    provider,
+                    total_cost_usd,
+                    total_ms,
+                    bool(reformatted),
+                    local_cache_hits or 0,
+                    memo_hits or 0,
+                    audit_schema_version,
+                    audit_json,
                 ],
             )
 
