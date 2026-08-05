@@ -249,6 +249,25 @@ def audit_capture(
             is_error = True
             error_message = _audit_event["error"]
 
+        # Delegation-level errors: if ALL delegations failed (each has an error
+        # and no report), the research completely failed even though the
+        # top-level audit["error"] is null.  This catches the case where the
+        # worker tool execution failed internally before making any API calls
+        # (e.g. the sniffer callback bug in LexChat ≤9e76339), producing an
+        # apology message that would otherwise be stored as valid eval data.
+        _delegations = _audit_event.get("delegations") or []
+        if (
+            not is_error
+            and _delegations
+            and all(d.get("error") for d in _delegations)
+            and not any(d.get("report") for d in _delegations)
+        ):
+            is_error = True
+            _first_err = next(d["error"] for d in _delegations if d.get("error"))
+            error_message = (
+                f"All delegations failed — first error: {_first_err}"
+            )
+
     # ------------------------------------------------------------------
     # Derive the return dict from the audit event
     # ------------------------------------------------------------------

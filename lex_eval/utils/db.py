@@ -94,18 +94,21 @@ CREATE TABLE IF NOT EXISTS responses (
 # Without IF NOT EXISTS, DuckDB raises CatalogException when the column already
 # exists, which the exception handler in init_db catches and skips. This preserves
 # existing data.
+#
+# NOTE: DuckDB does not support ADD COLUMN with NOT NULL constraints — it raises
+# ParserException ("Adding columns with constraints not yet supported"). DEFAULT
+# alone is fine, but we omit it here for consistency. Columns are added without
+# constraints; the application code provides defaults via dict.get() with fallback
+# values, and load_records() applies fallbacks when reading.
 _MIGRATE_RESPONSES = [
-    "ALTER TABLE responses ADD COLUMN research_mode TEXT NOT NULL DEFAULT 'legislation_only'",
+    "ALTER TABLE responses ADD COLUMN research_mode TEXT",
     "ALTER TABLE responses ADD COLUMN case_law_context JSON",
     "ALTER TABLE responses ADD COLUMN tool_sequence JSON",
-    "ALTER TABLE responses ADD COLUMN fallback_used BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE responses ADD COLUMN fallback_used BOOLEAN",
     "ALTER TABLE responses ADD COLUMN summarisation_output JSON",
-    "ALTER TABLE responses ADD COLUMN summarisation_used BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE responses ADD COLUMN summarisation_used BOOLEAN",
     "ALTER TABLE responses ADD COLUMN summarisation_llm TEXT",
     # --- audit event migration (LexChat commit da3070d) ---
-    # NOTE: DuckDB does not support ADD COLUMN with NOT NULL/DEFAULT
-    # constraints. Columns are added without constraints; the application
-    # code provides defaults via dict.get() with fallback values.
     "ALTER TABLE responses ADD COLUMN chat_mode TEXT",
     "ALTER TABLE responses ADD COLUMN provider TEXT",
     "ALTER TABLE responses ADD COLUMN total_cost_usd DOUBLE",
