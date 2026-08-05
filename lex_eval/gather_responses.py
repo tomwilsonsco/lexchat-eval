@@ -11,6 +11,7 @@ Usage:
     python -m lex_eval.gather_responses --overwrite
     python -m lex_eval.gather_responses --debug-events
     python -m lex_eval.gather_responses --verbose-capture
+    python -m lex_eval.gather_responses --chat-mode deep_research
 """
 
 from __future__ import annotations
@@ -50,6 +51,7 @@ def process_question(
     model_name: str,
     summarisation_llm: str,
     max_retries: int,
+    chat_mode: str = "research",
     debug_events_file: Optional[IO[str]] = None,
     verbose_log_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
@@ -59,6 +61,57 @@ def process_question(
     """
     client = get_authenticated_client()
     try:
+        # ------------------------------------------------------------------
+        # Deep Research: obtain plan before streaming (two-phase flow)
+        # ------------------------------------------------------------------
+        deep_research_plan: Optional[dict] = None
+        if chat_mode == "deep_research":
+            plan_response = client.post(
+                "/api/research/plan",
+                json={
+                    "messages": [{"role": "user", "content": question}],
+                    "model": model_name,
+                },
+            )
+            plan_response.raise_for_status()
+            plan_data = plan_response.json()
+
+            if plan_data.get("needs_clarification"):
+                logger.warning(
+                    "Q%d: Deep Research plan needs clarification (%s) — skipping",
+                    question_id,
+                    plan_data.get("question", ""),
+                )
+                return {
+                    "question_id": question_id,
+                    "question": question,
+                    "llm_name": model_name,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "actual_output": "",
+                    "retrieval_context": [],
+                    "tools_called": [],
+                    "research_output": "",
+                    "research_mode": research_mode,
+                    "case_law_context": [],
+                    "tool_sequence": [],
+                    "fallback_used": False,
+                    "summarisation_output": [],
+                    "summarisation_used": False,
+                    "summarisation_llm": summarisation_llm,
+                    "chat_mode": "deep_research",
+                    "provider": None,
+                    "total_cost_usd": None,
+                    "total_ms": None,
+                    "local_cache_hits": 0,
+                    "memo_hits": 0,
+                    "reformatted": False,
+                    "audit_schema_version": None,
+                    "audit_json": None,
+                    "error": f"Deep Research plan requires clarification: {plan_data.get('question', '')}",
+                }
+
+            deep_research_plan = plan_data.get("plan")
+
         for attempt in range(1, max_retries + 1):
             if attempt > 1:
                 logger.info("Retry %d/%d for Q%d", attempt, max_retries, question_id)
@@ -92,13 +145,18 @@ def process_question(
                 question,
                 model_name,
                 research_mode=research_mode,
+                chat_mode=chat_mode,
+                deep_research_plan=deep_research_plan,
                 on_event=on_event,
                 verbose_log_path=attempt_log_path,
             )
 
             actual_output = capture_result.get("actual_output", "")
+            capture_is_error = capture_result.get("is_error", False)
+            capture_error_message = capture_result.get("error_message", "")
+
             if actual_output:
-                return {
+                result = {
                     "question_id": question_id,
                     "question": question,
                     "llm_name": model_name,
@@ -107,7 +165,7 @@ def process_question(
                     "retrieval_context": capture_result.get("retrieval_context", []),
                     "tools_called": capture_result.get("tools_called", []),
                     "research_output": capture_result.get("research_output", ""),
-                    "research_mode": research_mode,
+                    "research_mode": capture_result.get("research_mode", research_mode),
                     "case_law_context": capture_result.get("case_law_context", []),
                     "tool_sequence": capture_result.get("tool_sequence", []),
                     "fallback_used": capture_result.get("fallback_used", False),
@@ -118,14 +176,36 @@ def process_question(
                         "summarisation_used", False
                     ),
                     "summarisation_llm": summarisation_llm,
-                    "is_error": False,
-                    "error_message": "",
+                    "is_error": capture_is_error,
+                    "error_message": capture_error_message,
+                    "chat_mode": capture_result.get("chat_mode", chat_mode),
+                    "provider": capture_result.get("provider"),
+                    "total_cost_usd": capture_result.get("total_cost_usd"),
+                    "total_ms": capture_result.get("total_ms"),
+                    "local_cache_hits": capture_result.get("local_cache_hits", 0),
+                    "memo_hits": capture_result.get("memo_hits", 0),
+                    "reformatted": capture_result.get("reformatted", False),
+                    "audit_schema_version": capture_result.get("audit_schema_version"),
+                    "audit_json": capture_result.get("audit_json"),
                 }
+                # If the capture layer observed an error (e.g. the audit event
+                # carried an error), add the "error" key so insert_response
+                # treats this as an error row consistently.
+                if capture_is_error and capture_error_message:
+                    result["error"] = capture_error_message
+                return result
             else:
                 logger.warning(
                     "Empty actual_output for Q%d on attempt %d", question_id, attempt
                 )
                 if attempt == max_retries:
+                    # Preserve the specific error_message from the capture
+                    # layer if available, falling back to the generic message.
+                    error_msg = (
+                        capture_error_message
+                        if capture_error_message
+                        else "Empty actual_output after retries"
+                    )
                     return {
                         "question_id": question_id,
                         "question": question,
@@ -142,7 +222,16 @@ def process_question(
                         "summarisation_output": [],
                         "summarisation_used": False,
                         "summarisation_llm": summarisation_llm,
-                        "error": "Empty actual_output after retries",
+                        "chat_mode": chat_mode,
+                        "provider": None,
+                        "total_cost_usd": None,
+                        "total_ms": None,
+                        "local_cache_hits": 0,
+                        "memo_hits": 0,
+                        "reformatted": False,
+                        "audit_schema_version": None,
+                        "audit_json": None,
+                        "error": error_msg,
                     }
     finally:
         client.close()
@@ -189,6 +278,12 @@ def main() -> None:
         type=int,
         default=None,
         help="Run only the question with this ID (default: all questions)",
+    )
+    parser.add_argument(
+        "--chat-mode",
+        default="research",
+        choices=["research", "conversational", "deep_research"],
+        help="Chat mode to pass to /api/system/chat (default: research)",
     )
     args = parser.parse_args()
 
@@ -305,6 +400,7 @@ def main() -> None:
                         model_name,
                         summ_model_name,
                         args.retries,
+                        args.chat_mode,
                         debug_fh,
                         verbose_log_path,
                     )
@@ -346,6 +442,15 @@ def main() -> None:
                             "summarisation_output": [],
                             "summarisation_used": False,
                             "summarisation_llm": summ_model_name,
+                            "chat_mode": args.chat_mode,
+                            "provider": None,
+                            "total_cost_usd": None,
+                            "total_ms": None,
+                            "local_cache_hits": 0,
+                            "memo_hits": 0,
+                            "reformatted": False,
+                            "audit_schema_version": None,
+                            "audit_json": None,
                             "error": str(exc),
                         },
                     )
