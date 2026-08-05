@@ -144,7 +144,7 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
     for stmt in _MIGRATE_RESPONSES:
         try:
             conn.execute(stmt)
-        except Exception:
+        except duckdb.CatalogException:
             # Column already exists — roll back the aborted statement so the
             # connection remains usable, then skip.
             try:
@@ -155,6 +155,20 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
                 stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
             )
             logger.debug("Migration skipped (column may already exist): %s", col_hint)
+        except Exception:
+            # Unexpected migration failure (syntax error, type mismatch, etc.)
+            # — roll back and surface it at WARNING so real failures aren't
+            # silently hidden at the default INFO log level.
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            col_hint = (
+                stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
+            )
+            logger.warning(
+                "Migration failed for column: %s", col_hint, exc_info=True
+            )
 
 
 def clear_responses(conn: duckdb.DuckDBPyConnection) -> None:

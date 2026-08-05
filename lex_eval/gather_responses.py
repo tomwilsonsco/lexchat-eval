@@ -152,8 +152,11 @@ def process_question(
             )
 
             actual_output = capture_result.get("actual_output", "")
+            capture_is_error = capture_result.get("is_error", False)
+            capture_error_message = capture_result.get("error_message", "")
+
             if actual_output:
-                return {
+                result = {
                     "question_id": question_id,
                     "question": question,
                     "llm_name": model_name,
@@ -173,8 +176,8 @@ def process_question(
                         "summarisation_used", False
                     ),
                     "summarisation_llm": summarisation_llm,
-                    "is_error": False,
-                    "error_message": "",
+                    "is_error": capture_is_error,
+                    "error_message": capture_error_message,
                     "chat_mode": capture_result.get("chat_mode", chat_mode),
                     "provider": capture_result.get("provider"),
                     "total_cost_usd": capture_result.get("total_cost_usd"),
@@ -185,11 +188,24 @@ def process_question(
                     "audit_schema_version": capture_result.get("audit_schema_version"),
                     "audit_json": capture_result.get("audit_json"),
                 }
+                # If the capture layer observed an error (e.g. the audit event
+                # carried an error), add the "error" key so insert_response
+                # treats this as an error row consistently.
+                if capture_is_error and capture_error_message:
+                    result["error"] = capture_error_message
+                return result
             else:
                 logger.warning(
                     "Empty actual_output for Q%d on attempt %d", question_id, attempt
                 )
                 if attempt == max_retries:
+                    # Preserve the specific error_message from the capture
+                    # layer if available, falling back to the generic message.
+                    error_msg = (
+                        capture_error_message
+                        if capture_error_message
+                        else "Empty actual_output after retries"
+                    )
                     return {
                         "question_id": question_id,
                         "question": question,
@@ -215,7 +231,7 @@ def process_question(
                         "reformatted": False,
                         "audit_schema_version": None,
                         "audit_json": None,
-                        "error": "Empty actual_output after retries",
+                        "error": error_msg,
                     }
     finally:
         client.close()

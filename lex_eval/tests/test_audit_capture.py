@@ -269,6 +269,71 @@ AUDIT_WRONG_SCHEMA = {
     "error": None,
 }
 
+# Audit event with a tool entry that has a missing/empty name field.
+# The capture layer should use "Worker: unknown" as a placeholder instead
+# of producing an ambiguous "Worker: " entry.
+AUDIT_MISSING_TOOL_NAME = {
+    "type": "audit",
+    "schema_version": 1,
+    "request_id": "noname789",
+    "chat_mode": "research",
+    "research_mode": "legislation_only",
+    "provider": "openrouter",
+    "model": "openai/gpt-4o",
+    "answer": "An answer with a tool that has no name.",
+    "delegations": [
+        {
+            "id": "d1",
+            "kind": "delegation",
+            "step": None,
+            "title": None,
+            "brief": "Research something",
+            "report": "**Summary Answer (BLUF):**\nReport text.",
+            "reformatted": False,
+            "error": None,
+            "started_at": 0.5,
+            "duration_s": 5.0,
+            "tools": [
+                {
+                    "id": "t1",
+                    "name": "search_legislation",
+                    "args": {"query": "test"},
+                    "raw_result": "...",
+                    "final_result": "...",
+                    "summarised": False,
+                    "local_cache_hit": False,
+                    "memo_hit": False,
+                    "api_calls": [],
+                },
+                {
+                    "id": "t2",
+                    # Missing "name" field entirely
+                    "args": {"query": "no name"},
+                    "raw_result": "...",
+                    "final_result": "Result from unnamed tool",
+                    "summarised": False,
+                    "local_cache_hit": False,
+                    "memo_hit": False,
+                    "api_calls": [],
+                },
+                {
+                    "id": "t3",
+                    "name": "",  # Empty string name
+                    "args": {"query": "empty name"},
+                    "raw_result": "...",
+                    "final_result": "Result from empty-named tool",
+                    "summarised": False,
+                    "local_cache_hit": False,
+                    "memo_hit": False,
+                    "api_calls": [],
+                },
+            ],
+        }
+    ],
+    "timings": {"total_ms": 5000, "llm_calls": 2, "total_cost_usd": 0.02},
+    "error": None,
+}
+
 
 # ---------------------------------------------------------------------------
 # Tests — standard legislation_only
@@ -452,3 +517,44 @@ class TestUnknownSchemaVersion:
         lines = _sse_lines(AUDIT_WRONG_SCHEMA)
         with pytest.raises(RuntimeError, match="schema_version"):
             audit_capture(_MockClient(lines), "test question", "test-model")
+
+
+# ---------------------------------------------------------------------------
+# Tests — tool with missing/empty name
+# ---------------------------------------------------------------------------
+
+
+class TestMissingToolName:
+    """Test that tools with missing or empty name fields get a placeholder."""
+
+    def test_missing_name_uses_unknown_placeholder(self):
+        """Tools with no 'name' field should produce 'Worker: unknown'."""
+        lines = _sse_lines(AUDIT_MISSING_TOOL_NAME)
+        result = audit_capture(_MockClient(lines), "test question", "test-model")
+        names = [t["name"] for t in result["tools_called"]]
+        # The named tool should be preserved
+        assert "Worker: search_legislation" in names
+        # Missing-name and empty-name tools should both become "Worker: unknown"
+        assert names.count("Worker: unknown") == 2
+        # No ambiguous "Worker: " entries should exist
+        assert "Worker: " not in names
+
+    def test_missing_name_in_tool_sequence(self):
+        """tool_sequence should also use 'Worker: unknown' for missing names."""
+        lines = _sse_lines(AUDIT_MISSING_TOOL_NAME)
+        result = audit_capture(_MockClient(lines), "test question", "test-model")
+        assert result["tool_sequence"].count("Worker: unknown") == 2
+        assert "Worker: " not in result["tool_sequence"]
+
+    def test_missing_name_preserves_tool_data(self):
+        """Tool args and output should still be captured for unnamed tools."""
+        lines = _sse_lines(AUDIT_MISSING_TOOL_NAME)
+        result = audit_capture(_MockClient(lines), "test question", "test-model")
+        unnamed_tools = [
+            t for t in result["tools_called"] if t["name"] == "Worker: unknown"
+        ]
+        assert len(unnamed_tools) == 2
+        # Check that the output from the unnamed tools is preserved
+        outputs = [t["output"] for t in unnamed_tools]
+        assert "Result from unnamed tool" in outputs
+        assert "Result from empty-named tool" in outputs

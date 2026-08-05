@@ -281,14 +281,21 @@ def audit_capture(
 
         # Worker-level tool entries
         for t in d.get("tools", []):
+            tool_name = t.get("name") or ""
+            if not tool_name:
+                logger.warning(
+                    "audit event: tool entry missing 'name' field — "
+                    "using 'unknown' placeholder"
+                )
+                tool_name = "unknown"
             tools_called.append(
                 {
-                    "name": f"Worker: {t.get('name', '')}",
+                    "name": f"Worker: {tool_name}",
                     "input_parameters": t.get("args", {}),
                     "output": t.get("final_result", ""),
                 }
             )
-            tool_sequence.append(f"Worker: {t.get('name', '')}")
+            tool_sequence.append(f"Worker: {tool_name}")
 
     # retrieval_context, case_law_context, fallback_used
     retrieval_context: List[str] = []
