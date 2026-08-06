@@ -38,14 +38,14 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "groundedness: custom legal AI-judge metrics — answer relevancy, response groundedness, "
-        "research groundedness (require OPENAI_API_KEY or GEMINI_API_KEY)",
+        "research groundedness (require OPENROUTER_API_KEY)",
     )
     config.addinivalue_line(
         "markers", "consistency: same-model repeatability tests (cosine similarity)"
     )
     config.addinivalue_line(
         "markers",
-        "consistency_llm: same-model repeatability tests (AI judge, requires OPENAI_API_KEY)",
+        "consistency_llm: same-model repeatability tests (AI judge, requires OPENROUTER_API_KEY)",
     )
     config.addinivalue_line(
         "markers", "structure: tests that check mandatory Worker output structure"
