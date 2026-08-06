@@ -46,7 +46,7 @@ _REPO_ROOT = str(Path(__file__).resolve().parent.parent)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-TESTS_DIR = Path(__file__).parent / "tests"
+TESTS_DIR = Path(__file__).parent / "tests" / "eval"
 
 SUITES = {
     "tool_usage": "test_tool_usage.py",
@@ -137,28 +137,28 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                     deselect_args.extend(
                         [
                             "--deselect",
-                            f"lex_eval/tests/{test_file}::test_faithfulness[{pid}]",
+                            f"lex_eval/tests/eval/{test_file}::test_faithfulness[{pid}]",
                         ]
                     )
                 if (qid, rec_llm, "answer_relevancy") in covered_triples:
                     deselect_args.extend(
                         [
                             "--deselect",
-                            f"lex_eval/tests/{test_file}::test_answer_relevancy[{pid}]",
+                            f"lex_eval/tests/eval/{test_file}::test_answer_relevancy[{pid}]",
                         ]
                     )
             elif suite == "tool_usage":
                 deselect_args.extend(
                     [
                         "--deselect",
-                        f"lex_eval/tests/{test_file}::test_tool_usage[{pid}]",
+                        f"lex_eval/tests/eval/{test_file}::test_tool_usage[{pid}]",
                     ]
                 )
             elif suite == "consistency":
                 deselect_args.extend(
                     [
                         "--deselect",
-                        f"lex_eval/tests/{test_file}::test_consistency[{pid}]",
+                        f"lex_eval/tests/eval/{test_file}::test_consistency[{pid}]",
                     ]
                 )
             elif suite == "structure":
@@ -167,14 +167,14 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                     deselect_args.extend(
                         [
                             "--deselect",
-                            f"lex_eval/tests/{test_file}::test_mandatory_structure[{pid}]",
+                            f"lex_eval/tests/eval/{test_file}::test_mandatory_structure[{pid}]",
                         ]
                     )
                 if (qid, rec_llm, "citation_passthrough") in covered_triples:
                     deselect_args.extend(
                         [
                             "--deselect",
-                            f"lex_eval/tests/{test_file}::test_citation_passthrough[{pid}]",
+                            f"lex_eval/tests/eval/{test_file}::test_citation_passthrough[{pid}]",
                         ]
                     )
 
@@ -192,7 +192,7 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                 deselect_args.extend(
                     [
                         "--deselect",
-                        f"lex_eval/tests/{test_file}::test_consistency_llm[{key}]",
+                        f"lex_eval/tests/eval/{test_file}::test_consistency_llm[{key}]",
                     ]
                 )
 
