@@ -402,6 +402,19 @@ def _strip_worker_prefix(name: str) -> str:
     return name.removeprefix("Worker: ")
 
 
+# chat_mode -> (icon, label) used for tab labels and the execution context badge.
+_CHAT_MODE_DISPLAY = {
+    "research": ("🔎", "research"),
+    "deep_research": ("🧭", "deep_research"),
+    "conversational": ("💬", "conversational"),
+}
+
+
+def _chat_mode_badge(chat_mode: str) -> str:
+    icon, label = _CHAT_MODE_DISPLAY.get(chat_mode, ("❔", chat_mode or "unknown"))
+    return f"{icon} {label}"
+
+
 def _render_chat_interaction(records: list[dict]) -> None:
     """
     raw chat interaction(s) for an LLM/question pair.
@@ -412,20 +425,27 @@ def _render_chat_interaction(records: list[dict]) -> None:
         return
 
     run_tabs = st.tabs(
-        [f"Run {i + 1}  ({r['timestamp'][:19]})" for i, r in enumerate(records)]
+        [
+            f"Run {i + 1}  {_chat_mode_badge(r.get('chat_mode', 'research'))}  "
+            f"({r['timestamp'][:19]})"
+            for i, r in enumerate(records)
+        ]
     )
 
     for tab, rec in zip(run_tabs, records):
         with tab:
             # --- Execution Metadata ---
             st.markdown("##### ⚙️ Execution Context")
-            cols = st.columns(4)
+            cols = st.columns(5)
             with cols[0]:
-                st.markdown(f"**Mode:** `{rec.get('research_mode', 'N/A')}`")
+                chat_mode = rec.get("chat_mode", "research")
+                st.markdown(f"**Research Type:** {_chat_mode_badge(chat_mode)}")
             with cols[1]:
+                st.markdown(f"**Research Mode:** `{rec.get('research_mode', 'N/A')}`")
+            with cols[2]:
                 fallback = rec.get("fallback_used", False)
                 st.markdown(f"**Fallback Used:** {'Yes' if fallback else 'No'}")
-            with cols[2]:
+            with cols[3]:
                 summarisation = rec.get("summarisation_used", False)
                 summ_llm = rec.get("summarisation_llm", "")
                 main_llm = rec.get("llm_name", "")
@@ -436,7 +456,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
                     st.markdown("**Summarisation:** Yes *(main model)*")
                 else:
                     st.markdown("**Summarisation:** No")
-            with cols[3]:
+            with cols[4]:
                 tool_seq = rec.get("tool_sequence") or []
                 st.markdown(f"**Tool Sequence:** `{len(tool_seq)}` steps")
                 if tool_seq:
@@ -444,6 +464,29 @@ def _render_chat_interaction(records: list[dict]) -> None:
                     st.caption(" → ".join(display_seq))
 
             st.divider()
+
+            # --- Deep Research Plan ---
+            research_plan = rec.get("research_plan")
+            if chat_mode == "deep_research" and research_plan:
+                with st.expander("📋 Deep Research Plan (as presented to the user)"):
+                    steps = (
+                        research_plan.get("steps")
+                        if isinstance(research_plan, dict)
+                        else None
+                    )
+                    if steps:
+                        for i, step in enumerate(steps):
+                            if isinstance(step, dict):
+                                title = step.get("title") or f"Step {i + 1}"
+                                detail = step.get("brief") or step.get("description")
+                                st.markdown(f"**{i + 1}. {title}**")
+                                if detail:
+                                    st.caption(detail)
+                            else:
+                                st.markdown(f"**{i + 1}.** {step}")
+                    else:
+                        st.json(research_plan, expanded=False)
+                st.divider()
 
             # --- LLM Answer ---
             st.markdown("#### LLM Answer")
@@ -648,6 +691,8 @@ def _render_chat_interaction(records: list[dict]) -> None:
                     "summarisation_llm": rec.get("summarisation_llm", ""),
                     "question_id": rec.get("question_id"),
                     "research_mode": rec.get("research_mode"),
+                    "chat_mode": rec.get("chat_mode"),
+                    "research_plan": rec.get("research_plan"),
                     "fallback_used": rec.get("fallback_used"),
                     "summarisation_used": rec.get("summarisation_used"),
                     "tool_sequence": rec.get("tool_sequence", []),
