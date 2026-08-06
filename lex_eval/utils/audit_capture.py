@@ -116,6 +116,12 @@ def audit_capture(
     _vlog(_vf, "=====================")
     _vlog(_vf, "")
 
+    if deep_research_plan is not None:
+        _vlog(_vf, "=== DEEP RESEARCH PLAN (from POST /api/research/plan) ===")
+        _vlog(_vf, json.dumps(deep_research_plan, indent=2, default=str))
+        _vlog(_vf, "==========================================================")
+        _vlog(_vf, "")
+
     # ------------------------------------------------------------------
     # Request payload
     # ------------------------------------------------------------------
