@@ -21,6 +21,9 @@ import pytest
 
 from lex_eval.utils.audit_capture import audit_capture
 
+# Mark every test in this module as a unit test (fast, offline, no LLM).
+pytestmark = pytest.mark.unit
+
 # ---------------------------------------------------------------------------
 # Mock SSE client
 # ---------------------------------------------------------------------------

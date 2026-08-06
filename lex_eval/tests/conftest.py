@@ -29,6 +29,10 @@ def pytest_configure(config):
 
     config.addinivalue_line(
         "markers",
+        "unit: unit tests for the lex_eval harness itself (capture, DB, gather) — fast, offline, no LLM",
+    )
+    config.addinivalue_line(
+        "markers",
         "tool_usage: tests that check correct tool invocation (fast, offline)",
     )
     config.addinivalue_line(
