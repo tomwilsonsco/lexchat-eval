@@ -23,6 +23,8 @@ responses
     tool_sequence     JSON       (ordered list of worker tool names called, e.g. [search_legislation, search_legislation_sections])
     fallback_used     BOOLEAN     (True when get_legislation_text was invoked)
     summarisation_llm TEXT        (model used for summarisation; equals llm_name when no separate model is configured)
+    chat_mode         TEXT        (research | conversational | deep_research)
+    research_plan     JSON        (deep_research only: the plan from POST /api/research/plan, NULL otherwise)
 
 eval_results
     id          SEQUENCE primary key
@@ -84,7 +86,8 @@ CREATE TABLE IF NOT EXISTS responses (
     local_cache_hits  INTEGER  NOT NULL DEFAULT 0,
     memo_hits         INTEGER  NOT NULL DEFAULT 0,
     audit_schema_version INTEGER,
-    audit_json        JSON
+    audit_json        JSON,
+    research_plan     JSON
 );
 """
 
@@ -118,6 +121,8 @@ _MIGRATE_RESPONSES = [
     "ALTER TABLE responses ADD COLUMN memo_hits INTEGER",
     "ALTER TABLE responses ADD COLUMN audit_schema_version INTEGER",
     "ALTER TABLE responses ADD COLUMN audit_json JSON",
+    # --- deep_research plan capture (POST /api/research/plan) ---
+    "ALTER TABLE responses ADD COLUMN research_plan JSON",
 ]
 
 _INSERT_RESPONSE = """
@@ -127,8 +132,8 @@ INSERT INTO responses (
     research_mode, case_law_context, tool_sequence, fallback_used,
     summarisation_output, summarisation_used, summarisation_llm,
     chat_mode, provider, total_cost_usd, total_ms, reformatted,
-    local_cache_hits, memo_hits, audit_schema_version, audit_json
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -223,6 +228,11 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             record.get("memo_hits", 0),
             record.get("audit_schema_version") or None,
             record.get("audit_json") or None,
+            (
+                json.dumps(record["research_plan"])
+                if record.get("research_plan") is not None
+                else None
+            ),
         ],
     )
 
@@ -254,7 +264,8 @@ def load_records(
                    research_mode, case_law_context, tool_sequence, fallback_used,
                    summarisation_output, summarisation_used, summarisation_llm,
                    chat_mode, provider, total_cost_usd, total_ms, reformatted,
-                   local_cache_hits, memo_hits, audit_schema_version, audit_json
+                   local_cache_hits, memo_hits, audit_schema_version, audit_json,
+                   research_plan
             FROM responses
             {where}
             ORDER BY id
@@ -288,6 +299,7 @@ def load_records(
         memo_hits,
         audit_schema_version,
         audit_json,
+        research_plan_json,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -299,6 +311,9 @@ def load_records(
         tool_sequence = json.loads(tool_sequence_json) if tool_sequence_json else []
         summarisation_output = (
             json.loads(summarisation_output_json) if summarisation_output_json else []
+        )
+        research_plan = (
+            json.loads(research_plan_json) if research_plan_json else None
         )
         records.append(
             {
@@ -326,6 +341,7 @@ def load_records(
                 "memo_hits": memo_hits or 0,
                 "audit_schema_version": audit_schema_version,
                 "audit_json": audit_json,
+                "research_plan": research_plan,
             }
         )
     return records
@@ -636,7 +652,7 @@ def make_deploy_db(
             "research_mode, case_law_context, tool_sequence, fallback_used, "
             "summarisation_output, summarisation_used, summarisation_llm, "
             "chat_mode, provider, total_cost_usd, total_ms, reformatted, "
-            "local_cache_hits, memo_hits, audit_schema_version, audit_json "
+            "local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan "
             "FROM responses ORDER BY id"
         ).fetchall()
 
@@ -669,6 +685,7 @@ def make_deploy_db(
                 memo_hits,
                 audit_schema_version,
                 audit_json,
+                research_plan_json,
             ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
@@ -709,6 +726,7 @@ def make_deploy_db(
                     memo_hits or 0,
                     audit_schema_version,
                     audit_json,
+                    research_plan_json,
                 ],
             )
 
