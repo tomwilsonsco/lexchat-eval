@@ -149,8 +149,8 @@ class TestInitDbMigrationHandling:
         debug_msgs = [r for r in caplog.records if r.levelno == logging.DEBUG]
 
         assert any("Migration failed" in r.message for r in warning_msgs)
-        assert any("Migration skipped" in r.message for r in debug_msgs), (
-            "Subsequent migrations should have continued after the first failure"
-        )
+        assert any(
+            "Migration skipped" in r.message for r in debug_msgs
+        ), "Subsequent migrations should have continued after the first failure"
 
         conn.close()

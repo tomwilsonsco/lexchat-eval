@@ -174,9 +174,7 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
             col_hint = (
                 stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
             )
-            logger.warning(
-                "Migration failed for column: %s", col_hint, exc_info=True
-            )
+            logger.warning("Migration failed for column: %s", col_hint, exc_info=True)
 
 
 def clear_responses(conn: duckdb.DuckDBPyConnection) -> None:
@@ -312,9 +310,7 @@ def load_records(
         summarisation_output = (
             json.loads(summarisation_output_json) if summarisation_output_json else []
         )
-        research_plan = (
-            json.loads(research_plan_json) if research_plan_json else None
-        )
+        research_plan = json.loads(research_plan_json) if research_plan_json else None
         records.append(
             {
                 "question_id": qid,

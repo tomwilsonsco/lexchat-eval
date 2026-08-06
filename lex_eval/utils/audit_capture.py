@@ -270,9 +270,7 @@ def audit_capture(
         ):
             is_error = True
             _first_err = next(d["error"] for d in _delegations if d.get("error"))
-            error_message = (
-                f"All delegations failed — first error: {_first_err}"
-            )
+            error_message = f"All delegations failed — first error: {_first_err}"
 
     # ------------------------------------------------------------------
     # Derive the return dict from the audit event

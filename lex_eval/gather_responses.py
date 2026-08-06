@@ -352,17 +352,9 @@ def main() -> None:
             sys.exit(1)
         logger.info("Filtered to question ID %d", args.question_id)
 
-    # Filter out already-gathered questions (unless --overwrite)
-    pending = []
-    # Simple skip logic - just add all questions since should_skip is not available
-    for q in questions:
-        if not args.overwrite:
-            logger.info("Processing Q%d (skipping existing check)", q["id"])
-        pending.append(q)
-
-    if not pending:
-        logger.info("All questions already gathered. Use --overwrite to re-gather.")
-        return
+    # No per-question skip check exists — every question is (re-)gathered on each
+    # run. --overwrite clears prior responses first; otherwise runs are appended.
+    pending = questions
 
     logger.info("Gathering responses for %d pending questions", len(pending))
 

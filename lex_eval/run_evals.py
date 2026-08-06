@@ -133,18 +133,25 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
             # deselect all test functions in this suite file for this parametrize ID
             if suite == "groundedness":
                 # Check per-test-function so a partially-run pair isn't fully skipped
-                if (qid, rec_llm, "faithfulness") in covered_triples:
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_faithfulness[{pid}]",
-                        ]
-                    )
                 if (qid, rec_llm, "answer_relevancy") in covered_triples:
                     deselect_args.extend(
                         [
                             "--deselect",
                             f"lex_eval/tests/eval/{test_file}::test_answer_relevancy[{pid}]",
+                        ]
+                    )
+                if (qid, rec_llm, "response_groundedness") in covered_triples:
+                    deselect_args.extend(
+                        [
+                            "--deselect",
+                            f"lex_eval/tests/eval/{test_file}::test_response_groundedness[{pid}]",
+                        ]
+                    )
+                if (qid, rec_llm, "research_groundedness") in covered_triples:
+                    deselect_args.extend(
+                        [
+                            "--deselect",
+                            f"lex_eval/tests/eval/{test_file}::test_research_groundedness[{pid}]",
                         ]
                     )
             elif suite == "tool_usage":
