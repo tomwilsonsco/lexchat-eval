@@ -164,6 +164,107 @@ python -m lex_eval.utils.db --deploy-db path/to/output.db
 Commit `deploy.db` (not `responses.db`) to the repository. Configure
 Streamlit Cloud to point at `deploy.db`.
 
+## Reference ("gold") answers
+
+A set of expected answers for the questions in `questions.json`, for tests to compare LexChat's
+responses against. Each answer is researched against the live LEX API using the same legislation
+tools LexChat's Worker agent uses, so it rests on exactly the material LexChat would have retrieved,
+and is then written up by hand.
+
+This does **not** need a running LexChat instance — it talks to the LEX API directly, so it works
+when Steps 1-2 cannot run.
+
+> Generated answers are **unverified drafts** until a lawyer completes the review block at the foot
+> of each Markdown file. `load_reference_answers()` returns only signed-off answers by default.
+
+### Building them
+
+```bash
+python -m lex_eval.reference.build --author "Your Name"
+```
+
+Run it repeatedly. It looks for questions with no `q{id}.md` yet and advances each one a stage,
+printing what it needs from you next:
+
+| Stage | What the script does | What you do next |
+| --- | --- | --- |
+| **SCAFFOLD** | Creates `.authored/q{id}/` with template files | Fill in `searches.json` |
+| **RETRIEVE** | Runs your searches, writes `retrieved.md` | Read it, then write `plan.json` and `answer.md` |
+| **BUILT** | Writes `q{id}.md` and updates the manifest | Send it for lawyer review |
+
+Useful flags:
+
+```bash
+python -m lex_eval.reference.build --question-id 7    # one question only
+python -m lex_eval.reference.build --refetch          # re-run searches after editing searches.json
+python -m lex_eval.reference.build --overwrite        # rebuild a question that already has an answer
+```
+
+### The three files you write
+
+In `lex_eval/data/reference_answers/.authored/q{id}/`:
+
+**`searches.json`** — the LEX tool calls to make. Follow the Worker's phases: `search_legislation`
+to find the Acts, then `search_legislation_sections` to pull the provisions from each one
+(`get_legislation_text` is available as a fallback for a whole Act).
+
+```json
+[
+  {"tool": "search_legislation",
+   "args": {"query": "Data Protection Act 2018", "year_from": 2018, "year_to": 2018}},
+  {"tool": "search_legislation_sections",
+   "args": {"legislation_id": "ukpga/2018/12", "query": "meaning of controller, definitions"}}
+]
+```
+
+You will usually run the build twice here: once with the Phase 1 searches to find the
+`legislation_id`s, then again after adding the Phase 2 section searches (`--refetch`).
+
+**`plan.json`** — how the question breaks down. Recorded so the reasoning behind the answer is
+reviewable, not just the conclusion.
+
+```json
+{
+  "scope_note": "What this answer covers and what it deliberately excludes.",
+  "steps": [{"title": "Short imperative title", "detail": "What exactly to find, in domain terms."}]
+}
+```
+
+**`answer.md`** — the answer itself, written from `retrieved.md`. Ground every statement in the
+retrieved text and cite it. Use the four headings the Worker system prompt mandates:
+**Summary Answer (BLUF)**, **Detailed Analysis**, **Jurisdiction & Status**, **References**.
+
+### Output
+
+```text
+lex_eval/data/reference_answers/
+├── q1.md                      # for review: plan, answer, retrieval audit, sign-off block
+├── reference_answers.json     # machine-readable manifest, all questions
+└── .authored/q1/              # your three files, plus the generated retrieved.md
+```
+
+Read the manifest from a test with:
+
+```python
+from lex_eval.reference import load_reference_answers
+
+answers = load_reference_answers()                      # signed-off answers only
+answers = load_reference_answers(verified_only=False)   # including drafts
+```
+
+A completed review survives a rebuild; if the answer changes after sign-off the review is kept but
+flagged `stale: true`.
+
+### The retrieval audit
+
+Each answer records two lists of sources, and the distinction matters when checking citations:
+
+- **`sources_retrieved`** — provisions whose text was actually pulled. Citing one is grounded.
+- **`sources_discovered`** — Acts and SIs that appeared in a search result but were never read. They
+  exist and were found, but the answer never saw their text, and should say so.
+
+Both appear in the Markdown so a reviewer can check every citation against them.
+
 ## Database utilities
 
 ```bash
@@ -184,8 +285,14 @@ lex_eval/
 ├── data/
 │   ├── questions.json       # evaluation questions
 │   ├── deploy.db            # committed compact database for Streamlit Cloud
+│   ├── reference_answers/   # gold answers: q{id}.md + reference_answers.json
 │   └── verbose_logs/        # per-question capture audit logs (gitignored)
+├── docs/                    # gap analysis, reference-answer notes
 ├── metrics/                 # custom DeepEval metric classes
+├── reference/               # reference ("gold") answers
+│   ├── build.py             # the build script
+│   ├── lex_client.py        # the three LEX tools, as LexChat calls them
+│   └── store.py             # manifest + Markdown for review
 ├── reports/
 │   └── streamlit_report.py  # Streamlit dashboard
 ├── tests/                   # pytest evaluation suites
