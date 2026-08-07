@@ -1,0 +1,29 @@
+{
+  "scope_note": "Covers the Information Commissioner's statutory powers to impose financial penalties for breach of data protection duties: the grounds on which a penalty notice may be given, the maximum amounts and how they are tiered, the mandatory procedure, the restrictions on the power, and the route of appeal. Confined to legislation (Acts, SIs and retained EU law); case law on the exercise of the power is out of scope in this mode.",
+  "steps": [
+    {
+      "title": "Identify the primary Act conferring the penalty power and the failures it reaches",
+      "detail": "Identify the current primary legislation conferring on the Information Commissioner a power to impose a financial penalty for breach of data protection duties, and set out the categories of failure that engage it, including any cross-referenced provisions defining those failures."
+    },
+    {
+      "title": "Establish the maximum amounts and how they are tiered",
+      "detail": "Find the provisions fixing the maximum penalty, including any distinction between a standard and a higher maximum, the figures for each, the turnover-based alternative for undertakings, and which failures attract which tier."
+    },
+    {
+      "title": "Establish the matters the Commissioner must consider",
+      "detail": "Find the provisions listing the factors the Commissioner must have regard to when deciding whether to give a penalty notice and in determining the amount, distinguishing those that apply to UK GDPR matters from those that apply to other matters."
+    },
+    {
+      "title": "Set out the mandatory procedure for imposing a penalty",
+      "detail": "Find the Schedule or sections governing procedure: any requirement to give a notice of intent, the minimum period for representations, any time limit within which the penalty notice must follow, the required contents of each notice, the period for payment, and the provisions on variation, cancellation and recovery."
+    },
+    {
+      "title": "Identify the restrictions and exclusions on the power",
+      "detail": "Find the provisions restricting the Commissioner's power to give a penalty notice — including any special-purposes leave requirement, any excluded bodies, and any limits relating to joint controllers — and any provision requiring the power to be exercised only in a particular way."
+    },
+    {
+      "title": "Establish the appeal route and the related but distinct criminal penalties",
+      "detail": "Find the provisions conferring a right of appeal against a penalty notice and against the amount, and the Tribunal's powers on such an appeal; and identify the separate provisions dealing with criminal penalties for offences, so the two are not conflated."
+    }
+  ]
+}

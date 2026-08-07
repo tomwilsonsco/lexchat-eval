@@ -1,0 +1,36 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Food (Scotland) Act 2015"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Food Standards Scotland establishment membership chair appointment"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "establishment of Food Standards Scotland, membership, appointment of chair and members by the Scottish Ministers, tenure, removal, remuneration, schedule 1 status and proceedings",
+      "legislation_id": "asp/2015/1"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Public Appointments and Public Bodies etc. (Scotland) Act 2003",
+      "year_from": 2003,
+      "year_to": 2003
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "code of practice for making public appointments, Commissioner for Ethical Standards in Public Life in Scotland, specified authorities schedule 2, appointment to which the code applies, merit, compliance",
+      "legislation_id": "asp/2003/4"
+    }
+  }
+]

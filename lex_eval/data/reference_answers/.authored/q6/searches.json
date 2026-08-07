@@ -1,0 +1,23 @@
+[
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "legislative competence of the Scottish Parliament, reserved matters, Schedule 5 Head G professions, regulation of health professions, section 29",
+      "legislation_id": "ukpga/1998/46"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "requirement of suitable experience for medical practitioners section 21, arrangements for the provision of general dental services section 25, vocational training disciplinary proceedings",
+      "legislation_id": "ukpga/1978/29"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "suitable experience medical practitioner general medical services vocational training prescribed experience",
+      "legislation_id": "ukpga/1978/29"
+    }
+  }
+]

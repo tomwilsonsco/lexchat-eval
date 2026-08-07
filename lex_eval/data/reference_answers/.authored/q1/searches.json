@@ -1,0 +1,51 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Data Protection Act 2018",
+      "year_from": 2018,
+      "year_to": 2018
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Data Protection Act 2018 meaning of processing"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/2018/12",
+      "query": "section 6 meaning of controller and processor, definitions, Part 1 preliminary, terms used in the GDPR"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Data Protection, Privacy and Electronic Communications (Amendments etc) (EU Exit) Regulations 2019",
+      "year_from": 2019,
+      "year_to": 2019
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Data (Use and Access) Act 2025"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2019/419",
+      "query": "amendment of section 6 of the Data Protection Act 2018 meaning of controller, references to the GDPR substituted UK GDPR"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/2025/18",
+      "query": "amendment of section 6 Data Protection Act 2018 meaning of controller, definitions, commencement"
+    }
+  }
+]
