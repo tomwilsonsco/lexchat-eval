@@ -16,12 +16,16 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from urllib.parse import urlparse
 
 import httpx
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 LEX_API_URL = os.getenv("LEX_API_URL", "https://lex.lab.i.ai.gov.uk").rstrip("/")
 
