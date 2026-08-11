@@ -1,0 +1,909 @@
+# lex-eval — AI-as-Judge Metrics: Review and Recommended Changes
+
+**Date:** 2026-08-07
+**Scope:** the four AI-as-judge metrics only — `Consistency (AI Judge)`, `Answer Relevancy`,
+`Response Groundedness`, `Research Groundedness`. The rule-based suites (`tool_usage`, `structure`,
+`citations`, `consistency` cosine, `reference` set arithmetic) are referenced where they overlap but are
+not under review here.
+**Data:** `lex_eval/data/responses.db` as at 2026-08-07 — 24 responses (6 questions × 2 models ×
+2 runs), all `research_mode=legislation_only`.
+**Judge under review:** `deepseek/deepseek-v4-flash-0731` at `temperature=0`.
+**Companion:** `docs/eval-gap-analysis.md` (2026-08-06). Section 5 below picks up what that review
+left open.
+**Re-checked 2026-08-10.** `responses.db` is unchanged (24 rows; `Research Groundedness` still reads
+0.292) and so is the code every finding rests on — `judge.py` still hard-codes `max_tokens=4096`,
+`eval_results` still has no `outcome`/`judge_model`/`run_id` columns, `research_groundedness.py`
+still `break`s on truncation against a 128k assumption, and all three metrics still convert a judge
+exception into `score=0.00, passed=False`. Every finding below stands. The one thing that changed is
+the framing of the judge-model decision: a **low-cost judge is now a fixed constraint, not an option**
+(§6), and the recommendations in §1 and §4.1 have been rewritten accordingly.
+
+---
+
+## Headline
+
+Four findings, in order of how much they change what you should do next.
+
+1. **The published judge numbers are not valid yet — a bug is inflating the failure rate.**
+   8 of the 72 judge calls (11%) never returned a verdict, and every one of them was written to
+   `eval_results` as `score=0.00, passed=False` — indistinguishable from a model that hallucinated.
+   `Research Groundedness` reads 0.291 today; excluding the failed calls and the capture gates, the
+   15 genuine verdicts average **0.467**. The cause is a one-line configuration error, diagnosed and
+   verified below.
+
+2. **The cheap judge is doing better than the scores suggest, but it is being asked the wrong
+   questions.** Where the judge is well-anchored (Research Groundedness) it caught a real, serious
+   hallucination and its reasons hold up on inspection. Where it is unanchored (Answer Relevancy,
+   Response Groundedness) it returns 1.00 for ~90% of records and discriminates nothing. The problem
+   is prompt design and metric design, not model capability — see 3.
+
+3. **Cost is not the constraint you think it is; latency is.** A full groundedness sweep of these 24
+   records costs about **$0.13** on the current judge and about **$0.63** on `gpt-5-mini`. The
+   30 minutes is not the price of a cheap model — it is a reasoning-token cap, a 97,000-token prompt,
+   and a completely sequential test loop. All three are fixable, and the suite should run in
+   about four minutes.
+
+4. **The cheap judge is a fixed requirement, so the metrics have to be designed around it.** Every
+   metric here must be robust on a `deepseek-v4-flash`-class model. That is achievable, but only if
+   the judge is asked to *classify supplied evidence*, never to *grade holistically from its own legal
+   knowledge* — and only if the score is computed in Python from the judge's labels rather than read
+   off a 1–5 ladder. §6 sets out the design rules and the acceptance gate that proves a metric passes
+   them. Every §3 and §4 recommendation is written to satisfy them.
+
+---
+
+## 1. Has the cheap judge done a good job?
+
+**Overall: yes on grounding, no on quality.** Split the four metrics by whether the judge is given
+something concrete to check against.
+
+| Metric | Judge calls | Real verdicts | Distribution of real verdicts | Verdict on the judge |
+| --- | --- | --- | --- | --- |
+| Research Groundedness | 24 | 15 (7 judge errors, 2 capture gates) | 0.00×1, 0.25×4, 0.50×7, 0.75×2, 1.00×1 | **Working.** Discriminates, and its reasons check out |
+| Consistency (AI Judge) | 12 | 12 | 0.00×2, 0.20×1, 0.40×3, 0.70×3, 1.00×3 | **Working, but the rubric is wrong** (§3) |
+| Response Groundedness | 24 | 21 (1 judge error, 2 gates) | 1.00×19, 0.50×2 | **Saturated** — 90% perfect |
+| Answer Relevancy | 24 | 22 (2 gates) | 1.00×20, 0.25×1, 0.00×1 | **Saturated** — 91% perfect |
+
+### Where it did well
+
+**It caught the single worst failure in the whole dataset.** On q1 ("What does section 6 of the Data
+Protection Act 2018 say?"), one `glm-5.2` run asserted:
+
+> - section 209 (which deals with the controller in the context of intelligence services processing); and
+> - section 210 (which deals with the controller in the context of immigration processing).
+
+Neither section's text was in that run's retrieval context. The judge scored it 0.25 with
+"the agent fabricated the subject matter of sections 209 and 210". The hand-written reference answer
+for the same question independently reaches the same conclusion, and writes the disciplined version:
+
+> **The available database does not contain, in the material retrieved, the operative text of sections
+> 209 and 210.**
+
+That is exactly the failure mode LexChat's Worker prompt is written to prevent ("DO NOT attempt to fill
+gaps with internal training data"), and the cheap judge found it unaided. I re-ran that judgement and it
+reproduced identically, so it is stable, not luck.
+
+Its other confirmed catches: a fabricated statutory quotation and an invented Article 6(1) reference in
+q1 `mistral` (Response Groundedness 0.50); an omitted limitation on the s.9 power of direction in q2
+`mistral` (0.50); and the reversed reserved/devolved conclusion in q6 `mistral` (Answer Relevancy 0.25).
+
+### Where it did badly
+
+**Answer Relevancy is not measuring relevancy.** 20 of 22 real verdicts are a perfect 1.00, with reasons
+like "complete, precise, and directly addresses the question with detailed and relevant information".
+LexChat's Worker prompt *mandates* a BLUF-plus-analysis-plus-references structure, so every non-failed
+run is long, on-topic and well-organised — and the rubric's "5" is reachable by any answer that looks
+like that. The metric cannot separate the two models, cannot separate two runs of the same model, and
+cannot separate a right answer from a wrong one.
+
+Worse, its two non-perfect scores were awarded for something the rubric does not ask about. q6
+`mistral` run 2 was marked 0.25 with "the response misses the main point by reversing the
+reserved/devolved position, since regulation of health professions is reserved to the UK Parliament under
+Schedule 5 Part II Head G2". That is a *correctness* judgement, made from the judge's own parametric
+knowledge of UK law, inside a metric whose rubric is about scope and waffle. It happens to be right here.
+It is not a property you can rely on from a low-cost model with no reference material, and it is not what
+the score column claims to mean.
+
+**Response Groundedness is measuring a copy operation.** The Manager's prompt says "present their
+findings exactly as structured… Do NOT condense, summarise, or restructure the report". The judge's own
+reason on q5 says the quiet part: *"the final response is a verbatim copy of the research output"*. A
+1–5 fidelity rubric applied to a near-deterministic pass-through will read 5 almost every time, and it
+does. The two real catches it produced are worth keeping — but they are catchable far more cheaply
+(§3).
+
+**The judge editorialises beyond the evidence.** In the q1 verdict above it added that ss.209 and 210
+"are about the Crown" — a claim it could no more source from the retrieval context than the model
+could. The score was right; the reason contains an unsourced assertion of law. If these reasons are
+ever read by a lawyer, that matters.
+
+**It gave a perfect score to a legally wrong answer.** q6 `mistral` run 2 states that regulation of the
+health professions is "primarily a devolved matter". Its Worker report said the same thing, so
+Response Groundedness scored it **1.00** — correctly, by its own definition. This is
+`eval-gap-analysis.md` item 2 made concrete: perfect faithfulness to a wrong retrieval is exactly what
+a bad run looks like.
+
+**It rewards consistent failure.** q3 `mistral` returned "Could you narrow this down?" on both runs.
+Consistency (AI Judge) scored that **1.00** — "both responses are identical in content and scope, both
+asking for clarification rather than providing substantive legal information". Meanwhile the same two
+rows scored 0.00 on three other metrics via the capture gates. The harness records the same event as
+both a perfect result and three total failures.
+
+### The judge errors — root cause, diagnosed
+
+This is the most important finding in section 1, because it is not a judging problem at all.
+
+`deepseek-v4-flash` is a **reasoning model**. `OpenRouterJudge.generate` sets `max_tokens=4096`, and
+reasoning tokens count against it. On the harder prompts the model spends the entire budget thinking and
+returns `finish_reason="length"` with **empty `content`** — or, when it gets a little further, a
+truncated string, which surfaces as `Judge error: Unterminated string`.
+
+Reproduced deterministically on the q6 `mistral` Response Groundedness prompt:
+
+| `response_format` | `max_tokens` | `finish_reason` | `content` | `reasoning` |
+| --- | --- | --- | --- | --- |
+| strict json_schema | 4096 | `length` | **0 chars** | 19,947 chars |
+| json_object | 4096 | `length` | **0 chars** | 19,448 chars |
+| none | 4096 | `stop` | 904 chars (valid) | 15,243 chars |
+| **strict json_schema** | **16000** | **`stop`** | **537 chars (valid)** | — |
+
+With the cap raised, that record scores **1.00**. It has been sitting in the results table as a 0.00
+model failure. Seven `Research Groundedness` rows and one `Response Groundedness` row are the same bug.
+
+Note the second-order consequence: the failures are **not random**. They cluster on the prompts the
+judge finds hardest, which are disproportionately the ones with something to complain about. So the bug
+does not just add noise — it may be selectively deleting the judge's most considered verdicts.
+
+### On the choice of a low-cost model
+
+Measured against this dataset:
+
+| Judge | Input $/M | Output $/M | Est. cost, full groundedness sweep (24 records) |
+| --- | --- | --- | --- |
+| `deepseek/deepseek-v4-flash-0731` (current) | 0.09 | 0.18 | **~$0.13** |
+| `openai/gpt-5-mini` | 0.25 | 2.00 | ~$0.63 |
+| `google/gemini-2.5-flash` | 0.30 | 2.50 | ~$0.77 |
+| `openai/o4-mini` | 1.10 | 4.40 | ~$1.98 |
+| `openai/gpt-4o` (repo default) | 2.50 | 10.00 | ~$4.50 |
+
+(≈1.08M input tokens and ≈180k output tokens per sweep, dominated by Research Groundedness at ~922k
+input tokens across 24 calls.)
+
+The gap between the cheapest and a solidly capable judge is 50 pence per sweep, so cost alone would not
+force the decision at this dataset size. But **low-cost judging is a standing requirement of this
+harness**, and the numbers above are for 24 records — a question set an order of magnitude larger,
+re-scored on every LexChat build, multiplies that gap by the same factor. Take the requirement as
+fixed. The recommendation is therefore not "spend more", and not "spend more on the hard metrics
+only" — it is:
+
+- **Design every metric so a `deepseek-v4-flash`-class judge can do it well.** §6 sets out how, and
+  the evidence in this section says it is achievable: the one metric already built that way (Research
+  Groundedness, which checks claims against supplied text) is the one metric that works.
+- **Keep a mid-tier model configured, but only as a fallback and a calibration reference** — a retry
+  target when the cheap judge returns nothing (§3.5), and a periodic spot-check on a handful of
+  records to measure how far the cheap judge has drifted from it. Not the default path for any suite.
+- **Record the judge model and temperature in `eval_results`.** They are not stored today, so a judge
+  change is invisible and would read as a quality regression in LexChat. This matters more, not less,
+  under a cheap-judge policy: the whole strategy depends on being able to prove that a score moved
+  because LexChat changed and not because the judge did. This is `eval-gap-analysis.md` item 9, and it
+  is a two-column change.
+
+---
+
+## 2. Why the groundedness suite takes 30 minutes
+
+**No, that is not just how it is.** It should take about four minutes. Measured per-call latency:
+
+| Metric | Small context (q5, ~3k tok) | Large context (q1, ~97k tok) |
+| --- | --- | --- |
+| Answer Relevancy | 4.3 s | 2.7 s |
+| Response Groundedness | 4.1 s | 10.9 s |
+| **Research Groundedness** | **29.8 s** | **62.1 s** |
+
+≈57 s per record × 24 records ≈ **23 minutes**, sequential — which matches what you see.
+
+Three separate causes, in order of payoff.
+
+### (a) The suite is entirely sequential — ~8× available for free
+
+`pytest` runs one test at a time; there is no `pytest-xdist`, no async, no `addopts` parallelism in
+`pyproject.toml`. Every one of the 72 calls waits for the previous one. These are independent network
+calls to a provider that will happily serve them concurrently.
+
+**Change:** add `pytest-xdist` and run the judge suites with `-n 8`. That alone takes 23 minutes to
+roughly 3. (`conftest.py`'s `pytest_sessionfinish` hook writes `eval_results`; under xdist it fires per
+worker, so verify the DuckDB writes still land — a `-p no:randomly`-style single-writer or a
+`pytest_sessionfinish` guarded on `workerinput` may be needed.)
+
+### (b) Research Groundedness sends up to 97,000 tokens per call
+
+`retrieval_context` for these runs totals **3.69M characters (~922k tokens)** across 24 records. Per
+record it ranges from 0 to 411,098 characters. q1 `glm` sends 26 items — of which **25 are short
+search-result titles and one is a single 366,322-character full-Act dump** pulled by
+`get_legislation_text`.
+
+But note the 29.8 s on a **3k-token** context. Prefill is not the dominant cost — reasoning-token
+generation is. So trimming the context helps, and is worth doing for correctness reasons (§3), but the
+bigger latency lever is (c).
+
+### (c) The reasoning budget
+
+Every call spends 15,000–20,000 characters of reasoning before writing a two-sentence verdict, and the
+4096-token cap means some of them spend it and produce nothing at all. Options, cheapest first:
+
+- Raise `max_tokens` to 16000 (required regardless — it is the bug in §1).
+- Pass OpenRouter's `reasoning: {"effort": "low"}` (or `{"exclude": true}`) for the mechanical metrics.
+  Make it an env key rather than a constant, so it is tunable per suite (§6.7).
+- Ask for a shorter `analysis` field, or drop it for the metrics where it is not read.
+
+### Also worth fixing while you are in there
+
+- `_MAX_CONTEXT_CHARS = (128_000 - 30_000) * 4` in `research_groundedness.py` assumes a 128k judge
+  window. The configured judge has **1,048,576**. The constant is now both wrong and arbitrary.
+- `FULL_CONTEXT_GROUNDEDNESS=false` is set in `lex_eval/.env` and **is not read anywhere in the
+  repo**. Dead config — implement it or delete it.
+
+**Realistic target:** xdist `-n 8` + raised `max_tokens` + tagged/trimmed context (§3) → **≈4 minutes**
+for the full sweep at roughly the same cost.
+
+---
+
+## 3. Adequacy of the current judge prompts
+
+The prompts were clearly thought about — the "identify X before scoring" scaffold is the right shape,
+the 1–5 rubrics have distinguishable rungs, and forcing JSON via a Pydantic schema is right. What
+follows are specific defects, per prompt.
+
+### 3.1 Research Groundedness — the right idea, fed the wrong input
+
+This is the most valuable of the four and the most fixable.
+
+**The context it is given is untagged and unusable for verification.** `audit_capture.py` builds
+`retrieval_context` as a flat `List[str]` mixing four kinds of thing:
+
+- Phase-1 `search_legislation` hits, **title only**: `"Data Protection Act 2018 (2018, revised)"`
+- Phase-2 section text, prefixed only by the section heading:
+  `"Terms relating to the processing of personal data: Section 3) ..."`
+- Phase-3 full-Act dumps: one 366k-character blob
+- Case-law hits, title and citation only
+
+No Act name, no provision URI, no section number is attached to any section text. The judge is asked
+"can this claim be traced to a specific passage" and given a bag of blobs in which the same section
+number could belong to any of four Acts. Several of the harsher verdicts are consistent with the judge
+simply being unable to locate text that was there.
+
+**Worse, Phase-1 titles sit in the same bag as retrieved text.** LexChat's Worker prompt is emphatic
+that Phase-1 results "are NOT sufficient to answer questions about specific legal provisions". By
+pooling them, the harness lets a Phase-1-only answer look grounded to the judge.
+
+**Truncation is silent and can drop the wrong end.** The loop `break`s at the first item that would
+exceed the budget rather than skipping it, so one oversized item early in the list discards everything
+after it. On q6 `glm` run 1, **27 of 97 items (19,467 chars) are dropped** — and the prompt still
+presents what remains as the complete retrieval context, so anything grounded in the dropped tail reads
+as a fabrication.
+
+**Change:**
+- Build the judge's context from `utils/sources.py` (`tool_calls`, `run_sources`) rather than the flat
+  list, so each passage carries `[Act short title | provision URI | section number]`. That is the same
+  reader `citations` and `reference` already use.
+- Put Phase-1 discoveries in a **separate, labelled block**: "Acts found by search but whose text was
+  never retrieved". Instruct the judge that a claim about the *content* of anything in that block is
+  ungrounded by definition. This turns a weakness into the metric's sharpest edge — it is precisely the
+  q1 ss.209/210 failure.
+- Make truncation `continue`, not `break`; prefer retrieved sections over full-Act dumps when the budget
+  binds; and **declare the truncation in the prompt** ("N further passages omitted for length; do not
+  treat their absence as evidence").
+- Add an explicit instruction: *an express statement that something was not retrieved, or that the
+  database does not contain it, is grounded behaviour and must not be scored as an unsupported claim.*
+  The Worker prompt mandates that sentence and the gold answer uses it; the judge has penalised it.
+- Add: *do not assert what the law says from your own knowledge; quote the context or say it is absent.*
+- Have the judge return `unsupported_claims: list[{claim, why}]` alongside the score, so the count of
+  fabrications is available as a headline figure rather than buried in a mean.
+
+### 3.2 Response Groundedness — right catch, wrong instrument
+
+The rubric is fine. The problem is that it spends 24 LLM calls to grade a copy-paste, and 19 of them
+return 5.
+
+**Change — make it a filter plus a judge, and rename it to what it measures:**
+
+- Rename to **Answer Fidelity**: the answer's fidelity to the report, which is what the Manager
+  prompt promises and what this measures. It also names the metric by the pair it compares, as
+  `Answer Relevancy` (answer vs question) and `Research Groundedness` (report vs retrieved text) do.
+- Compute three deterministic signals first, at zero cost:
+  1. containment/similarity of `actual_output` against `research_output`;
+  2. URLs in the answer absent from the report (already `Citation Integrity`'s territory —
+     cross-reference, don't duplicate);
+  3. **quoted material** — every `>` blockquote and every `"…"` span in the answer that does not appear
+     in the report. This alone catches the q1 `mistral` "fabricated statutory quotation" case with no
+     LLM call at all.
+- Invoke the judge **only** where the answer materially diverges from the report. On this dataset that
+  is roughly 5 of 24 records — an ~80% cut in calls, concentrated on the ones that matter.
+- Rebalance the rubric toward **omission**. The real catch here was q2 `mistral` dropping the necessity
+  requirement and the s.8(2)/s.9 interaction. Omission is currently one bullet in the preamble while
+  the 1–5 scale is written entirely around hallucination.
+
+### 3.3 Answer Relevancy — replace it
+
+The rubric asks a question that LexChat's mandated output structure answers automatically, so it
+saturates; and the judge, given nothing to compare against, quietly substitutes its own legal knowledge.
+Both are structural, not fixable by rewording.
+
+**Change:** retire it in favour of the reference-anchored metrics in §4. In the interim:
+
+- **Move it out of the `groundedness` suite.** It is not a groundedness metric, it does not need
+  `retrieval_context`, and it is a 3-second call currently trapped behind a 30-minute suite. Give it its
+  own marker so it can be run in a minute.
+- Detach it from `_gate_retrieval_context` / `_MIN_OUTPUT_CHARS` (see §3.5).
+
+### 3.4 Consistency (AI Judge) — the rubric fights itself
+
+**It is direction-dependent, and the direction is arbitrary.** Rule 2 penalises Response B for
+*omitting*; rule 3 penalises Response B for *adding*. B is whichever run happens to be `records[0]`,
+which comes from `load_records()` row order — not pinned, not timestamped. The q4 `mistral` reason shows
+both rules firing on the same pair: *"Response B omits critical legal caveats… While Response B also
+covers additional ground… the omission triggers the 0.2 score"*. Swap A and B and that pair scores 0.4
+instead of 0.2. A symmetric property is being measured with an asymmetric instrument.
+
+**The severity ordering is wrong for a legal tool.** Scope drift (rule 3 → 0.4) is ranked as nearly as
+serious as omitting a critical caveat (rule 2 → 0.2), and far worse than "minor differences" (0.7). But
+what a lawyer needs to know is: *did the two runs cite the same provisions and reach the same
+conclusion?* Breadth drift is second order — and it is exactly what you would expect from a model
+searching a live corpus twice.
+
+**It rewards consistent non-answers** (q3 `mistral`, 1.00 for asking the same clarifying question
+twice).
+
+**Change — split it in two:**
+
+- **Source Stability** — deterministic. Jaccard over the normalised provision URIs from
+  `run_sources()` across runs. No judge, no cost, no variance, and it directly measures the thing
+  `eval-gap-analysis.md` item 8 asks for ("which sources were retrieved… rather than phrasing").
+- **Conclusion Stability** — one judge call, asking only: *do these runs reach the same legal
+  conclusion, and does either contradict the other?* Make it symmetric by asking for propositions
+  present in A only / B only / both, plus a contradiction list, and derive the score from that set
+  rather than from a 5-rung ladder applied in one direction.
+- Gate both on the run having actually done research, so a repeated clarifying question is reported as
+  "consistent non-answer", not 1.00.
+- Declare the score as an int/enum, not `float` — the current schema lets the judge return anything
+  while the prompt offers five discrete values.
+
+### 3.5 Cross-cutting: the failure paths
+
+Three different things currently write `score=0.00, passed=False`:
+
+| Cause | Rows | What it actually means |
+| --- | --- | --- |
+| Judge returned nothing / truncated JSON | 8 | **Infrastructure failure** — no verdict exists |
+| Capture gate (`no retrieval context`, `output too short`) | 6 | **Harness or triage event**, not a quality score |
+| Genuine judge verdict of 1/5 | 2 | A real, bad result |
+
+The metrics' `except` blocks set `raw_score = 1.0` → `score = 0.0` → `passed = False`, which is the
+worst possible outcome for an event that carries no information about the model. This is
+`eval-gap-analysis.md` item 9's "give judge failures and capture failures their own outcome"; it is now
+quantified at **11% of all judge calls**.
+
+**Change:** add an `outcome` column to `eval_results`
+(`scored | not_applicable | capture_failure | judge_failure | refused`), exclude everything but `scored`
+from means, and report the rest as a reliability count in the dashboard. Retry judge failures once
+against a fallback model before recording one.
+
+---
+
+## 4. What the golden answers unlock
+
+`lex_eval/data/reference_answers/` gives each question a hand-researched `final_answer`, a `plan` with
+scoped steps, `sources_retrieved` vs `sources_discovered`, a full `retrieval_context` recorded
+**unsummarised**, and a `review` block with `required_citations`.
+
+`eval-gap-analysis.md` item 1 identified the judge-shaped half of reference comparison and the last pass
+deliberately deferred it. It is now unblocked. The reference answers change the judge metrics in one
+fundamental way: **they let the judge stop reasoning about UK law and start comparing two documents.**
+That is the single change most likely to make a low-cost judge trustworthy.
+
+**Caveat, stated up front:** all six references are `verified: false` and all six have an empty
+`required_citations`. Until a lawyer signs off, every metric below measures agreement with one author's
+research, not legal correctness. Reuse `reference_compare.reference_stamp()` on the new metrics so a
+draft-derived score is never mistaken for a verified one — the existing suite already does this.
+
+### 4.1 Substantive Agreement — replaces Answer Relevancy *(highest value)*
+
+Give the judge the reference `final_answer` as `expected_output` and ask it to classify each legal
+proposition in the reference as **stated / contradicted / omitted** by the run, and to list any
+proposition the run asserts that the reference contradicts.
+
+- Score from the classification, weighting a contradiction far more heavily than an omission.
+- Report **contradictions of a verified reference as a standalone count**, never folded into a mean.
+  That is the legal-risk number.
+- This is the only metric that would have flagged q6 `mistral` run 2 for what it was, rather than
+  awarding it 1.00 relevancy and 1.00 response groundedness.
+- **It is the metric best suited to a cheap judge, not the one that needs an expensive one.** The
+  prompt is small (two answers, no retrieval context) and the task is comparison, not recall: the
+  judge never has to know UK law, only whether proposition *P* from the reference appears in, is
+  contradicted by, or is missing from the run. That is exactly the shape §6 says cheap models handle
+  reliably — and it is the same judgement `deepseek-v4-flash` already made correctly, unaided, on the
+  q1 ss.209/210 fabrication.
+- Ask for the classification one proposition at a time in a single structured list, with `verbatim`
+  quotes from each document as evidence for each label, and compute the score from the labels in
+  Python. Do not ask for an overall grade.
+
+### 4.2 Plan Step Coverage — a completeness metric with a human-set bar
+
+The reference `plan.steps` are a person's decision about what the question turns on. Ask the judge, per
+step, whether the run's answer addresses it. Small prompt, per-step breakdown you can act on, and it is
+the judge-side complement to `Source Coverage`'s set arithmetic — one says *did it reach the material*,
+the other says *did it use it*.
+
+### 4.3 Honest-Gap Discipline — mostly no judge required
+
+The Worker prompt's most important instruction is: if the API data does not answer the question, **say
+so** and do not fill the gap from training data. Nothing scores this today, and Research Groundedness
+has actively penalised the correct behaviour.
+
+- **Deterministic half:** extract every provision the answer asserts the *content* of (`s.209`,
+  `section 210`, etc., resolved against the Act in context), and check the provision URI against
+  `run_sources().retrieved_uris`, allowing `ACT_TEXT_CREDIT`-style credit where the whole Act was
+  fetched. A content claim about a provision never retrieved and not inside a fetched Act is an
+  unsupported provision claim. **Zero LLM calls**, and it catches the q1 hallucination exactly.
+  Note this is *not* covered by `Citation Integrity`, which checks cited URLs — the q1 fabrication
+  appeared in prose with no URL at all.
+- **Judge half:** does the answer claim to know the content of anything it also concedes it did not
+  retrieve? One small call.
+- q1 gives you a ready-made positive and negative control in a single question: the gold answer
+  declines to state what ss.209/210 contain, one run declines, one run invents.
+
+### 4.4 The reference answers as a standing judge-calibration harness
+
+This is the cheapest thing on the list and it directly answers "is the judge any good?" on an ongoing
+basis rather than by inspection.
+
+Run the judge metrics **against the gold records themselves**. By construction a reference record's
+`final_answer` *is* its `research_output`, and its `retrieval_context` is the unsummarised primary text
+its author wrote from. So:
+
+- Response Groundedness on a gold record must score ≈1.00. Anything less is a judge false positive.
+- Research Groundedness on a gold record should score high. If the judge cannot give a hand-written,
+  fully-sourced answer ≥0.75, the metric is measuring the judge, not the model.
+
+Publish that as the judge's measured false-positive rate next to the scores. It is
+`eval-gap-analysis.md` item 9's "publish the agreement level" in a form you can run today, without
+waiting for lawyer grading.
+
+**Important:** this applies to the **judge** metrics only. `docs/reference-answers.md` is right that
+running `tool_usage` or `structure` against a reference record is a category error — those read the
+`delegate_research` entry, which does not exist. The judge groundedness and relevancy metrics do not.
+
+### 4.5 Trap questions
+
+Once references exist for questions whose correct answer is "no such source exists", they become the
+negative control for §4.1 and §4.3 — a run that invents something must score badly, and you can prove
+the metric fires. `eval-gap-analysis.md` item 1 notes LexChat's own golden set already contains these.
+
+---
+
+## 5. Are these metrics on track for legislation research?
+
+Checking the four judge metrics against what LexChat's `WORKER_SYSTEM_PROMPT` and `_MANAGER_BODY`
+actually require of a `legislation_only` run:
+
+| LexChat requirement | Covered? |
+| --- | --- |
+| "grounded EXCLUSIVELY in the data retrieved from the LEX API tools" | **Yes** — Research Groundedness is the direct test. Fix its inputs (§3.1) |
+| "If the API data does not answer… state: 'The available database does not contain…'. DO NOT fill gaps with internal training data" | **No — and mis-scored.** Nothing rewards the disclaimer; the judge has penalised it. §4.3 |
+| Phase 1 results "NOT sufficient… do not synthesise from Phase 1 alone" | **Partly** (rule-based `Retrieval Rules`). The judge is currently *fooled* into accepting Phase-1-only claims because titles and text share one list. §3.1 |
+| Phase 2 mandatory before composing | Rule-based (`Tool Usage`). No judge needed |
+| Output structure: BLUF / Detailed Analysis / Jurisdiction & Status / References | Rule-based (`structure`). No judge needed |
+| Citation protocol: `/section/{n}` appended, `legislation.gov.uk` only | Rule-based (`citations`). Good |
+| Manager PASS-THROUGH ACCURACY and CITATION PRESERVATION | Response Groundedness + `Reference Preservation` — overlapping; §3.2 |
+| Manager ONE DELEGATION PER QUESTION | Rule-based (`Retrieval Rules`) |
+| Manager triage / clarify-before-delegating | **No.** q3 `mistral`'s "Could you narrow this down?" is currently three zeros and one 1.00 |
+| **Is the answer legally right?** | **No.** §4.1 |
+
+**On track: yes, with one structural gap.** The judge metrics cover *faithfulness* well and cover
+*correctness* not at all. Every gap in the right-hand column is either a §4 metric or a §3 input fix.
+
+### Carried over from `eval-gap-analysis.md`
+
+| Item | What this review adds |
+| --- | --- |
+| **9 — calibrate the judge; separate judge failure from model failure** | Promote to **P0**. Quantified: 8/72 calls (11%) failed, all recorded as model scores of 0.00, root cause diagnosed and fix verified. §4.4 gives a calibration harness you can run today |
+| **1 — correctness against a gold answer** | Now unblocked by the reference answers. §4.1, §4.2 |
+| **2 — retrieval quality vs faithfulness to whatever was retrieved** | Concrete instance found: q6 `mistral` run 2 scored 1.00 Response Groundedness for faithfully relaying a reversed conclusion |
+| **6 — reliability as a metric, not a filter** | The inverse also bites: non-answers (q3 `mistral`) are scored as bad answers on three metrics and a perfect one on a fourth |
+| **8 — metrics that pass too easily** | Answer Relevancy (20/22 = 1.00) and Response Groundedness (19/21 = 1.00) are the two worst remaining offenders |
+| **10 — versioned, controlled experiment** | Felt directly: `eval_results` has no timestamp and no run identity, so I could not tell which of the two q6 `mistral` runs a given score belonged to without re-invoking the judge. Add `run_id`, `timestamp`, `judge_model`, `judge_temperature` |
+
+---
+
+## 6. Designing metrics a low-cost judge can be trusted with
+
+The judge will stay in the `deepseek-v4-flash-0731` price class. That is a constraint on **metric
+design**, not a compromise on quality — and the evidence in §1 is the argument for it. The one metric
+that discriminates today (Research Groundedness) is the one that hands the judge concrete text and
+asks it to check claims against it. The two that saturate (Answer Relevancy, Response Groundedness)
+are the two that ask for an unanchored quality opinion. That split is not about model capability. It
+is the difference between a task a small model does well and one no small model does well.
+
+Nine rules follow from what this dataset showed. Every §3 and §4 recommendation already conforms; the
+point of writing them down is that new metrics should be held to them too.
+
+**1. Anchor every judgement in supplied text.** If answering requires the judge to recall UK law, the
+metric is not cheap-judge-safe. The failure is already on record: Answer Relevancy scored q6 `mistral`
+0.25 by reaching for Schedule 5 Part II Head G2 from parametric knowledge. It was right that time.
+That is not a property to build on. Every prompt should carry the instruction from §3.1 — *do not
+assert what the law says from your own knowledge; quote the supplied material or state that it is
+absent.*
+
+**2. Ask for labels, compute the score in Python.** Small models are competent classifiers and poor
+calibrators. A 1–5 holistic ladder asks for calibration and gets a 5 (19/21 on Response Groundedness,
+20/22 on Answer Relevancy). Replace every rubric with a per-item decision — *is this claim supported /
+unsupported / partially supported*, *is this reference proposition stated / contradicted / omitted* —
+and derive the metric score arithmetically from the returned list. This also makes the weighting
+explicit and auditable instead of hidden inside the model's sense of what a "4" is.
+
+**3. One decision per call, and keep the prompt small.** Cheap models degrade with context length far
+faster than frontier ones, and this suite currently sends up to 97,000 tokens in a single call.
+Prefer several small calls to one large one: they parallelise (§2a), they fail independently, and each
+comes back with an evidence span you can check. Where a large retrieval context is unavoidable, chunk
+it and judge per chunk rather than asking for one verdict over the whole bag.
+
+**4. Require evidence spans, and validate them in code.** Every label the judge returns should carry a
+`quote` field lifted verbatim from the supplied material. Then check the quote actually occurs in the
+source. A cheap model that invents an evidence span is caught mechanically — which converts the
+judge's weakest habit (§1, "the judge editorialises beyond the evidence") into a detectable, countable
+error rather than a silent one.
+
+**5. Make prompts order- and position-symmetric.** Small models show stronger position bias than large
+ones, and the Consistency rubric currently bakes it in: swap A and B on q4 `mistral` and the score
+moves 0.2 → 0.4 (§3.4). Any metric comparing two documents must either be symmetric by construction
+(propositions in A-only / B-only / both) or be run both ways and averaged. Given the price, running it
+both ways is affordable.
+
+**6. Constrain the output schema tightly.** Enums, not floats (§3.4). Short, length-capped free-text
+fields. Fixed-length lists where the count is known. The less the model has to generate, the less
+reasoning budget it burns and the fewer ways the response can be malformed.
+
+**7. Budget the reasoning explicitly, and never let a truncated response become a score.** This is
+the §1 bug generalised: a reasoning model on a cheap tier will happily spend 20,000 characters
+thinking. Raise `max_tokens`, set the OpenRouter `reasoning` effort deliberately per metric (low or
+excluded for the mechanical ones), retry once, fall back to the mid-tier model, and record the result
+as `judge_failure` rather than 0.00. Make the effort level configurable — `OPENROUTER_JUDGE_REASONING_EFFORT`
+alongside the existing model and temperature keys — so it is tunable per suite without a code change.
+
+**8. Spend the savings on repetition, not on a bigger model.** Where a judgement is genuinely
+borderline, three calls at temperature 0 on the cheap judge and a majority vote costs about $0.39 per
+sweep — still under the $0.63 of one single-shot `gpt-5-mini` pass, and it yields a disagreement rate
+you can publish. Self-consistency is a better use of the budget than model tier, because it produces a
+reliability number as a by-product.
+
+**9. Prove each metric on fixtures before trusting it on data.** Two gates, both cheap and both
+runnable today:
+
+- **Defect injection.** `tests/unit/test_metrics_new.py` already establishes the pattern for the
+  rule-based metrics — build a record containing the specific defect and assert the metric fails it.
+  Extend it to the judge metrics with a small fixture set carrying known injected faults: a fabricated
+  section quotation, a dropped limitation, a reversed conclusion, an unsourced provision claim. A
+  judge metric that cannot catch its own planted defect does not ship. Run it on the cheap judge — that
+  is the model it has to work on.
+- **Calibration against the gold records** (§4.4) — the false-positive half. Response Groundedness on
+  a reference record must score ≈1.00; Research Groundedness ≥0.75.
+
+Together these give an accept/reject test for "is the cheap judge good enough for this metric" that
+does not depend on anyone's impression of the scores. If a metric fails either gate, the fix is to
+re-shape the question (rules 1–6) before considering a larger model.
+
+---
+
+## Recommended changes, in priority order
+
+### P0 — the numbers are wrong until these land
+
+**Implemented 2026-08-10.** All four landed; the figures below supersede every judge number quoted
+earlier in this document.
+
+| | Before | After |
+| --- | --- | --- |
+| Judge calls with no verdict | 8 of 72 (11%) | **0 of 84** |
+| `Research Groundedness` | 0.292 over 24 rows | **0.489** over 22 real verdicts (0.00×1, 0.25×7, 0.50×9, 0.75×2, 1.00×3) |
+| `Response Groundedness` | 0.833 over 24 rows | 0.886 over 22 |
+| `Answer Relevancy` | 0.844 over 24 rows | 0.943 over 22 (still saturated — §3.3 stands) |
+| `Consistency (AI Judge)` | 0.542 over 12 | 0.542 over 12 (unchanged; no failures either way) |
+
+The 6 capture-gate rows (q3 `mistral`, both runs × 3 metrics) are now `capture_failure` with a NULL
+score instead of 0.00, which is most of the movement in the two saturated metrics. The estimate in §1
+that the genuine verdicts average 0.467 was close: the measured figure over the full set is 0.489.
+
+Two further findings from the re-run:
+
+- **16000 is not always enough.** Two calls still exhausted the budget on reasoning; both recovered on
+  the retry (which doubles the budget after a truncation). One `Research Groundedness` call —
+  q5 `glm-5.2` — exhausted both attempts and was served by the fallback `openai/gpt-5-mini`, scoring
+  **1.00**. Under the old code that record was a 0.00 model failure. The retry/fallback path is not
+  belt-and-braces; it is load-bearing.
+- **Reasoning effort moves verdicts**, so it is recorded alongside model and temperature. The same
+  groundedness prompt scored 4, 3 and 2 at effort `none`, `low` and `high` on the configured judge.
+  `judge_reasoning_effort` is NULL for this particular run only — the column was added after the run
+  started; it ran at `low` throughout.
+- Wall clock is now **48 minutes** for the groundedness sweep, up from ~30: at 4096 the judge was
+  being cut off mid-thought and now gets to finish. §2's parallelism fix (P1 #7) is what brings this
+  down, not a smaller budget.
+
+
+| # | Change | Where | Effort |
+| --- | --- | --- | --- |
+| 1 | Raise `max_tokens` 4096 → 16000; add one retry and a fallback judge model on empty/truncated content; make reasoning effort configurable (`OPENROUTER_JUDGE_REASONING_EFFORT`) and default it low for the mechanical metrics | `utils/judge.py`, `.env`, `.env.example` | XS |
+| 2 | Add `outcome` to `eval_results`; stop writing judge and capture failures as `score=0.00, passed=False`; exclude non-`scored` rows from means | `metrics/*`, `utils/collector.py`, `utils/db.py`, `reports/streamlit_report.py` | S |
+| 3 | Record `judge_model` and `judge_temperature` on every judge result row | `utils/collector.py`, `utils/db.py` | XS |
+| 4 | Re-run `--suite groundedness --overwrite` and `--suite consistency_llm --overwrite`. **Do not report the current figures** | — | S |
+
+Landed as: `utils/judge.py` (budget, effort, retry/fallback, `JudgeError`), `utils/outcomes.py` +
+`metrics/_judge_common.py` (new), `utils/collector.py`, `utils/db.py`, `run_evals.py`,
+`reports/streamlit_report.py`, `tests/unit/test_judge_reliability.py` (new).
+
+### P1 — make the metrics measure what they claim
+
+**Implemented and re-scored 2026-08-10.** All six landed and both suites were re-run with
+`--overwrite`. These figures supersede the P0 table above.
+
+| | P0 instrument | P1 instrument |
+| --- | --- | --- |
+| Judge calls with no verdict | 0 of 84 | **0 of 57** (one truncation retry fired and succeeded) |
+| Judge calls needed | 24 + 24 + 24 | **22 + 11 + 24** — pass-through settled 11 of 22 records with no LLM call |
+| `Research Groundedness` | 0.489 over 22 | **0.420** over 22 (0.00×2, 0.25×8, 0.50×9, 0.75×1, 1.00×2); 3 of 22 above the 0.6 threshold |
+| `Response Groundedness` → `Answer Fidelity` | 0.886 over 22 | **0.693** over 22 (1.00×12, 0.75×1, 0.50×4, 0.25×2, 0.00×3); 13 of 22 pass |
+| `Answer Relevancy` | 0.943 over 22 | **0.906** over 24 — the two q3 `mistral` clarifying replies are now scored answers (0.00) rather than capture failures |
+| Wall clock, groundedness sweep | 48 min serial | **25 min** at `-n 8` |
+
+**Both faithfulness metrics got stricter, and the drops are real.** Spot-checked against the failures
+this review documented by hand:
+
+- `Research Groundedness` scores **both** q1 `glm` runs 0.25 and names ss.209/210 explicitly in
+  `unsupported_claims` — the fabrication of §1, now itemised rather than buried in a mean.
+- It scores q6 `mistral` **0.00** with six claims, the first being *"the regulation of health
+  professions in Scotland is primarily a devolved matter"*. That is the reversed conclusion of §1 that
+  the old Response Groundedness scored **1.00** for relaying faithfully (§5, gap-analysis item 2). It is
+  caught here because the Phase-1 block makes an assertion about an Act nobody retrieved ungrounded by
+  construction — not because the judge knows Scottish devolution law.
+- `Answer Fidelity` scores q2 `mistral` 0.25 for dropping *"the necessity requirement for
+  section 78A directions"* and the s.9 limitation — the exact omission §3.2 said the old rubric
+  under-weighted — and q5 `mistral` 0.00 for *"reverses the discretionary removal grounds into automatic
+  disqualification"*.
+
+**What this leaves open:** 19 of 22 records now fail `Research Groundedness` at threshold 0.6. A metric
+that fails almost everything is as uninformative as one that passes everything *unless the failures are
+real*, and the spot-checks say these are. The next question is therefore the threshold, not the metric —
+and answering it needs a lawyer to read a dozen `unsupported_claims` lists, not another prompt revision.
+§4.4's calibration harness (run the metric against the gold records, where the answer is known to be
+sound) is the cheapest way to find out whether 0.42 is the model's number or the judge's.
+
+What changed, and what it is worth knowing about each:
+
+- **The groundedness judge now sees tagged text** (#5, #6). `utils/sources.py` gained
+  `retrieval_passages()` and `discovered_acts()`; every passage carries `Act title | act id | provision
+  URI | heading`, and Acts a Phase-1 search only *named* are a separate block the prompt declares
+  ungrounded-by-definition to make claims about. On the 24 stored records that block is never empty: q1
+  discovers 5 Acts and retrieves 1, q6 `glm` discovers 46 and retrieves 10. The prompt also now forbids
+  the judge asserting law from its own knowledge, protects an express "not retrieved / not in the
+  database" statement, and returns `unsupported_claims[]`, whose count leads the stored `reason`.
+  Verified live on q5 `glm`: 3 itemised unsupported claims, all about jurisdiction/status/commencement
+  material that was never retrieved.
+- **Truncation `continue`s and is declared** (#5, #10). `_MAX_CONTEXT_CHARS` is gone; the budget comes
+  from `OPENROUTER_JUDGE_CONTEXT_TOKENS` (default 1,048,576 — the configured judge's real window), so on
+  this dataset nothing truncates at all, and when it does bind the whole-Act dump gives way to the
+  section text rather than the other way round. `FULL_CONTEXT_GROUNDEDNESS` had already been removed from
+  `.env`; nothing was left to delete.
+- **Response Groundedness is now `Answer Fidelity`** (#8), and settles most records without
+  a judge. Measured on the 24 stored records: **12 need a judge call, 12 do not** — every `glm` run is a
+  near-verbatim pass-through (retention ≥0.92), every `mistral` run condenses the report by half or more,
+  which is itself the finding. Sentence matching is word-5-gram containment, not equality; exact matching
+  scored a close paraphrase of the whole report at 14% retention. The unmatched-quotation check finds the
+  q1 `mistral` fabricated statutory quotation **with no LLM call**, and the judge that then runs scores
+  that record 1/5 for the quotation plus a dropped caveat — the old metric gave it 0.50.
+- **Answer Relevancy has its own suite** (#9): `--suite relevancy`, `tests/eval/test_relevancy.py`, marker
+  `relevancy`. Its only gate is an empty answer, so a Manager that replies "Could you narrow this down?"
+  is scored as the low-relevancy answer it is rather than recorded as a capture failure. Existing rows are
+  retagged from `groundedness` to `relevancy` by a data migration in `utils/db.py`, so the move does not
+  re-score them or double-count them in the dashboard. The metric is still saturated; §3.3 stands and §4.1
+  is still its replacement.
+- **The judge suites run 8-way parallel** (#7). DuckDB takes one write lock per file, so this needed two
+  changes beyond adding `pytest-xdist`: workers spool their rows to a temp directory and only the
+  controller writes `eval_results` (`tests/conftest.py`), and `utils/db.py` opens its readers read-only so
+  eight workers can load `responses` at import. Verified both ways — 12 rows from 4 workers written once,
+  and 8 concurrent processes reading the 38 MB database. `LEX_EVAL_JUDGE_WORKERS=1` restores serial
+  behaviour.
+
+**On §2's "≈4 minutes" target: not met, and the reason is the prompt, not the plumbing.** The measured
+sweep is **25 minutes** at `-n 8`, down from 48 serial. A single `Research Groundedness` call on a
+*small* (16k char) context now takes ~164 s against 29.8 s before: tagged passages, the Phase-1 block and
+an itemised `unsupported_claims` list all cost deliberation, so parallelism bought roughly 8× and the
+prompt gave back roughly 5×. That is a deliberate trade — the extra time is what produces the itemised
+findings above — but if the sweep needs to be faster, the lever is the prompt (§6.3: chunk the retrieval
+context and judge per chunk), not more workers.
+
+| # | Change | Where | Effort |
+| --- | --- | --- | --- |
+| 5 | Rebuild the Research Groundedness context from `utils/sources.py` with tagged passages; separate Phase-1 discoveries into their own labelled block; `continue`-not-`break` truncation, declared in the prompt | `metrics/research_groundedness.py`, `utils/sources.py` | M |
+| 6 | Add to the Research Groundedness prompt: an express "not retrieved / not in the database" statement is grounded; do not assert law from your own knowledge; return `unsupported_claims[]` | `metrics/research_groundedness.py` | S |
+| 7 | Add `pytest-xdist`, run judge suites with `-n 8`; verify `pytest_sessionfinish` still writes under xdist | `pyproject.toml`, `run_evals.py`, `tests/conftest.py` | S |
+| 8 | Reframe Response Groundedness as **Answer Fidelity**: deterministic containment + unmatched-quotation check first, judge only on material divergence; rebalance rubric toward omission | `metrics/answer_fidelity.py` | M |
+| 9 | Move Answer Relevancy out of the `groundedness` suite and off the retrieval-context gate | `tests/eval/`, `run_evals.py`, `pyproject.toml` | S |
+| 10 | Fix `_MAX_CONTEXT_CHARS` (judge window is 1M, not 128k); delete or implement `FULL_CONTEXT_GROUNDEDNESS` (set in `lex_eval/.env`, absent from `.env.example`, read nowhere) | `metrics/research_groundedness.py`, `.env`, `.env.example` | XS |
+
+### P2 — the new metrics the gold answers make possible
+
+**Partly implemented 2026-08-11.** #12, #13 and #15 landed; #16 was already
+satisfied by P0 #1. #11 and #14 are deliberately **not** built yet — see "What
+was deferred" below.
+
+| | Landed as |
+| --- | --- |
+| **#12 Honest-Gap Discipline** | `metrics/honest_gap.py` (two metrics), `tests/eval/test_honest_gap.py`, suite `honest_gap` |
+| **#13 Judge calibration harness** | `lex_eval/calibrate_judge.py`, `reference/as_record.py` |
+| **#15 Defect-injection fixtures** | `tests/unit/defect_fixtures.py`, `tests/unit/test_judge_defects.py` |
+| **#16 Cheap judge, mid-tier as fallback only** | already in `utils/judge.py` from P0 #1; no suite defaults to the mid-tier model |
+
+**#12 splits in two, and only one half needs a judge.**
+
+- `Provision Claim Support` is deterministic. It reads every section whose
+  *content* the report asserts, resolves it against the Act under discussion,
+  and checks it against what the run retrieved. Measured on the 24 stored
+  records: 13 are scored, 5 fail, and the failures name specific provisions —
+  q2 `glm` s.78A of `asp/2004/7`; q3 `glm` s.33 of `ssi/2014/283`; q4 `glm`
+  (two records) ss.142/146/148A/155; q6 `glm` ss.209/228 of `ukpga/1999/8`, the
+  Health Act 1999, never retrieved and never fetched in full. The other 11 are
+  `not_applicable` — either the report asserts no section's content, or every
+  claim it makes rests on an Act carried over from earlier prose, which the
+  metric reports but refuses to score.
+- `Honest Gap Discipline` is the judge half, asked of the report alone, and only
+  of reports that declare a gap at all — nothing else can contradict one. Every
+  quote it returns as evidence is checked back against the report and discarded
+  if it is not there (§6.4), so an invented evidence span is countable rather
+  than silent.
+
+**Reading a claim out of legal prose is the hard part, and the gold answers
+paid for the rules.** Running the deterministic half over the reference answers
+— where by construction there is nothing to catch — produced a 40% false-positive
+rate on the first pass, and each rule below was written against one of those
+findings:
+
+- a verb *before* the reference belongs to a different subject ("the higher
+  maximum applies to a failure to comply with section 35" says what the penalty
+  section provides, not what s.35 does);
+- a pointer in front of a reference makes it a cross-reference quoted out of the
+  provision under discussion — the q1 gold answer quotes s.6 as having effect
+  "subject to … section 209 and section 210", which the first pass read as a
+  claim about ss.209 and 210, i.e. as the very fabrication that answer exists to
+  avoid;
+- an Act named inside a parenthetical ("inserted by the … Act 2004, s.6")
+  qualifies the reference beside it but never becomes the subject — without this,
+  nine sections of the NHS (Scotland) Act 1978 were charged to the 2004 Act that
+  amended one of them;
+- an Act named more than eight sentences earlier is stale, and claims resting on
+  it are reported with the support they would have had, but not scored.
+
+The result is precision-first, and the cost was visible in the first version
+shipped: on the gold answers the metric scored **nothing at all**, because they
+name their Act once at the top and then run for forty sentences of tables and
+cross-references. Two follow-up fixes, found by checking the extraction logic
+rather than only its output, recovered some of that: the acronym resolver used
+one fixed formula (every word's initial, including the trailing "Act") and so
+produced "NHSSA" for the National Health Service (Scotland) Act 1978 — a string
+that appears nowhere, when the stored `glm` runs write "NHS" 23 times between
+them — and the content-verb list had present-tense forms for most verbs
+("imposes", "empowers", "amends") but no past tense at all, so "section 6
+**imposed** an obligation" was invisible to the extractor. Both are now
+generated in both forms. On the gold answers this moved the calibration result
+from 0 scored records to 2 scored, 0 false positives; on the stored runs it is
+what surfaced the q6 `glm` ss.209/228 finding above, previously invisible
+because both sentences use past tense ("Section 209 **amended** section 60…").
+The real gate is still #15's planted fabrication, not the calibration run —
+these fixes were found by reading the code, not by the calibration harness
+itself, which had nothing to score either way.
+
+**Two things the deterministic pass settled that this review had recorded
+differently.** Both q1 `glm` runs fetched the whole Data Protection Act 2018 via
+`get_legislation_text`, so the text of ss.209 and 210 *was* in front of the model
+— §1's "neither section's text was in that run's retrieval context" is true of
+the flat `retrieval_context` and not of the full-Act dump the same run pulled.
+The claim is still poorly evidenced and `Research Groundedness` still scores it
+0.25, but it is not the clean fabrication the headline implies. Second, `Answer
+Fidelity`'s deterministic router did not treat a one-word reversal ("is the
+controller" → "is **not** the controller") as material divergence, so it never
+reached a judge: five-word-run containment is deliberately tolerant of one-word
+edits. A negation-count check now routes it, and on the 24 stored records it
+changes no routing decision (still 11 of 22 need a judge) — it costs nothing and
+closes the cheapest defect to write.
+
+**#13 runs the metrics against the gold records** by presenting a reference
+answer as a stored run (`reference/as_record.py` rebuilds an `audit_json` trace
+from the tool calls the author's research recorded, so `utils/sources.py` reads
+it exactly as it reads a real run). It prints a per-record table and a
+false-positive rate per metric, writes `data/judge_calibration.json`, and exits
+non-zero when a metric marked down a gold answer — usable as a gate on a metric
+change, not only as a report. Nothing is written to `eval_results`: these measure
+the harness, not any model. `--offline` runs the deterministic metrics with no
+key and no spend.
+
+**The live gate is green on the cheap judge, measured 2026-08-11.** All eight
+live fixtures pass on `deepseek/deepseek-v4-flash-0731` at effort `low`:
+`Answer Fidelity` catches the fabricated quotation, the dropped limitation and
+the reversed conclusion (111 s for the three); `Honest Gap Discipline` catches
+the filled gap and leaves a declared-and-respected gap alone (15 s for the two);
+`Research Groundedness` catches the unsourced provision claim and does **not**
+mark down the clean control (175 s for the pair). The judge half of
+`Honest Gap Discipline` was also run against the q5 gold answer directly: 49 s,
+scored **1.00**, no discarded quotes, and its reason names the gaps that answer
+declares — the code of practice and the Commencement Order — and confirms it
+fills none of them. That is the §4.4 false-positive check for that metric, and
+it passed on the first attempt.
+
+The one gate still unmeasured is `Research Groundedness` on the gold records
+end to end: a single-question `calibrate_judge` run exceeded a 15-minute budget
+and was killed. That is §2's latency, not a fault — the same metric's live
+fixture returns in under three minutes on a small record.
+
+**#15 is two gates in one file.** The offline half asserts that the deterministic
+checks catch what is deterministically catchable (the fabricated quotation, the
+unsourced provision claim) and leave the clean control alone; it runs in every
+`pytest lex_eval/tests/unit`. The live half hands the same fixtures to the
+configured cheap judge and is skipped unless `LEX_EVAL_LIVE_JUDGE_TESTS=1`, so
+the unit directory stays offline and free.
+
+**What was deferred, and why.** #11 (Substantive Agreement) and #14 (Plan Step
+Coverage) are the two metrics that score a run against the *substance* of a
+reference answer — what it concludes, and what its author decided the question
+turns on. Both would report nothing but `[DRAFT REFERENCE — unverified]` today,
+and #11 carries a further instruction — retire `Answer Relevancy` on its
+strength — which should not rest on six unsigned drafts. They stay blocked on the
+prerequisite below. The work done here is what does not need sign-off: #12 needs
+no reference at all, #13 uses the references only as internally-consistent
+documents (a property that holds whether or not a lawyer agrees with them), and
+#15 needs no data beyond its own fixtures.
+
+| # | Change | Where | Effort |
+| --- | --- | --- | --- |
+| 11 | ⏸ (blocked on sign-off) **Substantive Agreement** vs the reference `final_answer` — per-proposition stated/contradicted/omitted labels with verbatim evidence spans, score computed in Python; contradictions reported as a standalone count. Retire Answer Relevancy | new `metrics/`, `tests/eval/test_reference.py` | M |
+| 12 | ✅ **Honest-Gap Discipline** — deterministic unsupported-provision-claim check plus a small judge call | `metrics/honest_gap.py`, `tests/eval/test_honest_gap.py` | M |
+| 13 | ✅ **Judge calibration harness** — run the judge metrics against the gold records; publish the false-positive rate | `calibrate_judge.py`, `reference/as_record.py` | S |
+| 14 | ⏸ (blocked on sign-off) **Plan Step Coverage** vs the reference `plan.steps` — per-step addressed/not-addressed labels, not a grade | new `metrics/` | M |
+| 15 | ✅ **Defect-injection fixtures for the judge metrics**, run against the cheap judge — a planted fabrication, dropped limitation, reversed conclusion and unsourced provision claim must each be caught. Gate for shipping any new judge metric (§6.9) | `tests/unit/` | M |
+| 16 | ✅ (landed with P0 #1) Keep every metric on the cheap judge; wire the mid-tier model as retry/fallback and as a periodic spot-check reference only, never as a suite's default (§6) | `utils/judge.py` | S |
+
+### P3 — consistency
+
+| # | Change | Where | Effort |
+| --- | --- | --- | --- |
+| 17 | Split Consistency (AI Judge) into deterministic **Source Stability** (Jaccard over `run_sources()` URIs) and symmetric **Conclusion Stability** (one judge call, propositions + contradictions) | `metrics/consistency_llm.py` | M |
+| 18 | Gate both on the run having performed research, so a repeated clarifying question reports as "consistent non-answer" | `tests/eval/test_consistency_llm.py` | S |
+| 19 | Pin group ordering by timestamp so a consistency score is reproducible | `utils/db.py` | XS |
+
+### Prerequisite for most of P2
+
+Get the six reference answers **lawyer-verified** and `required_citations` populated. Until then, every
+reference-anchored score reads "[DRAFT REFERENCE — unverified]" and measures agreement with one author.
+That is genuinely useful for harness and retrieval work; it is not a verdict on legal correctness.
+
+---
+
+## Appendix — measurements behind this review
+
+All figures from `lex_eval/data/responses.db`, 2026-08-07.
+
+**Judge call outcomes (72 calls):** 64 verdicts, 7 `Research Groundedness` failures, 1
+`Response Groundedness` failure. A further 6 rows were written by capture gates without a judge call.
+
+**`Research Groundedness`, published vs corrected:** 0.291 over 24 rows → **0.467** over the 15 rows
+that are actual judge verdicts (3 of 15 above the 0.6 threshold).
+
+**`retrieval_context` size:** 3,687,196 chars (~922k tokens) total; per record min 0, max 411,098,
+median ~100k. Two records (q3 `mistral`, both runs) have none.
+
+**Truncation:** one record (q6 `glm` run 1) exceeds `_MAX_CONTEXT_CHARS`; 27 of 97 items are dropped
+silently.
+
+**Latency, measured directly against the live judge:** Answer Relevancy 2.7–4.3 s;
+Response Groundedness 4.1–10.9 s (41.7 s at `max_tokens=16000`); Research Groundedness 29.8 s at 3k
+tokens of context, 62.1 s at 97k.
+
+**Reproduced judge failure:** q6 `mistral` run 2, Response Groundedness prompt, `temperature=0` — empty
+content at `max_tokens=4096` under both `json_schema` and `json_object`; valid JSON with no
+`response_format`; valid JSON scoring 5/5 at `max_tokens=16000`. Deterministic across repeats.

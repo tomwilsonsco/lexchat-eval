@@ -224,5 +224,5 @@ dist/
 *.db
 
 .clinerules
-docs/
+/docs/
 lexchat/
