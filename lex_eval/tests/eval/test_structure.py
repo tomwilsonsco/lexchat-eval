@@ -18,6 +18,7 @@ failing score.
 import pytest
 
 from lex_eval.metrics.structure import (
+    CitationGroundingMetric,
     CitationPassthroughMetric,
     MandatoryStructureMetric,
 )
@@ -88,6 +89,40 @@ def test_citation_passthrough(request, record):
         request,
         record=record,
         test_name="citation_passthrough",
+        metric_name=metric.__name__,
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason,
+        suite="structure",
+    )
+
+    assert metric.is_successful(), metric.reason
+
+
+@pytest.mark.parametrize(
+    "record",
+    records,
+    ids=[record_id(r) for r in records],
+)
+@pytest.mark.structure
+def test_citation_grounding(request, record):
+    """
+    Every Act cited in the Worker output must correspond to a legislation_id
+    this run's own tool calls actually retrieved via search_legislation,
+    search_legislation_sections, or get_legislation_text.
+
+    Records with no delegate_research call automatically score 0.0.
+    Records with no citation URLs at all score 1.0 (nothing to ground).
+    """
+    test_case = record_to_test_case(record)
+    metric = CitationGroundingMetric(threshold=1.0)
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="citation_grounding",
         metric_name=metric.__name__,
         score=metric.score,
         threshold=metric.threshold,

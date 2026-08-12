@@ -5,13 +5,18 @@ from .consistency import ConsistencyMetric
 from .consistency_llm import LLMConsistencyMetric
 from .research_groundedness import ResearchGroundednessMetric
 from .response_groundedness import ResponseGroundednessMetric
-from .structure import CitationPassthroughMetric, MandatoryStructureMetric
+from .structure import (
+    CitationGroundingMetric,
+    CitationPassthroughMetric,
+    MandatoryStructureMetric,
+)
 from .tool_usage import ToolUsageMetric
 
 __all__ = [
     "ConsistencyMetric",
     "LegalAnswerRelevancyMetric",
     "LLMConsistencyMetric",
+    "CitationGroundingMetric",
     "CitationPassthroughMetric",
     "MandatoryStructureMetric",
     "ResearchGroundednessMetric",

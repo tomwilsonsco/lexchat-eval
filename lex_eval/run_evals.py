@@ -141,6 +141,7 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
             for test_name, fn_name in (
                 ("mandatory_structure", "test_mandatory_structure"),
                 ("citation_passthrough", "test_citation_passthrough"),
+                ("citation_grounding", "test_citation_grounding"),
             ):
                 if _covered(record, test_name):
                     deselect_args.extend(

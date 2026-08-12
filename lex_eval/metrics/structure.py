@@ -3,12 +3,15 @@ Metrics that validate Worker Agent output quality.
 
 MandatoryStructureMetric  — checks the 4-part Markdown heading structure.
 CitationPassthroughMetric — checks that Worker references reach the final response.
+CitationGroundingMetric   — checks that Worker citations were actually retrieved.
 
-Both metrics inspect the ``delegate_research`` tool-call output, which is where
+All three metrics inspect the ``delegate_research`` tool-call output, which is where
 the Worker Agent's response is surfaced.
 """
 
+import json
 import re
+from urllib.parse import urlparse
 
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
@@ -221,3 +224,142 @@ class CitationPassthroughMetric(BaseMetric):
     @property
     def __name__(self) -> str:  # type: ignore[override]
         return "Reference Links"
+
+
+def _legislation_id_from_url(url: str) -> str:
+    """
+    Derive the Act-level legislation_id (e.g. ``ukpga/1978/29``) from a
+    legislation.gov.uk URL, whether it points at the Act itself or a specific
+    section/schedule within it (e.g. ``ukpga/1978/29/section/10C``).
+
+    Mirrors how the LexChat server builds legislation_id from a search result
+    URI (``LexChat/server_py/src/agent/tools/lex.py::_slim_search_results``:
+    URL path, minus a leading ``id/`` segment), then keeps only the first
+    three path segments (type/year/number) since that's the granularity
+    search_legislation_sections and get_legislation_text are called at.
+    """
+    path = urlparse(url).path.lstrip("/")
+    if path.startswith("id/"):
+        path = path[3:]
+    return "/".join(path.split("/")[:3])
+
+
+def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:
+    """
+    Return the set of legislation_ids the run's own tool calls actually
+    retrieved: results returned by ``search_legislation``, plus the
+    legislation_id argument passed to ``search_legislation_sections`` /
+    ``get_legislation_text``.
+    """
+    ids: set = set()
+    if not test_case.tools_called:
+        return ids
+
+    for tool in test_case.tools_called:
+        if tool.name == "Worker: search_legislation":
+            raw = tool.output
+            try:
+                data = json.loads(raw) if isinstance(raw, str) else raw
+                for r in (data or {}).get("results", []):
+                    lid = r.get("legislation_id")
+                    if lid:
+                        ids.add(lid)
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                continue
+        elif tool.name in (
+            "Worker: search_legislation_sections",
+            "Worker: get_legislation_text",
+        ):
+            params = tool.input_parameters or {}
+            lid = params.get("legislation_id")
+            if lid:
+                ids.add(lid)
+
+    return ids
+
+
+class CitationGroundingMetric(BaseMetric):
+    """
+    Checks that every Act cited in the Worker's report was actually retrieved
+    by this run's own tool calls, rather than invented from pattern-matching.
+
+    Catches fabrication (a citation to something never retrieved), not
+    wrongness (a citation to a real, retrieved Act that doesn't actually
+    answer the question, which is a substantive-correctness question this
+    rule-based check can't make).
+
+    Score:
+        0.0  — no delegate_research call found; citations cannot be verified.
+        1.0  — no legislation.gov.uk citation URLs in Worker output (nothing
+               to falsely ground).
+        0.0  — one or more cited Acts were never retrieved by search_legislation,
+               search_legislation_sections, or get_legislation_text in this run.
+        1.0  — every cited Act was retrieved by this run.
+
+    No partial credit: unlike Reference Links, where "some links survived" is
+    a meaningfully different failure from "none did", one fabricated citation
+    is a full failure regardless of how many others were genuine.
+    """
+
+    def __init__(self, threshold: float = 1.0) -> None:
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        dr_output = _get_delegate_output(test_case)
+
+        if dr_output is None:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "citation grounding cannot be verified."
+            )
+            return self.score
+
+        cited_urls = set(_URL_RE.findall(dr_output))
+        cited_ids = {
+            lid for lid in (_legislation_id_from_url(u) for u in cited_urls) if lid
+        }
+
+        if not cited_ids:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                "No legislation.gov.uk citations found in Worker output; "
+                "nothing to ground."
+            )
+            return self.score
+
+        retrieved_ids = _retrieved_legislation_ids(test_case)
+        fabricated = cited_ids - retrieved_ids
+
+        if fabricated:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"Fabricated citation(s): {sorted(fabricated)} cited in Worker "
+                "output but never retrieved by search_legislation, "
+                "search_legislation_sections, or get_legislation_text in this run."
+            )
+        else:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                f"All {len(cited_ids)} cited Act(s) were retrieved by this "
+                "run's tool calls."
+            )
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Citation Grounding"
