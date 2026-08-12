@@ -6,7 +6,8 @@ Presence — 1/3 per required tool (delegate_research, Worker: search_legislatio
 Worker: search_legislation_sections).
 
 Order (legislation_only only) — Worker tools must appear in the phase order
-mandated by the Worker system prompt:
+mandated by the Worker system prompt, and must not loop back to an earlier
+phase once a later one has begun:
 
     1. Worker: search_legislation          (Phase 1 — DISCOVER)
     2. Worker: search_legislation_sections (Phase 2 — RETRIEVE PROVISIONS)

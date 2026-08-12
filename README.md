@@ -313,7 +313,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 
 | Metric | Description |
 |--------|-------------|
-| Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed). |
+| Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed), and does the Worker stick to that order rather than looping back to an earlier step later in the same run? |
 | Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. |
 | Reference Links | Are reference links included in the answer provided to the user. |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. |
