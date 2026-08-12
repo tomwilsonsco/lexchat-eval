@@ -31,7 +31,7 @@ from lex_eval.utils.test_helpers import (
 )
 from lex_eval.utils.collector import attach_metric
 
-records = load_records()
+records = load_records(read_only=True)
 
 
 def _tools_list(test_case):

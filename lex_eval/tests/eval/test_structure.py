@@ -31,7 +31,7 @@ from lex_eval.utils.test_helpers import (
     record_to_test_case,
 )
 
-records = load_records()
+records = load_records(read_only=True)
 
 
 @pytest.mark.parametrize(

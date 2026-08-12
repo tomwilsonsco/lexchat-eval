@@ -38,7 +38,7 @@ def _multi_run_groups():
     that has more than one captured response.
     Each element in the tuple is the full list of records for that group.
     """
-    grouped = group_by_question_and_llm()
+    grouped = group_by_question_and_llm(read_only=True)
     cases = []
     for key, records in sorted(grouped.items()):
         if len(records) >= 2:

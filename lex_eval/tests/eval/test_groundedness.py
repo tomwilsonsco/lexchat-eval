@@ -40,7 +40,7 @@ _THRESHOLD: float = 0.6
 # Shared state
 # ---------------------------------------------------------------------------
 
-records = load_records()
+records = load_records(read_only=True)
 
 _skip_no_api_key = pytest.mark.skipif(
     _judge is None,

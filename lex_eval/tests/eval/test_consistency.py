@@ -29,7 +29,7 @@ def _same_model_cases():
     Only produces cases when a (question, LLM) pair has more than one
     captured response.
     """
-    grouped = group_by_question_and_llm()
+    grouped = group_by_question_and_llm(read_only=True)
     cases = []
     for key, records in sorted(grouped.items()):
         if len(records) < 2:

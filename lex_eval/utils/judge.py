@@ -13,11 +13,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import APIStatusError, OpenAI, RateLimitError
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,12 @@ def _parse_temperature(raw: str | None) -> float:
 OPENROUTER_JUDGE_TEMPERATURE: float = _parse_temperature(
     os.getenv("OPENROUTER_JUDGE_TEMPERATURE")
 )
+
+# Retries for transient errors (rate limits, 5xx) — running multiple
+# pytest-xdist workers concurrently makes these more likely than in a fully
+# serial run. Backoff: 1s, 2s, 4s.
+_MAX_RETRIES = 3
+_RETRY_BACKOFF_SECONDS = 1.0
 
 
 class OpenRouterJudge:
@@ -115,24 +122,43 @@ class OpenRouterJudge:
                 },
             }
 
-        try:
-            response = self._client.chat.completions.create(**kwargs)
-            content = response.choices[0].message.content or ""
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                response = self._client.chat.completions.create(**kwargs)
+                content = response.choices[0].message.content or ""
 
-            if not content.strip():
-                raise ValueError(
-                    f"Judge returned empty content for prompt (model={self._model})"
+                if not content.strip():
+                    raise ValueError(
+                        f"Judge returned empty content for prompt (model={self._model})"
+                    )
+
+                if schema is not None:
+                    data = json.loads(content)
+                    return schema(**data)
+
+                return content
+
+            except (RateLimitError, APIStatusError) as exc:
+                status_code = getattr(exc, "status_code", None)
+                retryable = isinstance(exc, RateLimitError) or (
+                    status_code is not None and status_code >= 500
                 )
-
-            if schema is not None:
-                data = json.loads(content)
-                return schema(**data)
-
-            return content
-
-        except Exception:
-            logger.exception("OpenRouter judge call failed")
-            raise
+                if not retryable or attempt == _MAX_RETRIES:
+                    logger.exception("OpenRouter judge call failed")
+                    raise
+                delay = _RETRY_BACKOFF_SECONDS * (2**attempt)
+                logger.warning(
+                    "OpenRouter judge call failed (%s), retrying in %.0fs "
+                    "(attempt %d/%d)",
+                    exc,
+                    delay,
+                    attempt + 1,
+                    _MAX_RETRIES,
+                )
+                time.sleep(delay)
+            except Exception:
+                logger.exception("OpenRouter judge call failed")
+                raise
 
 
 def get_judge() -> OpenRouterJudge | None:

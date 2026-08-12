@@ -65,7 +65,23 @@ def pytest_runtest_makereport(item, call):
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """Write collected metric data to the eval_results DuckDB table."""
+    """Write collected metric data to the eval_results DuckDB table.
+
+    Under pytest-xdist, this session is either a worker (one of several
+    subprocesses collecting/running a slice of the tests) or the controller
+    (the process that dispatches to workers and merges their results). DuckDB
+    allows only one read-write connection to a file at a time, so only the
+    controller may write here — if every worker wrote independently, their
+    near-simultaneous connections would race and lock-error. Workers are
+    identified by ``session.config.workerinput``, an attribute xdist sets
+    only on worker processes; ship each worker's records to the controller
+    via ``workeroutput`` instead, where ``pytest_testnodedown`` (below) picks
+    them up.
+    """
+    if hasattr(session.config, "workerinput"):
+        session.config.workeroutput["metric_records"] = dict(_metric_records)
+        return
+
     if not _metric_records:
         return
 
@@ -88,3 +104,15 @@ def pytest_sessionfinish(session, exitstatus):
     conn.commit()
     conn.close()
     print(f"\n📊 {total} eval result(s) written to {DEFAULT_DB}")
+
+
+def pytest_testnodedown(node, error):
+    """Merge a finished pytest-xdist worker's metric records into the controller's.
+
+    Runs only on the controller, once per worker, before the controller's own
+    ``pytest_sessionfinish`` — so by the time that hook writes to DuckDB, every
+    worker's results have already been folded into ``_metric_records``.
+    """
+    worker_records = (node.workeroutput or {}).get("metric_records", {})
+    for suite, records in worker_records.items():
+        _metric_records[suite].extend(records)

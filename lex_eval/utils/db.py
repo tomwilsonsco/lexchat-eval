@@ -137,10 +137,19 @@ INSERT INTO responses (
 """
 
 
-def get_connection(path: Path = DEFAULT_DB) -> duckdb.DuckDBPyConnection:
-    """Return a DuckDB connection, creating the file if it doesn't exist."""
+def get_connection(
+    path: Path = DEFAULT_DB, read_only: bool = False
+) -> duckdb.DuckDBPyConnection:
+    """Return a DuckDB connection, creating the file if it doesn't exist.
+
+    Pass ``read_only=True`` for read-only access. DuckDB's single-file format
+    allows multiple concurrent read-only connections but only one read-write
+    connection at a time — read-only mode is required for callers that may run
+    alongside other processes reading the same file (e.g. pytest-xdist workers
+    collecting tests in parallel).
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    return duckdb.connect(str(path))
+    return duckdb.connect(str(path), read_only=read_only)
 
 
 def init_db(conn: duckdb.DuckDBPyConnection) -> None:
@@ -238,6 +247,7 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
 def load_records(
     path: Optional[Path] = None,
     include_errors: bool = False,
+    read_only: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Load responses from the database and return them as flat record dicts::
@@ -246,15 +256,22 @@ def load_records(
          actual_output, retrieval_context, tools_called}
 
     Error rows are excluded unless *include_errors* is True.
+
+    Pass ``read_only=True`` when this may run concurrently with other readers
+    of the same file (e.g. pytest-xdist workers collecting tests in
+    parallel). Read-only connections can't run schema migrations, so callers
+    that pass it are responsible for having already migrated the schema via a
+    prior read-write connection (``run_evals.py`` does this once, up front).
     """
     path = path or DEFAULT_DB
     if not path.exists():
         return []
 
-    conn = get_connection(path)
+    conn = get_connection(path, read_only=read_only)
     try:
-        # Ensure the schema is migrated (adds new columns to existing DBs)
-        init_db(conn)
+        if not read_only:
+            # Ensure the schema is migrated (adds new columns to existing DBs)
+            init_db(conn)
         where = "" if include_errors else "WHERE NOT is_error"
         rows = conn.execute(f"""
             SELECT id, question_id, question, llm_name, timestamp,
@@ -347,13 +364,14 @@ def load_records(
 
 def group_by_question_and_llm(
     path: Optional[Path] = None,
+    read_only: bool = False,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Return records grouped by ``'Q{question_id}_{llm_name}'`` key.
 
     Excludes error rows.
     """
-    records = load_records(path)
+    records = load_records(path, read_only=read_only)
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in records:
         key = f"Q{r['question_id']}_{r['llm_name']}"
@@ -568,21 +586,26 @@ def clear_eval_results(
 def load_eval_results(
     path: Optional[Path] = None,
     suite: Optional[str] = None,
+    read_only: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Load eval results from the database.  Returns a list of dicts loaded from
     the `eval_results` DuckDB table.
 
     Optionally filter to a single suite (e.g. ``"groundedness"``).
+
+    Pass ``read_only=True`` when this may run concurrently with other readers
+    of the same file (see ``load_records`` for why).
     """
     path = path or DEFAULT_DB
     if not path.exists():
         return []
 
-    conn = get_connection(path)
+    conn = get_connection(path, read_only=read_only)
     try:
-        # Ensure the schema is migrated (adds new columns to existing DBs)
-        init_eval_results(conn)
+        if not read_only:
+            # Ensure the schema is migrated (adds new columns to existing DBs)
+            init_eval_results(conn)
         if suite:
             rows = conn.execute(
                 "SELECT llm_name, question_id, question, test_name, metric_name, "

@@ -16,6 +16,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 def load_records(
     filepath: Optional[Path] = None,
+    read_only: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Load all records from the DuckDB responses database.
@@ -25,8 +26,12 @@ def load_records(
          actual_output, retrieval_context, tools_called}
 
     Error rows are excluded.
+
+    Pass ``read_only=True`` at pytest collection time, since multiple
+    pytest-xdist workers may call this concurrently (see
+    ``db.load_records``).
     """
-    return _db_load_records(path=filepath)
+    return _db_load_records(path=filepath, read_only=read_only)
 
 
 def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
@@ -78,17 +83,20 @@ def group_by_question(
 def group_by_question_and_llm(
     records: Optional[List[Dict[str, Any]]] = None,
     filepath: Optional[Path] = None,
+    read_only: bool = False,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Group records by (question_id, llm_name) tuple key.
 
     Useful for testing repeatability of the same LLM on the same question
     when ``gather_responses.py`` is run with ``--append``.
+
+    Pass ``read_only=True`` at pytest collection time (see ``load_records``).
     """
     if records is None:
         from .db import group_by_question_and_llm as _db_group
 
-        return _db_group(path=filepath)
+        return _db_group(path=filepath, read_only=read_only)
 
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in records:

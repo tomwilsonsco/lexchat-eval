@@ -13,6 +13,11 @@ already has 1+ results in the suite's records, the test is skipped.
 Use ``--overwrite`` to force re-running all tests and replacing existing
 results.
 
+Tests run in parallel via pytest-xdist (``EVAL_WORKERS`` in lex_eval/.env,
+default 4). This mainly speeds up the AI-judge suites (groundedness,
+consistency_llm), which are otherwise a long serial chain of blocking
+OpenRouter calls. Use ``--workers 1`` to disable and run single-process.
+
 Examples
 --------
 Run everything (skipping already-completed tests):
@@ -38,13 +43,18 @@ Verbose output:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 _REPO_ROOT = str(Path(__file__).resolve().parent.parent)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
+
+load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 TESTS_DIR = Path(__file__).parent / "tests" / "eval"
 
@@ -55,6 +65,23 @@ SUITES = {
     "consistency_llm": "test_consistency_llm.py",
     "structure": "test_structure.py",
 }
+
+_DEFAULT_WORKERS = 4
+
+
+def _default_workers() -> int:
+    """Resolve the pytest-xdist worker count: EVAL_WORKERS env var, else 4."""
+    raw = os.getenv("EVAL_WORKERS")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_WORKERS
+    try:
+        return int(raw)
+    except ValueError:
+        print(
+            f"⚠️  EVAL_WORKERS={raw!r} is not a valid integer; "
+            f"falling back to {_DEFAULT_WORKERS}"
+        )
+        return _DEFAULT_WORKERS
 
 
 def _load_existing_results(suite: str) -> list[dict]:
@@ -185,6 +212,7 @@ def run_evals(
     overwrite: bool = False,
     extra_args: list[str] | None = None,
     llm: str | None = None,
+    workers: int | None = None,
 ) -> int:
     """
     Launch pytest against the evaluation test suite.
@@ -199,11 +227,18 @@ def run_evals(
             DEFAULT_DB,
             clear_eval_results,
             get_connection,
+            init_db,
             init_eval_results,
         )
 
         conn = get_connection(DEFAULT_DB)
         try:
+            # Migrate both tables' schemas here, up front, in this single
+            # read-write connection. Eval test modules load records/results
+            # via read-only connections (safe under parallel pytest-xdist
+            # workers) and skip migration themselves, so it must happen once
+            # before pytest starts.
+            init_db(conn)
             init_eval_results(conn)  # Ensure table exists first
             if overwrite:
                 clear_eval_results(conn, suite=s)
@@ -231,6 +266,14 @@ def run_evals(
                     f"ℹ️  {s}: skipping {n_skipped} test(s) with existing results "
                     f"(use --overwrite to force)"
                 )
+
+        # parallelise via pytest-xdist unless disabled (--workers 1); applied
+        # uniformly across suites so any future AI-judge suite benefits with
+        # no extra wiring, and fast/offline suites just pay a small
+        # worker-startup cost
+        n_workers = workers if workers is not None else _default_workers()
+        if n_workers != 1:
+            cmd.extend(["-n", str(n_workers)])
 
         # display
         cmd.extend(["-v" if verbose else "-q", "--tb=short"])
@@ -304,6 +347,17 @@ Dashboard:
         help="Overwrite existing results instead of skipping completed tests",
     )
     parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Parallel pytest-xdist workers for AI-judge calls (default: "
+            "EVAL_WORKERS env var, or 4). Use --workers 1 to disable "
+            "parallelism, e.g. for easier-to-read debugging output."
+        ),
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -323,6 +377,7 @@ Dashboard:
         overwrite=args.overwrite,
         extra_args=args.extra,
         llm=args.llm,
+        workers=args.workers,
     )
 
 

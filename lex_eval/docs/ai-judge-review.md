@@ -907,3 +907,127 @@ tokens of context, 62.1 s at 97k.
 **Reproduced judge failure:** q6 `mistral` run 2, Response Groundedness prompt, `temperature=0` — empty
 content at `max_tokens=4096` under both `json_schema` and `json_object`; valid JSON with no
 `response_format`; valid JSON scoring 5/5 at `max_tokens=16000`. Deterministic across repeats.
+
+---
+
+## 12 August 2026 update — the P0/P1/P2 "Implemented" work above never landed
+
+**Re-checked against the current checked-out tree and the live `responses.db`.**
+None of the "✅ Implemented" work this document describes (P0, P1, P2 items #12,
+#13, #15) is present in the committed codebase. `utils/judge.py` still hardcodes
+`max_tokens=4096` with no retry, no fallback, and no reasoning-effort handling;
+there is no `metrics/honest_gap.py`, `utils/sources.py`, `calibrate_judge.py`,
+`reference/as_record.py`, or `outcome`/`judge_model`/`judge_temperature` column on
+`eval_results`; `response_groundedness.py` was never renamed; `answer_relevancy.py`
+is still bundled in the `groundedness` suite; `pytest-xdist` is not a dependency
+and `conftest.py`'s `pytest_sessionfinish` is fully sequential. The only trace of
+that work is orphaned `.pyc` bytecode dated 2026-08-10/11 for exactly those
+missing files — the work was done and run in a past session, but its source was
+never committed, and the checked-out repo is the pre-change state. Everything
+above this line describes a version of the codebase that does not currently exist;
+read it as history, not as current fact.
+
+This also means every subsequent recommendation in this document (P1's six
+changes, P2's #11/#14, P3) was written against code that isn't there. Rather than
+treat the 19-item, four-phase list as a backlog to re-implement verbatim, the
+findings were re-derived from scratch: reading the current source directly and
+querying `lex_eval/data/responses.db` as it stands today (24 `legislation_only`
+records — 6 questions × 2 models × 2 runs). Three findings from the original
+review turn out to still be real and are re-confirmed on live data below; the
+rest were checked and are explicitly not being carried forward, either because
+current data doesn't support them or because pursuing them now would repeat the
+over-building this repository has already walked back once (see this repo's
+CLAUDE.md "Working style": three earlier metrics — Reference Links, First-pass
+Structure, Citation Precision — were removed for being individually defensible
+but collectively unmaintainable).
+
+### Findings re-verified on current data
+
+**1. The judge is silently failing on ~1/6 of all groundedness calls, and those
+failures are scored as the worst possible verdict.** The configured judge (`.env`:
+`OPENROUTER_JUDGE_MODEL=deepseek/deepseek-v4-flash-0731`) is a reasoning model.
+`judge.py`'s hardcoded `max_tokens=4096` means reasoning tokens can exhaust the
+budget before any content is written, and `generate()` turns an empty response
+into an exception. Queried directly from `eval_results`: **8 of 24 Research
+Groundedness rows, 2 of 24 Answer Relevancy rows, 2 of 24 Response Groundedness
+rows** carry `reason = "Judge error: Judge returned empty content..."` — 12 of 72
+groundedness calls (17%), every one written as `score=0.0, passed=False`,
+indistinguishable from a genuine fabrication verdict. Consequence: Research
+Groundedness — the one metric that discriminates — has a third of its "0.0" rows
+be infrastructure noise, not model failures, corrupting its headline number.
+Severity: 4/5. The fix already exists as *dead config*: `lex_eval/.env` already
+sets `OPENROUTER_JUDGE_MAX_TOKENS=16000`, `OPENROUTER_JUDGE_REASONING_EFFORT=low`,
+and `OPENROUTER_JUDGE_FALLBACK_MODEL=openai/gpt-5-mini` — `judge.py` reads none of
+the three. This is almost certainly the surviving `.env` half of the lost P0 work,
+missing the code that was supposed to consume it.
+
+**2. Truncation in Research Groundedness silently drops content today, not just
+hypothetically.** `_MAX_CONTEXT_CHARS ≈ 392,000` chars, and the loop `break`s at
+the first oversized item, discarding everything after it. Queried directly: **5 of
+24 stored records exceed 392,000 chars** of total retrieval context (up to 411,098
+chars across 97 items). Truncation is live on a fifth of the dataset, and the
+judge is never told anything was cut. Severity: 3/5.
+
+**3. Failure-cause conflation is real but its size depends on fixing #1 first.**
+Capture gates (`No retrieval context captured`, `Output too short`), judge infra
+errors (#1), and genuine 1/5 verdicts all write identical `score=0.0,
+passed=False` rows, and `streamlit_report.py`'s `_aggregate_metrics` has no
+branching on `reason` to tell them apart. Confirmed real, but most of its current
+weight is #1. Recommendation: fix #1 and #2 first and re-measure before adding any
+schema-level fix (nullable score, or an `outcome` column) — that column is
+exactly the kind of machinery that shouldn't be added before confirming it's still
+needed.
+
+### Checked and not carried forward
+
+- **Answer Relevancy / Response Groundedness saturation** — confirmed real
+  (excluding gate/infra rows: Answer Relevancy 18/20 = 90% at 1.00; Response
+  Groundedness 16/20 = 80% at 1.00) against Research Groundedness's genuine spread
+  (mean ≈0.375, full 0–1 range). But the genuine-verdict pools for all three are
+  currently contaminated by #1 (infra failures are excluded as 0.0 noise rather
+  than landing as real low or high scores), so this needs re-measuring after #1–#2
+  land before deciding whether either metric needs a rubric rewrite or a
+  replacement like the original §4.1 "Substantive Agreement" proposal.
+- **Untagged, flat `retrieval_context`** in Research Groundedness — confirmed real
+  in `audit_capture.py` (Phase-1 titles, section text, and full-Act dumps share one
+  untagged `List[str]`). But the current genuine-verdict reasons already read as
+  correct and well-evidenced ("fabricates specific fine amounts", "extensive
+  claims about the 2008/2011 Acts entirely absent from the retrieval context",
+  "reverses the actual reservation... and fabricates the NMC's establishment") —
+  no sign the judge is actually confused by the lack of tagging. Not pursuing the
+  `utils/sources.py` tagged-passage rebuild described in §3.1; it's real new
+  machinery (module, prompt section, schema field) for a failure mode not observed
+  in the data. Revisit only if a specific verdict is later shown to be wrong
+  because of it.
+- **Consistency (AI Judge) rubric critique** (§3.4: direction-dependent, rewards a
+  repeated non-answer) — read all 12 stored verdicts directly; they look
+  substantively correct (real contradictions scored 0.0, real scope drift scored
+  0.4, real minor differences scored 0.7) and none reproduce the "rewards a
+  clarifying-question loop" case on this dataset. No action; unconfirmed here.
+- **P2 items #11/#14 (reference-anchored metrics), the calibration harness,
+  defect-injection fixtures, `outcome`/`judge_model` columns, pytest-xdist** — all
+  either blocked on the same prerequisite this document already names (all 6
+  reference answers remain unverified drafts, see `docs/reference-answers.md`), or
+  are observability/DX work not needed to fix the actual numbers. Any of these
+  should go through this repo's one-metric-at-a-time proposal process if picked up
+  later, not as a bundle.
+
+### Recommended next steps (not yet implemented)
+
+1. **`lex_eval/utils/judge.py`** — read `OPENROUTER_JUDGE_MAX_TOKENS` (default
+   4096), `OPENROUTER_JUDGE_REASONING_EFFORT` (pass through OpenRouter's
+   `reasoning: {"effort": ...}` via `extra_body`, since it isn't a native
+   `chat.completions.create` kwarg), and `OPENROUTER_JUDGE_FALLBACK_MODEL` — all
+   three already sit unused in `.env`. On empty content, retry once at double the
+   token budget; if still empty and a fallback model is configured, retry once
+   more against it. No schema change, no new files.
+2. **`lex_eval/metrics/research_groundedness.py`** — change the truncation loop's
+   `break` to `continue`, and declare any truncation in the prompt (count of
+   omitted items; instruct the judge not to read their absence as evidence).
+3. **Re-measure**: `python lex_eval/run_evals.py --suite groundedness --overwrite`
+   and `--suite consistency_llm --overwrite`, then re-run the same queries used
+   above. If judge-error rows drop to near zero, #3's conflation problem is
+   largely moot and no schema change is needed. If Answer Relevancy / Response
+   Groundedness are still >85% saturated on the refreshed numbers, that's the
+   trigger for a single follow-up proposal — scoped and signed off on its own,
+   not decided here.
