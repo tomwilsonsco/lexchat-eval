@@ -39,6 +39,7 @@ def attach_metric(
     """
     request.node._metric_data = {
         "suite": suite,
+        "response_id": record.get("response_id"),
         "llm_name": record["llm_name"],
         "question_id": record["question_id"],
         "question": record["question"],

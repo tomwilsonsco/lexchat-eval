@@ -257,7 +257,7 @@ def load_records(
         init_db(conn)
         where = "" if include_errors else "WHERE NOT is_error"
         rows = conn.execute(f"""
-            SELECT question_id, question, llm_name, timestamp,
+            SELECT id, question_id, question, llm_name, timestamp,
                    actual_output, retrieval_context, tools_called, research_output,
                    research_mode, case_law_context, tool_sequence, fallback_used,
                    summarisation_output, summarisation_used, summarisation_llm,
@@ -273,6 +273,7 @@ def load_records(
 
     records = []
     for (
+        response_id,
         qid,
         question,
         llm_name,
@@ -313,6 +314,7 @@ def load_records(
         research_plan = json.loads(research_plan_json) if research_plan_json else None
         records.append(
             {
+                "response_id": response_id,
                 "question_id": qid,
                 "question": question,
                 "llm_name": llm_name,
@@ -479,21 +481,54 @@ CREATE TABLE IF NOT EXISTS eval_results (
     passed      BOOLEAN NOT NULL,
     reason      TEXT,
     error       TEXT,
-    tools_used  JSON
+    tools_used  JSON,
+    response_id INTEGER
 );
 """
+
+# Columns added after the initial schema; applied to existing databases via
+# init_eval_results, mirroring the _MIGRATE_RESPONSES pattern above.
+_MIGRATE_EVAL_RESULTS = [
+    # Foreign key to responses.id. NULL on rows written before this migration —
+    # there is no reliable way to backfill which response they scored.
+    "ALTER TABLE eval_results ADD COLUMN response_id INTEGER",
+]
 
 _INSERT_EVAL_RESULT = """
 INSERT INTO eval_results (
     suite, llm_name, question_id, question, test_name, metric_name,
-    score, threshold, passed, reason, error, tools_used
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    score, threshold, passed, reason, error, tools_used, response_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
 def init_eval_results(conn: duckdb.DuckDBPyConnection) -> None:
-    """Create the eval_results table and sequence if they don't already exist."""
+    """Create the eval_results table and sequence if they don't already exist.
+
+    Also applies column migrations so existing databases gain new fields.
+    """
     conn.execute(_CREATE_EVAL_RESULTS_TABLE)
+    for stmt in _MIGRATE_EVAL_RESULTS:
+        try:
+            conn.execute(stmt)
+        except duckdb.CatalogException:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            col_hint = (
+                stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
+            )
+            logger.debug("Migration skipped (column may already exist): %s", col_hint)
+        except Exception:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            col_hint = (
+                stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
+            )
+            logger.warning("Migration failed for column: %s", col_hint, exc_info=True)
 
 
 def insert_eval_result(
@@ -515,6 +550,7 @@ def insert_eval_result(
             record.get("reason") or None,
             record.get("error") or None,
             json.dumps(record.get("tools_used")),
+            record.get("response_id"),
         ],
     )
 
@@ -545,17 +581,19 @@ def load_eval_results(
 
     conn = get_connection(path)
     try:
+        # Ensure the schema is migrated (adds new columns to existing DBs)
+        init_eval_results(conn)
         if suite:
             rows = conn.execute(
                 "SELECT llm_name, question_id, question, test_name, metric_name, "
-                "score, threshold, passed, reason, error, tools_used "
+                "score, threshold, passed, reason, error, tools_used, response_id "
                 "FROM eval_results WHERE suite = ? ORDER BY id",
                 [suite],
             ).fetchall()
         else:
             rows = conn.execute(
                 "SELECT llm_name, question_id, question, test_name, metric_name, "
-                "score, threshold, passed, reason, error, tools_used "
+                "score, threshold, passed, reason, error, tools_used, response_id "
                 "FROM eval_results ORDER BY id"
             ).fetchall()
     finally:
@@ -574,6 +612,7 @@ def load_eval_results(
         reason,
         error,
         tools_used_json,
+        response_id,
     ) in rows:
         results.append(
             {
@@ -592,6 +631,7 @@ def load_eval_results(
                     if tools_used_json and tools_used_json != "null"
                     else None
                 ),
+                "response_id": response_id,
             }
         )
     return results
@@ -637,6 +677,7 @@ def make_deploy_db(
     try:
         # Ensure source schema is migrated (adds new columns to existing DBs)
         init_db(src)
+        init_eval_results(src)
         # Recreate schema in the destination
         init_db(dst)
         init_eval_results(dst)
@@ -729,7 +770,7 @@ def make_deploy_db(
         # Copy eval_results verbatim
         eval_rows = src.execute(
             "SELECT suite, llm_name, question_id, question, test_name, metric_name, "
-            "score, threshold, passed, reason, error, tools_used "
+            "score, threshold, passed, reason, error, tools_used, response_id "
             "FROM eval_results ORDER BY id"
         ).fetchall()
         for er in eval_rows:

@@ -64,33 +64,15 @@ def _load_existing_results(suite: str) -> list[dict]:
     return load_eval_results(DEFAULT_DB, suite=suite)
 
 
-def _covered_pairs(results: list[dict]) -> set[tuple[int, str]]:
-    """
-    Return the set of (question_id, llm_name) pairs that already have
-    at least one result in the `eval_results` DuckDB table.
-    """
-    pairs: set[tuple[int, str]] = set()
-    for r in results:
-        pairs.add((int(r["question_id"]), r["llm_name"]))
-    return pairs
-
-
-def _covered_triples(results: list[dict]) -> set[tuple[int, str, str]]:
-    """
-    Return the set of (question_id, llm_name, test_name) triples that already
-    have a result. Used for suites with multiple test functions per pair so that
-    a partially-run pair is not fully skipped.
-    """
-    triples: set[tuple[int, str, str]] = set()
-    for r in results:
-        triples.add((int(r["question_id"]), r["llm_name"], r["test_name"]))
-    return triples
+def _covered_triples(results: list[dict]) -> set[tuple[int, str]]:
+    """Return the set of (response_id, test_name) pairs already covered."""
+    return {(int(r["response_id"]), r["test_name"]) for r in results}
 
 
 def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     """
-    Build pytest ``--deselect`` arguments for test IDs whose (question_id, llm_name)
-    pairs already have results.
+    Build pytest ``--deselect`` arguments for test IDs that already have a
+    result for that *specific* response (via ``response_id``).
 
     If *llm* is given, only records matching that LLM name are considered.
 
@@ -103,11 +85,7 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     if not existing:
         return []
 
-    covered = _covered_pairs(existing)
-    if not covered:
-        return []
-
-    covered_triples = _covered_triples(existing)
+    covered = _covered_triples(existing)
 
     # Pytest appends a numeric suffix (0, 1, …) when multiple records share
     # the same base ID, so we must replicate that here.
@@ -125,77 +103,69 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
         pytest_ids.append(f"{bid}{n}")
         id_counts[bid] = n + 1
 
+    def _covered(record: dict, test_name: str) -> bool:
+        return (int(record["response_id"]), test_name) in covered
+
     deselect_args: list[str] = []
     for record, pid in zip(records, pytest_ids):
-        qid = int(record["question_id"])
-        rec_llm = record["llm_name"]
-        if (qid, rec_llm) in covered:
-            # deselect all test functions in this suite file for this parametrize ID
-            if suite == "groundedness":
-                # Check per-test-function so a partially-run pair isn't fully skipped
-                if (qid, rec_llm, "answer_relevancy") in covered_triples:
+        if suite == "groundedness":
+            for test_name, fn_name in (
+                ("answer_relevancy", "test_answer_relevancy"),
+                ("response_groundedness", "test_response_groundedness"),
+                ("research_groundedness", "test_research_groundedness"),
+            ):
+                if _covered(record, test_name):
                     deselect_args.extend(
                         [
                             "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_answer_relevancy[{pid}]",
+                            f"lex_eval/tests/eval/{test_file}::{fn_name}[{pid}]",
                         ]
                     )
-                if (qid, rec_llm, "response_groundedness") in covered_triples:
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_response_groundedness[{pid}]",
-                        ]
-                    )
-                if (qid, rec_llm, "research_groundedness") in covered_triples:
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_research_groundedness[{pid}]",
-                        ]
-                    )
-            elif suite == "tool_usage":
+        elif suite == "tool_usage":
+            if _covered(record, "tool_usage"):
                 deselect_args.extend(
                     [
                         "--deselect",
                         f"lex_eval/tests/eval/{test_file}::test_tool_usage[{pid}]",
                     ]
                 )
-            elif suite == "consistency":
+        elif suite == "consistency":
+            if _covered(record, "consistency"):
                 deselect_args.extend(
                     [
                         "--deselect",
                         f"lex_eval/tests/eval/{test_file}::test_consistency[{pid}]",
                     ]
                 )
-            elif suite == "structure":
-                # check per-test-function so a partially-run pair isn't fully skipped
-                if (qid, rec_llm, "mandatory_structure") in covered_triples:
+        elif suite == "structure":
+            for test_name, fn_name in (
+                ("mandatory_structure", "test_mandatory_structure"),
+                ("citation_passthrough", "test_citation_passthrough"),
+            ):
+                if _covered(record, test_name):
                     deselect_args.extend(
                         [
                             "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_mandatory_structure[{pid}]",
-                        ]
-                    )
-                if (qid, rec_llm, "citation_passthrough") in covered_triples:
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_citation_passthrough[{pid}]",
+                            f"lex_eval/tests/eval/{test_file}::{fn_name}[{pid}]",
                         ]
                     )
 
-    # consistency_llm is parametrized by (question, LLM) group, not individual record
+    # consistency_llm is parametrized by (question, LLM) group, not individual
+    # record, and evaluates one result per group rather than per response — so
+    # it stays pair-based by design.
     if suite == "consistency_llm":
         from lex_eval.utils.test_helpers import group_by_question_and_llm
 
+        covered_pairs = {
+            (int(r["question_id"]), r["llm_name"]) for r in existing
+        }
         deselect_args = []
         for key, grp_records in sorted(group_by_question_and_llm().items()):
             if len(grp_records) < 2:
                 continue
             qid = int(grp_records[0]["question_id"])
             rec_llm = grp_records[0]["llm_name"]
-            if (qid, rec_llm) in covered:
+            if (qid, rec_llm) in covered_pairs:
                 deselect_args.extend(
                     [
                         "--deselect",
