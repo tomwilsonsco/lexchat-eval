@@ -78,6 +78,25 @@ METRIC_TOOLTIPS: dict[str, str] = {
 # comparing multiple
 _AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)", "Consistency (AI Judge)"}
 
+# Reason prefixes written by judge exceptions and harness capture gates (see
+# metrics/*.py except blocks, tests/eval/test_groundedness.py gate functions,
+# and structure.py's delegate_research precondition). Rows carrying one of
+# these are not a genuine quality verdict — excluded from the mean, reported
+# separately instead of averaged in as 0.0.
+_NON_SCORED_PREFIXES = (
+    "Judge error:",
+    "Output too short",
+    "No retrieval context captured",
+    "No research output captured",
+    "No reference outputs to compare against.",
+    "No 'delegate_research' tool call found;",
+)
+
+
+def _is_scored(result: dict) -> bool:
+    reason = result.get("reason") or ""
+    return not reason.startswith(_NON_SCORED_PREFIXES)
+
 
 def _metric_sort_key(metric: dict) -> int:
     name = metric["metric_name"]
@@ -103,20 +122,27 @@ def _aggregate_metrics(results: list[dict]) -> list[dict]:
     aggregated: list[dict] = []
     for metric_name, metric_results in by_metric.items():
         if metric_name in _AGGREGATE_ONLY_METRICS:
-            aggregated.append(metric_results[0])
+            aggregated.append(
+                {**metric_results[0], "scored": _is_scored(metric_results[0])}
+            )
         else:
-            scores = [r["score"] for r in metric_results]
-            mean_score = sum(scores) / len(scores)
+            scored = [r for r in metric_results if _is_scored(r)]
+            not_scored = [r for r in metric_results if not _is_scored(r)]
+            scores = [r["score"] for r in scored]
+            mean_score = sum(scores) / len(scores) if scores else 0.0
             aggregated.append(
                 {
                     **metric_results[0],
                     "score": mean_score,
-                    "min_score": min(scores),
-                    "max_score": max(scores),
+                    "min_score": min(scores) if scores else 0.0,
+                    "max_score": max(scores) if scores else 0.0,
                     "n_runs": len(metric_results),
                     "test_names": [r["test_name"] for r in metric_results],
                     "raw_results": metric_results,
-                    "passed": mean_score >= metric_results[0]["threshold"],
+                    "passed": bool(scores) and mean_score >= metric_results[0]["threshold"],
+                    "scored": bool(scores),
+                    "not_scored_count": len(not_scored),
+                    "not_scored_reasons": [r["reason"] for r in not_scored],
                 }
             )
     return sorted(aggregated, key=_metric_sort_key)
@@ -182,9 +208,13 @@ def _status_icon(passed: bool) -> str:
 
 
 def _get_llm_pass_rate(llm: str, hierarchy: dict) -> float:
-    """Calculate the overall pass rate for an LLM."""
+    """Calculate the overall pass rate for an LLM.
+
+    Metric groups with nothing scored (every run a judge error or capture
+    gate) are excluded entirely, not counted as failed.
+    """
     q_data = hierarchy.get(llm, {})
-    all_m = [r for results in q_data.values() for r in results]
+    all_m = [r for results in q_data.values() for r in results if r.get("scored", True)]
     total = len(all_m)
     return (sum(1 for r in all_m if r["passed"]) / total) if total else 0.0
 
@@ -196,17 +226,20 @@ def _render_top_summary(hierarchy: dict) -> None:
         hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)
     ):
         q_data = hierarchy[llm]
-        all_m = [r for results in q_data.values() for r in results]
+        all_results = [r for results in q_data.values() for r in results]
+        all_m = [r for r in all_results if r.get("scored", True)]
+        n_na = len(all_results) - len(all_m)
         total = len(all_m)
         passed = sum(1 for r in all_m if r["passed"])
         failed = total - passed
         pct = passed / total * 100 if total else 0.0
         pct_colour = "#3fb950" if pct >= 80 else "#f0ad4e" if pct >= 50 else "#f85149"
 
+        na_part = f" &nbsp; N/A: **{n_na}**" if n_na else ""
         label = (
             f"**{llm}** &nbsp;|&nbsp; "
             f"Passed: **{passed}** &nbsp; Failed: **{failed}** &nbsp; "
-            f"Total: **{total}** &nbsp; Pass Rate: **{pct:.1f}%**"
+            f"Total: **{total}**{na_part} &nbsp; Pass Rate: **{pct:.1f}%**"
         )
 
         with st.expander(label, expanded=False):
@@ -269,7 +302,9 @@ def _render_top_summary(hierarchy: dict) -> None:
 
 def _render_llm_summary_bar(llm: str, q_data: dict[int, list[dict]]) -> None:
     """header stats for an LLM"""
-    all_m = [r for results in q_data.values() for r in results]
+    all_m = [
+        r for results in q_data.values() for r in results if r.get("scored", True)
+    ]
     total = len(all_m)
     passed = sum(1 for r in all_m if r["passed"])
     pct = passed / total * 100 if total else 0.0
@@ -293,21 +328,43 @@ def _render_metric_summary_table(metrics: list[dict]) -> None:
         threshold = m["threshold"]
         passed = m["passed"]
         has_range = "min_score" in m and "max_score" in m
+        not_scored_count = m.get("not_scored_count", 0)
 
-        badge = _score_badge(score)
-        status = _status_icon(passed)
-
-        if has_range:
-            min_s = m["min_score"]
-            max_s = m["max_score"]
+        if not m.get("scored", True):
+            # Every run in this group was a judge error or capture gate —
+            # nothing to show a score or pass/fail status for.
             score_cell = (
-                f"{badge}"
-                f'&nbsp;<span style="font-size:0.78em;color:#8b949e;">'
-                f"min&nbsp;<code>{min_s:.3f}</code>&nbsp;"
-                f"max&nbsp;<code>{max_s:.3f}</code></span>"
+                '<span style="background:#30363d;color:#8b949e;padding:2px 8px;'
+                'border-radius:4px;font-family:monospace;font-size:0.85em;'
+                'font-weight:600;" title="No run produced a quality verdict '
+                '(judge error or capture gate)">N/A</span>'
+            )
+            status = (
+                '<span style="color:#8b949e;font-weight:600;">Not scored</span>'
             )
         else:
-            score_cell = badge
+            badge = _score_badge(score)
+            status = _status_icon(passed)
+
+            if has_range:
+                min_s = m["min_score"]
+                max_s = m["max_score"]
+                score_cell = (
+                    f"{badge}"
+                    f'&nbsp;<span style="font-size:0.78em;color:#8b949e;">'
+                    f"min&nbsp;<code>{min_s:.3f}</code>&nbsp;"
+                    f"max&nbsp;<code>{max_s:.3f}</code></span>"
+                )
+            else:
+                score_cell = badge
+
+            if not_scored_count:
+                score_cell += (
+                    f'&nbsp;<span style="font-size:0.78em;color:#d29922;" '
+                    f'title="Excluded from the mean: judge errors or capture '
+                    f'gates, not quality verdicts">&#9888; {not_scored_count} '
+                    f"not scored</span>"
+                )
 
         tooltip = METRIC_TOOLTIPS.get(name, "")
         if tooltip:
@@ -352,11 +409,16 @@ def _render_metric_detail(metrics: list[dict]) -> None:
     for m in metrics:
         name = m["metric_name"]
         has_range = "min_score" in m
-        icon = _status_icon(m["passed"])
-
-        st.markdown(
-            f"**{name}** {icon} - score: `{m['score']:.3f}`", unsafe_allow_html=True
-        )
+        if m.get("scored", True):
+            icon = _status_icon(m["passed"])
+            st.markdown(
+                f"**{name}** {icon} - score: `{m['score']:.3f}`",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"**{name}** :grey[Not scored] - no run produced a quality verdict"
+            )
         with st.container():
             if has_range:
                 n = m.get("n_runs", len(m.get("raw_results", [])))
@@ -367,6 +429,16 @@ def _render_metric_detail(metrics: list[dict]) -> None:
                     f"**Threshold:** `{m['threshold']:.3f}` &nbsp;|&nbsp; "
                     f"**Runs:** `{n}`"
                 )
+                not_scored_reasons = m.get("not_scored_reasons") or []
+                if not_scored_reasons:
+                    reasons_list = "; ".join(
+                        html.escape(reason) for reason in not_scored_reasons
+                    )
+                    st.markdown(
+                        f":orange[**{len(not_scored_reasons)} run(s) not scored** "
+                        f"(excluded from the mean above, not a quality verdict): "
+                        f"{reasons_list}]"
+                    )
                 for idx, raw in enumerate(m.get("raw_results", []), 1):
                     _render_single_eval_result(raw, run_label=f"Run {idx}")
             else:
@@ -377,10 +449,17 @@ def _render_metric_detail(metrics: list[dict]) -> None:
 
 def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
     """one raw eval result entry."""
-    passed = r["passed"]
-    colour = "#3fb950" if passed else "#f85149"
-    label = "Passed" if passed else "Failed"
     prefix = f"{run_label}: " if run_label else ""
+
+    if _is_scored(r):
+        passed = r["passed"]
+        colour = "#3fb950" if passed else "#f85149"
+        label = "Passed" if passed else "Failed"
+        score_text = f"{r['score']:.3f}"
+    else:
+        colour = "#8b949e"
+        label = "N/A"
+        score_text = "not scored"
 
     st.markdown(
         f'<div style="background:#0d1117;border-left:3px solid {colour};'
@@ -388,7 +467,7 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         f'<span style="color:#8b949e;font-size:0.8em;">'
         f'{prefix}{r.get("test_name","")}</span>&nbsp;&nbsp;'
         f'<span style="color:{colour};font-size:0.85em;font-weight:600;">{label}</span>'
-        f"&nbsp;&nbsp;score: <code>{r['score']:.3f}</code>"
+        f"&nbsp;&nbsp;score: <code>{score_text}</code>"
         f'<div style="color:#8b949e;font-size:0.85em;margin-top:6px;">'
         f'{r.get("reason","")}</div>'
         f"</div>",
@@ -714,9 +793,10 @@ def _render_question_block(
     response_records: list[dict],
 ) -> None:
     """Full block for one question within an LLM section."""
-    all_pass = all(m["passed"] for m in metrics)
-    n_pass = sum(1 for m in metrics if m["passed"])
-    n_total = len(metrics)
+    scored_metrics = [m for m in metrics if m.get("scored", True)]
+    all_pass = all(m["passed"] for m in scored_metrics)
+    n_pass = sum(1 for m in scored_metrics if m["passed"])
+    n_total = len(scored_metrics)
 
     # Determine the colour for the metric count
     count_colour = "#3fb950" if n_pass == n_total else "#f85149"

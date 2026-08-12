@@ -13,7 +13,9 @@ from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 from pydantic import BaseModel
 
-_MAX_CONTEXT_CHARS: int = (128_000 - 30_000) * 4  # ≈ 392 000 chars
+# The configured judge (deepseek-v4-flash-0731) has a 1,048,576-token context
+# window, not the 128k this was originally sized for.
+_MAX_CONTEXT_CHARS: int = (1_048_576 - 30_000) * 4  # ≈ 4 074 304 chars
 
 
 class _GroundednessJudgement(BaseModel):
@@ -26,7 +28,7 @@ _PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to score w
 
 Raw Retrieval Context:
 {retrieval_context}
-
+{truncation_note}
 Research Agent Output:
 {research_output}
 
@@ -75,19 +77,31 @@ class ResearchGroundednessMetric(BaseMetric):
         self.success = False
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        # Join and truncate retrieval context to stay within token budget
+        # Join retrieval context items, skipping (not truncating the whole
+        # list at) any individual item too large to fit the remaining budget.
         context_items = test_case.retrieval_context or []
         kept: list[str] = []
+        omitted = 0
         total = 0
         for item in context_items:
             if total + len(item) > _MAX_CONTEXT_CHARS:
-                break
+                omitted += 1
+                continue
             kept.append(item)
             total += len(item)
         retrieval_context_str = "\n\n".join(kept)
 
+        truncation_note = (
+            f"\n({omitted} further retrieval item(s) omitted for length; "
+            "do not treat their absence as evidence that something is "
+            "unsupported.)\n"
+            if omitted
+            else ""
+        )
+
         prompt = _PROMPT_TEMPLATE.format(
             retrieval_context=retrieval_context_str,
+            truncation_note=truncation_note,
             research_output=self.research_output,
         )
         try:

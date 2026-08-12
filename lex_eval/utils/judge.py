@@ -29,7 +29,38 @@ load_dotenv(dotenv_path=_env_path)
 OPENROUTER_API_KEY: str | None = os.getenv("OPENROUTER_API_KEY")
 _DEFAULT_MODEL = "openai/gpt-4o"
 _DEFAULT_TEMPERATURE = 0.0
+_DEFAULT_MAX_TOKENS = 4096
 OPENROUTER_JUDGE_MODEL: str = os.getenv("OPENROUTER_JUDGE_MODEL", _DEFAULT_MODEL)
+
+
+def _parse_max_tokens(raw: str | None) -> int:
+    """Parse the OPENROUTER_JUDGE_MAX_TOKENS env var.
+
+    Returns the default on missing/invalid input, logging a warning.
+    """
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_MAX_TOKENS
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "OPENROUTER_JUDGE_MAX_TOKENS=%r is not a valid int; falling back to %s",
+            raw,
+            _DEFAULT_MAX_TOKENS,
+        )
+        return _DEFAULT_MAX_TOKENS
+    return value
+
+
+OPENROUTER_JUDGE_MAX_TOKENS: int = _parse_max_tokens(
+    os.getenv("OPENROUTER_JUDGE_MAX_TOKENS")
+)
+OPENROUTER_JUDGE_REASONING_EFFORT: str | None = os.getenv(
+    "OPENROUTER_JUDGE_REASONING_EFFORT"
+) or None
+OPENROUTER_JUDGE_FALLBACK_MODEL: str | None = (
+    os.getenv("OPENROUTER_JUDGE_FALLBACK_MODEL") or None
+)
 
 
 def _parse_temperature(raw: str | None) -> float:
@@ -84,29 +115,32 @@ class OpenRouterJudge:
         self._temperature = (
             temperature if temperature is not None else OPENROUTER_JUDGE_TEMPERATURE
         )
+        self._max_tokens = OPENROUTER_JUDGE_MAX_TOKENS
         self._client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
         )
 
-    def generate(self, prompt: str, schema: type[BaseModel] | None = None) -> Any:
-        """Send a prompt to the OpenRouter model and return the response.
+    def _call(
+        self, model: str, prompt: str, max_tokens: int, schema: type[BaseModel] | None
+    ) -> Any:
+        """Make one judge call (with retry on transient rate-limit/5xx errors).
 
-        Args:
-            prompt: The prompt string to send.
-            schema: Optional Pydantic model; the response will be
-                    parsed into an instance of this model via JSON mode.
-
-        Returns:
-            A parsed Pydantic model instance if *schema* is provided,
-            otherwise the plain response text.
+        Raises ValueError if the model returns empty content — that is a
+        reasoning-budget exhaustion, not a transient error, and is handled by
+        the retry/fallback ladder in generate().
         """
         kwargs: dict[str, Any] = {
-            "model": self._model,
+            "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": self._temperature,
-            "max_tokens": 4096,
+            "max_tokens": max_tokens,
         }
+
+        if OPENROUTER_JUDGE_REASONING_EFFORT is not None:
+            kwargs["extra_body"] = {
+                "reasoning": {"effort": OPENROUTER_JUDGE_REASONING_EFFORT}
+            }
 
         if schema is not None:
             # Use structured output (JSON Schema mode) when a schema is provided.
@@ -129,7 +163,7 @@ class OpenRouterJudge:
 
                 if not content.strip():
                     raise ValueError(
-                        f"Judge returned empty content for prompt (model={self._model})"
+                        f"Judge returned empty content for prompt (model={model})"
                     )
 
                 if schema is not None:
@@ -159,6 +193,45 @@ class OpenRouterJudge:
             except Exception:
                 logger.exception("OpenRouter judge call failed")
                 raise
+
+    def generate(self, prompt: str, schema: type[BaseModel] | None = None) -> Any:
+        """Send a prompt to the OpenRouter model and return the response.
+
+        On empty content (the judge exhausted its reasoning budget), retries
+        once at double `max_tokens`, then once more against
+        OPENROUTER_JUDGE_FALLBACK_MODEL if that is configured and still empty.
+
+        Args:
+            prompt: The prompt string to send.
+            schema: Optional Pydantic model; the response will be
+                    parsed into an instance of this model via JSON mode.
+
+        Returns:
+            A parsed Pydantic model instance if *schema* is provided,
+            otherwise the plain response text.
+        """
+        try:
+            return self._call(self._model, prompt, self._max_tokens, schema)
+        except ValueError:
+            logger.warning(
+                "Judge returned empty content at max_tokens=%d, retrying at %d",
+                self._max_tokens,
+                self._max_tokens * 2,
+            )
+
+        try:
+            return self._call(self._model, prompt, self._max_tokens * 2, schema)
+        except ValueError:
+            if OPENROUTER_JUDGE_FALLBACK_MODEL is None:
+                raise
+            logger.warning(
+                "Judge still returned empty content after retry, falling back to %s",
+                OPENROUTER_JUDGE_FALLBACK_MODEL,
+            )
+
+        return self._call(
+            OPENROUTER_JUDGE_FALLBACK_MODEL, prompt, self._max_tokens * 2, schema
+        )
 
 
 def get_judge() -> OpenRouterJudge | None:
