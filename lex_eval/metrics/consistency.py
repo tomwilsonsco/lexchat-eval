@@ -6,21 +6,39 @@ question, either from the same LLM (repeatability) or across different LLMs
 Uses TF vectorisation (no IDF) with cosine similarity. Skipping IDF ensures
 that shared legal terminology is not down-weighted when comparing a small
 number of responses, giving more meaningful scores.
+
+Cosine similarity alone can't see a single flipped section number or Act
+buried among hundreds of otherwise-identical tokens, so responses are also
+checked for citing the exact same legislation.gov.uk section citations.
 """
 
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from typing import List
+from typing import List, Optional, Set
 import numpy as np
 import re
+
+_SECTION_CITATION_RE = re.compile(
+    r"(?:https?://)?(?:www\.)?legislation\.gov\.uk/[^\s)]+?/section/\d+",
+    re.IGNORECASE,
+)
 
 
 def _preprocess(text: str) -> str:
     """Strip markdown formatting and normalise whitespace."""
+    # Drop markdown link targets (keeping the visible link text): every
+    # citation shares the same legislation.gov.uk URL prefix, which would
+    # otherwise inflate similarity with content-free boilerplate.
+    text = re.sub(r"\]\([^)]*\)", " ", text)
     text = re.sub(r"[*_#>`\[\]()]", " ", text)
     return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def _extract_citations(text: str) -> Set[str]:
+    """Return the set of legislation.gov.uk section citation URLs in *text*."""
+    return {m.group(0).lower().rstrip("/") for m in _SECTION_CITATION_RE.finditer(text or "")}
 
 
 def _vectorize(texts: List[str]):
@@ -52,6 +70,13 @@ class ConsistencyMetric(BaseMetric):
     terminology retains its full weight rather than being penalised for
     appearing across the small comparison corpus. Cosine similarity then
     captures directional agreement independent of response length.
+
+    Alongside the cosine score, the response fails if it cites any
+    legislation.gov.uk section that isn't cited, or omits one that is
+    cited, in every reference response. This catches a flipped section
+    number or Act that cosine similarity is too coarse to notice. The
+    check is skipped when the response has no section citations at all
+    (the Worker prompt allows bold-text citation as a fallback).
 
     Args:
         reference_outputs: Other answers to compare against.
@@ -104,13 +129,40 @@ class ConsistencyMetric(BaseMetric):
 
         sims = cosine_similarity(actual_vec, ref_vecs)[0]
         self.score = float(np.mean(sims))
-        self.success = self.score >= self.threshold
+
+        citation_mismatch = self._find_citation_mismatch(test_case.actual_output or "")
+
+        self.success = self.score >= self.threshold and citation_mismatch is None
         self.reason = (
             f"Mean cosine similarity: {self.score:.3f} "
             f"(across {len(all_texts)} responses, "
             f"threshold: {self.threshold})"
         )
+        if citation_mismatch is not None:
+            self.reason += f". Section citations differ from a reference: {citation_mismatch}"
         return self.score
+
+    def _find_citation_mismatch(self, actual_raw: str) -> Optional[str]:
+        """
+        Return a description of the first reference whose cited
+        legislation.gov.uk sections differ from the response's, or None if
+        the response has no citations to check or all references agree.
+        """
+        actual_citations = _extract_citations(actual_raw)
+        if not actual_citations:
+            return None
+
+        for ref_raw in self.reference_outputs:
+            ref_citations = _extract_citations(ref_raw)
+            if ref_citations != actual_citations:
+                missing = actual_citations - ref_citations
+                extra = ref_citations - actual_citations
+                return (
+                    f"missing {sorted(missing)}, extra {sorted(extra)}"
+                    if missing or extra
+                    else "citation sets differ"
+                )
+        return None
 
     def is_successful(self) -> bool:
         return self.success
