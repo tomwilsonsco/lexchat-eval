@@ -4,8 +4,9 @@ Metrics that validate Worker Agent output quality.
 MandatoryStructureMetric  — checks the 4-part Markdown heading structure.
 CitationPassthroughMetric — checks that Worker references reach the final response.
 CitationGroundingMetric   — checks that Worker citations were actually retrieved.
+CitationDomainMetric      — checks that Worker citation URLs are on legislation.gov.uk.
 
-All three metrics inspect the ``delegate_research`` tool-call output, which is where
+All four metrics inspect the ``delegate_research`` tool-call output, which is where
 the Worker Agent's response is surfaced.
 """
 
@@ -363,3 +364,85 @@ class CitationGroundingMetric(BaseMetric):
     @property
     def __name__(self) -> str:  # type: ignore[override]
         return "Citation Grounding"
+
+
+_ALLOWED_CITATION_DOMAIN = "legislation.gov.uk"
+
+
+class CitationDomainMetric(BaseMetric):
+    """
+    Checks that every citation URL in the Worker's report points to
+    legislation.gov.uk, the only domain the Worker's system prompt permits
+    ("Do not invent URLs for domains other than legislation.gov.uk").
+
+    Score:
+        0.0  — no delegate_research call found; domains cannot be verified.
+        1.0  — no citation URLs in Worker output (nothing to check).
+        0.0  — one or more citation URLs point to a different domain.
+        1.0  — every citation URL is on legislation.gov.uk.
+
+    No partial credit, same reasoning as Citation Grounding: one invented
+    domain is a full failure regardless of how many other citations are fine.
+    """
+
+    def __init__(self, threshold: float = 1.0) -> None:
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        dr_output = _get_delegate_output(test_case)
+
+        if dr_output is None:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "citation domains cannot be verified."
+            )
+            return self.score
+
+        cited_urls = set(_URL_RE.findall(dr_output))
+
+        if not cited_urls:
+            self.score = 1.0
+            self.success = True
+            self.reason = "No citation URLs found in Worker output; nothing to check."
+            return self.score
+
+        def _on_allowed_domain(url: str) -> bool:
+            netloc = urlparse(url).netloc.lower()
+            return netloc == _ALLOWED_CITATION_DOMAIN or netloc.endswith(
+                f".{_ALLOWED_CITATION_DOMAIN}"
+            )
+
+        off_domain = {u for u in cited_urls if not _on_allowed_domain(u)}
+
+        if off_domain:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"Off-domain citation(s): {sorted(off_domain)} do not point to "
+                f"{_ALLOWED_CITATION_DOMAIN}, the only domain the Worker's "
+                "system prompt permits."
+            )
+        else:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                f"All {len(cited_urls)} citation URL(s) are on "
+                f"{_ALLOWED_CITATION_DOMAIN}."
+            )
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Citation Domain"

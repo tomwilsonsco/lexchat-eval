@@ -6,6 +6,7 @@ from .consistency_llm import LLMConsistencyMetric
 from .research_groundedness import ResearchGroundednessMetric
 from .response_groundedness import ResponseGroundednessMetric
 from .structure import (
+    CitationDomainMetric,
     CitationGroundingMetric,
     CitationPassthroughMetric,
     MandatoryStructureMetric,
@@ -16,6 +17,7 @@ __all__ = [
     "ConsistencyMetric",
     "LegalAnswerRelevancyMetric",
     "LLMConsistencyMetric",
+    "CitationDomainMetric",
     "CitationGroundingMetric",
     "CitationPassthroughMetric",
     "MandatoryStructureMetric",

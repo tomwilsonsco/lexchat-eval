@@ -18,6 +18,7 @@ failing score.
 import pytest
 
 from lex_eval.metrics.structure import (
+    CitationDomainMetric,
     CitationGroundingMetric,
     CitationPassthroughMetric,
     MandatoryStructureMetric,
@@ -123,6 +124,39 @@ def test_citation_grounding(request, record):
         request,
         record=record,
         test_name="citation_grounding",
+        metric_name=metric.__name__,
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason,
+        suite="structure",
+    )
+
+    assert metric.is_successful(), metric.reason
+
+
+@pytest.mark.parametrize(
+    "record",
+    records,
+    ids=[record_id(r) for r in records],
+)
+@pytest.mark.structure
+def test_citation_domain(request, record):
+    """
+    Every citation URL in the Worker output must point to legislation.gov.uk,
+    the only domain the Worker's system prompt permits.
+
+    Records with no delegate_research call automatically score 0.0.
+    Records with no citation URLs at all score 1.0 (nothing to check).
+    """
+    test_case = record_to_test_case(record)
+    metric = CitationDomainMetric(threshold=1.0)
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="citation_domain",
         metric_name=metric.__name__,
         score=metric.score,
         threshold=metric.threshold,
