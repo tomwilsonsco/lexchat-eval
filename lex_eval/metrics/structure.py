@@ -29,29 +29,39 @@ _URL_RE = re.compile(r"https?://[^\s\)\]>,\"']+")
 # alternatives. The summary heading accepts both "Summary Answer (BLUF)"
 # and "Summary Answer" — the (BLUF) qualifier is a stylistic hint in the
 # Worker system prompt (see LexChat/server_py/src/config.py), not a
-# semantic requirement, so either form passes.
+# semantic requirement, so either form passes. Likewise "Jurisdiction &
+# Status"/"Jurisdiction & Currency" accept the spelled-out "and" — models
+# routinely paraphrase the prompt's literal "&" this way.
 REQUIRED_HEADINGS = {
     "legislation_only": [
         ["Summary Answer (BLUF)", "Summary Answer"],
         "Detailed Analysis",
-        "Jurisdiction & Status",
+        ["Jurisdiction & Status", "Jurisdiction and Status"],
         "References",
     ],
     "case_law_only": [
         ["Summary Answer (BLUF)", "Summary Answer"],
         "Key Cases",
         "Analysis",
-        "Jurisdiction & Currency",
+        ["Jurisdiction & Currency", "Jurisdiction and Currency"],
         "References",
     ],
     "legislation_and_case_law": [
         ["Summary Answer (BLUF)", "Summary Answer"],
         "Statutory Framework",
         "Key Cases",
-        "Jurisdiction & Status",
+        ["Jurisdiction & Status", "Jurisdiction and Status"],
         "References",
     ],
 }
+
+# A heading match must sit at the start of its line, after only "decoration"
+# characters (whitespace, #, *, digits, '.', '-', ':') — this is what lets a
+# bare substring check for something like "References" tell a real heading
+# apart from the word appearing mid-sentence in ordinary legal prose (e.g.
+# "references to the 1978 Act..."), without requiring a literal Markdown
+# '#' that real Worker output doesn't always use.
+_HEADING_LINE_PREFIX = r"[\s#*\d.\-:]*"
 
 
 def _get_delegate_output(test_case: LLMTestCase) -> str | None:
@@ -109,7 +119,12 @@ class MandatoryStructureMetric(BaseMetric):
 
         def _heading_present(heading) -> bool:
             variants = heading if isinstance(heading, list) else [heading]
-            return any(v.lower() in lowered for v in variants)
+            return any(
+                re.search(
+                    rf"(?m)^{_HEADING_LINE_PREFIX}{re.escape(v.lower())}", lowered
+                )
+                for v in variants
+            )
 
         missing = [h for h in headings if not _heading_present(h)]
 
