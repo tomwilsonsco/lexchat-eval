@@ -318,6 +318,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Reference Links | Are all reference links found by the researcher included in the final answer given to the user. |
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |
 | Citation Domain | Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite. |
+| Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity, and check the same legislation section citations appear in every answer. |
 | Consistency (AI Judge) | AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information. |
 | Answer Relevancy | AI as a judge metric: Measures how directly and completely the response addresses the user's question, penalising vague answers and irrelevant content. |

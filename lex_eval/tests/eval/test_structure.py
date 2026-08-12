@@ -21,6 +21,7 @@ from lex_eval.metrics.structure import (
     CitationDomainMetric,
     CitationGroundingMetric,
     CitationPassthroughMetric,
+    GenuineGapMetric,
     MandatoryStructureMetric,
 )
 from lex_eval.utils.collector import attach_metric
@@ -157,6 +158,41 @@ def test_citation_domain(request, record):
         request,
         record=record,
         test_name="citation_domain",
+        metric_name=metric.__name__,
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason,
+        suite="structure",
+    )
+
+    assert metric.is_successful(), metric.reason
+
+
+@pytest.mark.parametrize(
+    "record",
+    records,
+    ids=[record_id(r) for r in records],
+)
+@pytest.mark.structure
+def test_genuine_gap(request, record):
+    """
+    When retrieval returned no usable legislation section/full-text content,
+    the Worker's report must disclose this rather than answering anyway.
+
+    Records with no delegate_research call automatically score 0.0.
+    Records outside legislation_only mode score 1.0 (not applicable).
+    Records where retrieval succeeded score 1.0 (nothing to disclose).
+    """
+    test_case = record_to_test_case(record)
+    research_mode = record.get("research_mode", "legislation_only")
+    metric = GenuineGapMetric(threshold=1.0, research_mode=research_mode)
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="genuine_gap",
         metric_name=metric.__name__,
         score=metric.score,
         threshold=metric.threshold,

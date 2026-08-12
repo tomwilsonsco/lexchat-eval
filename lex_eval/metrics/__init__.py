@@ -9,6 +9,7 @@ from .structure import (
     CitationDomainMetric,
     CitationGroundingMetric,
     CitationPassthroughMetric,
+    GenuineGapMetric,
     MandatoryStructureMetric,
 )
 from .tool_usage import ToolUsageMetric
@@ -20,6 +21,7 @@ __all__ = [
     "CitationDomainMetric",
     "CitationGroundingMetric",
     "CitationPassthroughMetric",
+    "GenuineGapMetric",
     "MandatoryStructureMetric",
     "ResearchGroundednessMetric",
     "ResponseGroundednessMetric",

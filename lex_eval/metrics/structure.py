@@ -5,8 +5,9 @@ MandatoryStructureMetric  — checks the 4-part Markdown heading structure.
 CitationPassthroughMetric — checks that Worker references reach the final response.
 CitationGroundingMetric   — checks that Worker citations were actually retrieved.
 CitationDomainMetric      — checks that Worker citation URLs are on legislation.gov.uk.
+GenuineGapMetric          — checks that an empty retrieval is disclosed, not papered over.
 
-All four metrics inspect the ``delegate_research`` tool-call output, which is where
+All five metrics inspect the ``delegate_research`` tool-call output, which is where
 the Worker Agent's response is surfaced.
 """
 
@@ -446,3 +447,134 @@ class CitationDomainMetric(BaseMetric):
     @property
     def __name__(self) -> str:  # type: ignore[override]
         return "Citation Domain"
+
+
+# The Worker system prompt's mandated sentence for an empty result
+# (LexChat/server_py/src/prompts.py, WORKER_SYSTEM_PROMPT, legislation-only block):
+# "If the API data does not answer the specific question, state: ... DO NOT attempt
+# to fill gaps with internal training data."
+_GENUINE_GAP_PHRASE = (
+    "The available database does not contain information on this specific issue."
+)
+
+# Paraphrases of the mandated sentence that still count as disclosing the gap,
+# just not in the exact required wording (0.5 partial credit).
+_GENUINE_GAP_KEYWORDS = (
+    "does not contain information",
+    "no relevant",
+    "could not find",
+    "no information",
+    "unable to find",
+)
+
+
+def _has_usable_section_result(test_case: LLMTestCase) -> bool:
+    """
+    True if any ``search_legislation_sections`` or ``get_legislation_text`` Worker
+    tool call in this run returned non-empty output, i.e. retrieval wasn't empty.
+    """
+    if not test_case.tools_called:
+        return False
+    return any(
+        tool.name
+        in ("Worker: search_legislation_sections", "Worker: get_legislation_text")
+        and tool.output
+        for tool in test_case.tools_called
+    )
+
+
+class GenuineGapMetric(BaseMetric):
+    """
+    When a run's own tool calls failed to retrieve any usable legislation section
+    text, checks that the Worker's report says so plainly instead of presenting a
+    confident but unsupported answer.
+
+    Only applies to ``legislation_only`` mode: the mandated disclosure sentence and
+    the tools this check inspects (search_legislation_sections, get_legislation_text)
+    are specific to legislation retrieval.
+
+    Score:
+        0.0  — no delegate_research call found; cannot be verified.
+        1.0  — research_mode is not legislation_only; check doesn't apply.
+        1.0  — at least one section/full-text tool call returned usable content;
+               nothing to disclose.
+        1.0  — retrieval was empty, and the exact mandated sentence is present.
+        0.5  — retrieval was empty, and a paraphrase of it is present (disclosed
+               the gap, just not in the mandated wording).
+        0.0  — retrieval was empty, and nothing disclosing the gap is present.
+    """
+
+    def __init__(
+        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+    ) -> None:
+        self.threshold = threshold
+        self.research_mode = research_mode
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        dr_output = _get_delegate_output(test_case)
+
+        if dr_output is None:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "genuine gap disclosure cannot be verified."
+            )
+            return self.score
+
+        if self.research_mode != "legislation_only":
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                f"Not applicable: research_mode is '{self.research_mode}', "
+                "not legislation_only."
+            )
+            return self.score
+
+        if _has_usable_section_result(test_case):
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                "Retrieval returned usable section/full-text content; "
+                "nothing to disclose."
+            )
+            return self.score
+
+        lowered = dr_output.lower()
+
+        if _GENUINE_GAP_PHRASE.lower() in lowered:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                "Retrieval was empty and the Worker used the mandated "
+                "disclosure sentence."
+            )
+        elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
+            self.score = 0.5
+            self.success = False
+            self.reason = (
+                "Retrieval was empty; the Worker disclosed the gap but not in "
+                "the mandated wording."
+            )
+        else:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                "Retrieval was empty and the Worker's report does not disclose "
+                "this; answered without an honest gap statement."
+            )
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Genuine Gap"
