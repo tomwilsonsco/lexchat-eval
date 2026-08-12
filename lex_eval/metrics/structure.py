@@ -153,14 +153,14 @@ class MandatoryStructureMetric(BaseMetric):
 
 class CitationPassthroughMetric(BaseMetric):
     """
-    Checks that at least one reference link from the Worker output is present
-    in the final response delivered to the user.
+    Checks that every reference link from the Worker output is present in
+    the final response delivered to the user.
 
     Score:
         0.0  — Failure A: no URLs found in Worker output at all.
-        0.5  — Failure B: Worker output contains URLs but none appear in the
+        0.5  — Failure B: one or more Worker links are missing from the
                           final response (citation links were dropped).
-        1.0  — Pass: at least one Worker URL is present in the final response.
+        1.0  — Pass: every Worker URL is present in the final response.
 
     Threshold defaults to 1.0, so both failure modes are recorded as fails.
     """
@@ -192,21 +192,22 @@ class CitationPassthroughMetric(BaseMetric):
             return self.score
 
         actual = test_case.actual_output or ""
-        passed_through = [link for link in worker_links if link in actual]
+        passed_through = {link for link in worker_links if link in actual}
+        missing = worker_links - passed_through
 
-        if not passed_through:
+        if missing:
             self.score = 0.5
             self.success = False
             self.reason = (
-                f"Failure B: {len(worker_links)} link(s) in Worker output "
-                "but none present in final response."
+                f"Failure B: {len(missing)} of {len(worker_links)} Worker "
+                "link(s) missing from final response."
             )
         else:
             self.score = 1.0
             self.success = True
             self.reason = (
-                f"Pass: {len(passed_through)} of {len(worker_links)} Worker "
-                "link(s) present in final response."
+                f"Pass: all {len(worker_links)} Worker link(s) present in "
+                "final response."
             )
 
         return self.score

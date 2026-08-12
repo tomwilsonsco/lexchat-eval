@@ -72,12 +72,13 @@ def test_mandatory_structure(request, record):
 @pytest.mark.structure
 def test_citation_passthrough(request, record):
     """
-    At least one legislation URL from the Worker output must appear in the
-    final response delivered to the user.
+    Every legislation URL from the Worker output must appear in the final
+    response delivered to the user.
 
     Failure A (0.0): no URLs at all in the Worker output.
-    Failure B (0.5): Worker output had URLs but none reached the final response.
-    Pass    (1.0): at least one Worker URL is present in the final response.
+    Failure B (0.5): Worker output had URLs but one or more didn't reach the
+                     final response.
+    Pass    (1.0): every Worker URL is present in the final response.
     """
     test_case = record_to_test_case(record)
     metric = CitationPassthroughMetric(threshold=1.0)
