@@ -1,10 +1,10 @@
 """Custom DeepEval metrics for LexChat evaluation."""
 
 from .citation_agreement import CitationAgreementMetric
+from .claim_support import ClaimSupportMetric
 from .consistency import ConsistencyMetric
 from .consistency_llm import LLMConsistencyMetric
 from .reference_answer_agreement import ReferenceAnswerAgreementMetric
-from .research_groundedness import ResearchGroundednessMetric
 from .response_groundedness import ResponseGroundednessMetric
 from .structure import (
     CitationDomainMetric,
@@ -17,6 +17,7 @@ from .tool_usage import ToolUsageMetric
 
 __all__ = [
     "CitationAgreementMetric",
+    "ClaimSupportMetric",
     "ConsistencyMetric",
     "LLMConsistencyMetric",
     "CitationDomainMetric",
@@ -25,7 +26,6 @@ __all__ = [
     "GenuineGapMetric",
     "MandatoryStructureMetric",
     "ReferenceAnswerAgreementMetric",
-    "ResearchGroundednessMetric",
     "ResponseGroundednessMetric",
     "ToolUsageMetric",
 ]
