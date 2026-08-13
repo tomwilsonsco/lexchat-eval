@@ -1,11 +1,12 @@
 """
 Test the groundedness of LexChat responses.
 
-Two custom single-call metrics replace the previous multi-step
-FaithfulnessMetric:
+Two custom single-call metrics cover the two hops from retrieved legal text to
+the answer the user sees:
 
-  - ResponseGroundednessMetric   : is the final response grounded in research output?
-  - ResearchGroundednessMetric   : is the research output grounded in retrieval context?
+  - ResponseGroundednessMetric : is the final response grounded in research output?
+  - ClaimSupportMetric         : are the research output's legal claims traceable
+                                 to the retrieval context?
 
 Both use a single LLM call per test case. The judge is configured in
 lex_eval/.env.
@@ -18,12 +19,13 @@ import pytest
 from deepeval.test_case import LLMTestCase
 
 from lex_eval.metrics import (
+    ClaimSupportMetric,
     ResponseGroundednessMetric,
-    ResearchGroundednessMetric,
 )
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
+    agent_visible_context,
     load_records,
     record_id,
     record_to_test_case,
@@ -35,6 +37,9 @@ from lex_eval.utils.test_helpers import (
 
 _MIN_OUTPUT_CHARS: int = 50
 _THRESHOLD: float = 0.6
+# Claim Support is a share of claims, not a normalised 1-5 grade: at most one
+# unsupported claim in five.
+_CLAIM_SUPPORT_THRESHOLD: float = 0.8
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +59,9 @@ _skip_no_api_key = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 
-def _gate_output_length(request, record, test_case, test_name, metric_name):
+def _gate_output_length(
+    request, record, test_case, test_name, metric_name, threshold=_THRESHOLD
+):
     """Fail fast if the output is too short to be meaningful."""
     char_count = len((test_case.actual_output or "").strip())
     if char_count <= _MIN_OUTPUT_CHARS:
@@ -68,7 +75,7 @@ def _gate_output_length(request, record, test_case, test_name, metric_name):
             test_name=test_name,
             metric_name=metric_name,
             score=0.0,
-            threshold=_THRESHOLD,
+            threshold=threshold,
             passed=False,
             reason=reason,
             suite="groundedness",
@@ -77,7 +84,9 @@ def _gate_output_length(request, record, test_case, test_name, metric_name):
     return True, ""
 
 
-def _gate_retrieval_context(request, record, test_case, test_name, metric_name):
+def _gate_retrieval_context(
+    request, record, test_case, test_name, metric_name, threshold=_THRESHOLD
+):
     """Fail fast if no retrieval context was captured."""
     if not test_case.retrieval_context:
         reason = f"No retrieval context captured; {metric_name} scored 0"
@@ -87,7 +96,7 @@ def _gate_retrieval_context(request, record, test_case, test_name, metric_name):
             test_name=test_name,
             metric_name=metric_name,
             score=0.0,
-            threshold=_THRESHOLD,
+            threshold=threshold,
             passed=False,
             reason=reason,
             suite="groundedness",
@@ -96,7 +105,9 @@ def _gate_retrieval_context(request, record, test_case, test_name, metric_name):
     return True, ""
 
 
-def _gate_research_output(request, record, test_name, metric_name):
+def _gate_research_output(
+    request, record, test_name, metric_name, threshold=_THRESHOLD
+):
     """Fail fast if no research output was captured."""
     if not record.get("research_output", "").strip():
         reason = f"No research output captured; {metric_name} scored 0"
@@ -106,7 +117,7 @@ def _gate_research_output(request, record, test_name, metric_name):
             test_name=test_name,
             metric_name=metric_name,
             score=0.0,
-            threshold=_THRESHOLD,
+            threshold=threshold,
             passed=False,
             reason=reason,
             suite="groundedness",
@@ -174,40 +185,54 @@ def test_response_groundedness(request, record):
 @pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
 @pytest.mark.groundedness
 @_skip_no_api_key
-def test_research_groundedness(request, record):
+def test_claim_support(request, record):
     """
-    The research agent's output must be grounded in the raw retrieval context.
+    The research agent's legal claims must be traceable to the text it saw.
+
+    Where LexChat summarised a tool result before returning it to the research
+    agent, the agent only ever saw the summary, so that is what its report is
+    judged against (see ``agent_visible_context``).
 
     Pre-flight gates:
-      - retrieval_context must be non-empty.
+      - the agent-visible context must be non-empty.
       - research_output must be non-empty.
     """
     test_case = record_to_test_case(record)
+    test_case.retrieval_context = agent_visible_context(record)
 
     ok, reason = _gate_retrieval_context(
-        request, record, test_case, "research_groundedness", "Research Groundedness"
+        request,
+        record,
+        test_case,
+        "claim_support",
+        "Claim Support",
+        threshold=_CLAIM_SUPPORT_THRESHOLD,
     )
     if not ok:
         pytest.skip(reason)
 
     ok, reason = _gate_research_output(
-        request, record, "research_groundedness", "Research Groundedness"
+        request,
+        record,
+        "claim_support",
+        "Claim Support",
+        threshold=_CLAIM_SUPPORT_THRESHOLD,
     )
     if not ok:
         pytest.skip(reason)
 
-    metric = ResearchGroundednessMetric(
+    metric = ClaimSupportMetric(
         research_output=record["research_output"],
         model=_judge,
-        threshold=_THRESHOLD,
+        threshold=_CLAIM_SUPPORT_THRESHOLD,
     )
     metric.measure(test_case)
 
     attach_metric(
         request,
         record=record,
-        test_name="research_groundedness",
-        metric_name="Research Groundedness",
+        test_name="claim_support",
+        metric_name="Claim Support",
         score=metric.score,
         threshold=metric.threshold,
         passed=metric.is_successful(),
@@ -217,6 +242,6 @@ def test_research_groundedness(request, record):
     )
 
     assert metric.is_successful(), (
-        f"Research Groundedness score {metric.score:.2f} < {metric.threshold}: "
+        f"Claim Support score {metric.score:.2f} < {metric.threshold}: "
         f"{metric.reason}"
     )

@@ -57,7 +57,7 @@ METRIC_DISPLAY_ORDER: list[str] = [
     "Citation Agreement",
     "Reference Answer Agreement",
     "Response Groundedness",
-    "Research Groundedness",
+    "Claim Support",
 ]
 
 # hover over tips on app summary tables
@@ -72,7 +72,7 @@ METRIC_TOOLTIPS: dict[str, str] = {
     "Consistency (AI Judge)": "AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information.",
     "Citation Agreement": "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
     "Reference Answer Agreement": "AI as a judge metric: How many of the main points in the hand written reference answer the response also makes. A point the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
-    "Research Groundedness": "AI as a judge metric: Measures whether the research summary is grounded exclusively in the legal text retrieved from the Lex API, penalising any external inferences or factual distortions.",
+    "Claim Support": "AI as a judge metric: What share of the researcher's legal claims are backed by the text it actually read (a summary, if LexChat shortened the source). The judge must quote the supporting passage, and that quote is checked against the text, so invented evidence scores nothing.",
     "Response Groundedness": "AI as a judge metric: Evaluates whether the final response is strictly grounded in the research worker's summary, ensuring no new information or contradictions have been introduced.",
 }
 

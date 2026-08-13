@@ -121,6 +121,29 @@ class OpenRouterJudge:
             api_key=OPENROUTER_API_KEY,
         )
 
+    @staticmethod
+    def _strict_schema(schema: type[BaseModel]) -> dict[str, Any]:
+        """Return a JSON Schema that strict structured-output mode accepts.
+
+        OpenAI models reject a strict schema unless every object in it sets
+        ``additionalProperties: false``, which Pydantic does not emit. Other
+        providers accept the schema either way, so this is applied always
+        rather than per-model.
+        """
+
+        def tighten(node: Any) -> Any:
+            if isinstance(node, dict):
+                if node.get("type") == "object":
+                    node["additionalProperties"] = False
+                for value in node.values():
+                    tighten(value)
+            elif isinstance(node, list):
+                for value in node:
+                    tighten(value)
+            return node
+
+        return tighten(schema.model_json_schema())
+
     def _call(
         self, model: str, prompt: str, max_tokens: int, schema: type[BaseModel] | None
     ) -> Any:
@@ -152,7 +175,7 @@ class OpenRouterJudge:
                 "json_schema": {
                     "name": schema.__name__,
                     "strict": True,
-                    "schema": schema.model_json_schema(),
+                    "schema": self._strict_schema(schema),
                 },
             }
 

@@ -75,7 +75,7 @@ SUITES = {
 # instead of clearing the whole suite.
 SUITE_TEST_NAMES = {
     "tool_usage": ["tool_usage"],
-    "groundedness": ["response_groundedness", "research_groundedness"],
+    "groundedness": ["response_groundedness", "claim_support"],
     "consistency": ["consistency"],
     "consistency_llm": ["consistency_llm"],
     "structure": [
@@ -160,7 +160,7 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
         if suite == "groundedness":
             for test_name, fn_name in (
                 ("response_groundedness", "test_response_groundedness"),
-                ("research_groundedness", "test_research_groundedness"),
+                ("claim_support", "test_claim_support"),
             ):
                 if _covered(record, test_name):
                     deselect_args.extend(

@@ -1104,3 +1104,45 @@ both tests now gate on `len(actual_output) <= 50` before measuring, writing the 
 "Output too short" reason `_NON_SCORED_PREFIXES` already recognises. The two affected rows were
 deleted and regenerated; no other row changed. Suite means: Citation Agreement 0.288,
 Reference Answer Agreement 0.543, both over 24 rows including the two now-gated ones.
+
+---
+
+## 13 August 2026 update — Research Groundedness replaced by Claim Support
+
+**Done, not proposed.** `metrics/research_groundedness.py` is deleted; `metrics/claim_support.py`
+(test `test_claim_support`, still in the `groundedness` suite) replaces it. Same job — is the
+research agent's report grounded in the legal text it retrieved — different mechanism, and it
+fixes a real bug in what the old metric was checking against.
+
+What changed:
+
+- **The comparison text is now what the agent actually saw, not the raw retrieval.** LexChat
+  summarises a tool result before the agent reads it when the result is large
+  (`summarisation_used`); the old metric still judged the report against the untouched raw
+  retrieval, so a faithful report could be marked ungrounded simply because the agent worked from
+  a summary the metric never looked at. `utils/test_helpers.agent_visible_context()` now selects
+  the agent's own summarised tool outputs when summarisation happened, raw retrieval otherwise.
+- **The judge now labels and quotes each claim instead of giving one 1-5 grade.** It extracts up
+  to 8 of the report's main legal claims, labels each supported/unsupported, and must quote the
+  exact retrieved passage for every "supported" claim. That quote is then checked in code against
+  the retrieved text (fuzzy-matched on its first 40 characters, since judges trim and reflow
+  quotes when copying — measured on real runs, this separated 39 genuine quotes from 3 invented
+  ones out of 42). A quote that isn't really there downgrades the claim to unsupported, so a judge
+  that invents supporting evidence cannot pass a record on the strength of its own claim. Score is
+  the share of claims that survive: `supported / total`.
+- **This is deliberately not the `utils/sources.py` tagged-passage rebuild** from §3.1 / P1 #5,
+  which the 12 August update already declined to build for lack of evidence it was needed (see
+  "Checked and not carried forward" above). Per-claim quote verification gets the same
+  anti-fabrication guarantee without the extra module, prompt section, and schema field that
+  approach would have needed.
+- **Threshold is 0.8, not the suite's usual 0.6** — documented in `test_groundedness.py` as a
+  claims-passed share rather than a normalised 1-5 grade, so it isn't directly comparable to the
+  other groundedness thresholds.
+- **Bundled fix:** `utils/judge.py` now forces `additionalProperties: false` on every object in a
+  structured-output schema (`OpenRouterJudge._strict_schema`), which OpenAI-style strict mode
+  requires but Pydantic doesn't emit. Needed for Claim Support's nested list-of-claims schema to
+  work under strict mode at all; applies to every judge metric, not just this one.
+
+13 new unit tests (`tests/unit/test_claim_support.py`) cover the scoring math, the quote-matching
+edge cases, the summarisation fallback, and the schema fix, all synthetic — no DB, judge, or
+LexChat instance needed. Not yet re-measured against live `responses.db` numbers.
