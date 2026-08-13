@@ -82,6 +82,7 @@ SUITE_TEST_NAMES = {
         "mandatory_structure",
         "citation_passthrough",
         "citation_grounding",
+        "citation_domain",
         "genuine_gap",
     ],
     "reference": ["citation_agreement", "reference_answer_agreement"],
@@ -190,6 +191,7 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                     ("mandatory_structure", "test_mandatory_structure"),
                     ("citation_passthrough", "test_citation_passthrough"),
                     ("citation_grounding", "test_citation_grounding"),
+                    ("citation_domain", "test_citation_domain"),
                     ("genuine_gap", "test_genuine_gap"),
                 ),
                 "reference": (
