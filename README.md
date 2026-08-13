@@ -110,10 +110,12 @@ python lex_eval/run_evals.py
 # Specific suite:
 python lex_eval/run_evals.py --suite tool_usage
 python lex_eval/run_evals.py --suite groundedness    # needs OPENROUTER_API_KEY
-# (Groundedness measures: answer relevancy, response groundedness, research groundedness)
+# (Groundedness measures: response groundedness, research groundedness)
 python lex_eval/run_evals.py --suite consistency
 python lex_eval/run_evals.py --suite consistency_llm # needs OPENROUTER_API_KEY
 python lex_eval/run_evals.py --suite structure
+python lex_eval/run_evals.py --suite reference       # Reference Answer Agreement needs OPENROUTER_API_KEY
+# (Reference measures against the hand written answers: key authority coverage, reference agreement)
 
 # Force re-run (overwrite existing results):
 python lex_eval/run_evals.py --suite groundedness --overwrite
@@ -306,7 +308,7 @@ lex_eval/
 ```
 
 ## A note on LLM judge models
-The judge LLM is accessed via OpenRouter, which provides access to hundreds of models from many providers. The default model is `openai/gpt-4o`, which offers a good balance of thoroughness and cost. More expensive or capable models may produce more critical judgments, leading to lower scores for answer relevancy, response groundedness, and research groundedness.
+The judge LLM is accessed via OpenRouter, which provides access to hundreds of models from many providers. The default model is `openai/gpt-4o`, which offers a good balance of thoroughness and cost. More expensive or capable models may produce more critical judgments, leading to lower scores for reference agreement, response groundedness, and research groundedness.
 
 For example, `openai/o4-mini` is a thinking model available through OpenRouter and will produce lower scores than `openai/gpt-4o-mini`. However, o4-mini does a better job picking up on subtleties that smaller models may ignore. You can change `OPENROUTER_JUDGE_MODEL` in your `.env` file to any model available on OpenRouter (e.g. `google/gemini-2.5-flash`, `openai/o4-mini`, `anthropic/claude-sonnet-4-6`).
 
@@ -324,6 +326,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity, and check the same legislation section citations appear in every answer. |
 | Consistency (AI Judge) | AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information. |
-| Answer Relevancy | AI as a judge metric: Measures how directly and completely the response addresses the user's question, penalising vague answers and irrelevant content. |
+| Citation Agreement | Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links. |
+| Reference Answer Agreement | AI as a judge metric: How many of the main points in the hand written reference answer the response also makes. A point the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
 | Research Groundedness | AI as a judge metric: Measures whether the research summary is grounded exclusively in the legal text retrieved from the Lex API, penalising any external inferences or factual distortions. |
 | Response Groundedness | Evaluates whether the final response is strictly grounded in the research worker's summary. A near-unmodified copy is accepted automatically; anything reworded enough to matter is passed to the AI judge to check for new information or contradictions. |

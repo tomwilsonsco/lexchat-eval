@@ -228,22 +228,44 @@ class CitationPassthroughMetric(BaseMetric):
         return "Reference Links"
 
 
+def _url_path(url: str) -> str:
+    """
+    The legislation.gov.uk path a URL points at, lowercased, without a leading
+    ``id/`` segment or a trailing slash, e.g. ``ukpga/1978/29/section/10c``.
+
+    Mirrors how the LexChat server builds legislation_id from a search result
+    URI (``LexChat/server_py/src/agent/tools/lex.py::_slim_search_results``:
+    URL path, minus a leading ``id/`` segment).
+    """
+    path = urlparse(url).path.strip("/").lower().rstrip(".,;:")
+    if path.startswith("id/"):
+        path = path[3:]
+    return path
+
+
+def provision_id_from_url(url: str) -> str:
+    """
+    Derive the provision-level id (e.g. ``ukpga/2018/12/section/6``) from a
+    legislation.gov.uk URL.
+
+    Unlike ``_legislation_id_from_url`` this keeps the section or schedule, so
+    a citation to section 3 of an Act is not treated as a citation to
+    section 6 of the same Act.
+    """
+    return _url_path(url)
+
+
 def _legislation_id_from_url(url: str) -> str:
     """
     Derive the Act-level legislation_id (e.g. ``ukpga/1978/29``) from a
     legislation.gov.uk URL, whether it points at the Act itself or a specific
     section/schedule within it (e.g. ``ukpga/1978/29/section/10C``).
 
-    Mirrors how the LexChat server builds legislation_id from a search result
-    URI (``LexChat/server_py/src/agent/tools/lex.py::_slim_search_results``:
-    URL path, minus a leading ``id/`` segment), then keeps only the first
-    three path segments (type/year/number) since that's the granularity
-    search_legislation_sections and get_legislation_text are called at.
+    Keeps only the first three path segments (type/year/number) since that's
+    the granularity search_legislation_sections and get_legislation_text are
+    called at.
     """
-    path = urlparse(url).path.lstrip("/")
-    if path.startswith("id/"):
-        path = path[3:]
-    return "/".join(path.split("/")[:3])
+    return "/".join(_url_path(url).split("/")[:3])
 
 
 def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:

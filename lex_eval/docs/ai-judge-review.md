@@ -1031,3 +1031,76 @@ needed.
    Groundedness are still >85% saturated on the refreshed numbers, that's the
    trigger for a single follow-up proposal — scoped and signed off on its own,
    not decided here.
+
+---
+
+## 13 August 2026 update — Answer Relevancy retired
+
+**Done, not proposed.** `Answer Relevancy` has been deleted and replaced by two metrics that
+compare a response against the hand-written reference answer for the same question. The
+saturation this document predicted held on the refreshed numbers: of the 24 stored rows, 18 were
+1.00, 2 were 0.75 (both awarded for covering a topic the user had not asked about, not for
+anything about correctness) and the remaining 4 were judge errors or capture gates rather than
+verdicts. 18 of 20 real verdicts perfect, no discrimination between models, runs, or right and
+wrong answers.
+
+What replaced it:
+
+| Metric | Threshold | What it catches |
+| --- | --- | --- |
+| Citation Agreement | 0.3 | An answer that never cites the provisions the question turns on. Deterministic, no judge: the legislation.gov.uk links in the reference answer against those in the response, compared at section level |
+| Reference Answer Agreement | 0.6 | An answer that omits or contradicts the substance of the reference answer. One judge call returning per-point `stated`/`contradicted`/`missing` labels; the score is computed in Python and any contradiction fails the record |
+
+This is §4.1's "Substantive Agreement" and the citation half of §4.2, built to the §6 design
+rules: both anchor the judgement in supplied text, the judge is asked for labels rather than a
+1-5 grade, and the prompt forbids it asserting law from its own knowledge. It was **not** held
+back for lawyer sign-off, as §4.1 originally recommended. The six reference answers are still
+unverified drafts, so every score carries a `[DRAFT REFERENCE - unverified]` note and means
+agreement with one author's research, not legal correctness.
+
+Two things to know about the thresholds:
+
+- Citation Agreement's 0.3 is low because a reference answer cites everything its author
+  consulted (10 to 23 provisions per question), including background material a good response
+  need not repeat. Measured over the 24 stored responses the scores run 0.00 to 0.65, and 5 of
+  them are 0.00 because the response contains no legislation links at all. Replace the whole
+  expected set with the lawyer's `required_citations` once the answers are signed off, and the
+  threshold can rise with it.
+- Neither metric writes a judge or harness failure as a score. A question with no reference
+  answer, a reference that cites nothing, and a judge error each write a reason the dashboard's
+  `_NON_SCORED_PREFIXES` keeps out of the mean.
+
+The other recommendations in this document are unaffected and still open.
+
+**First measured sweep, 13 August 2026, on the 24 stored responses.** Both metrics discriminate,
+which is the whole point of the replacement.
+
+| | Passes | Mean of passes | Mean of failures | Range |
+| --- | --- | --- | --- | --- |
+| Citation Agreement | 14 of 24 | 0.42 | 0.10 | 0.00 to 0.65 |
+| Reference Answer Agreement | 14 of 24 | 0.75 | 0.25 | 0.00 to 1.00 |
+
+The acceptance test set for this change was q6 `mistral-large-3`, which states that regulating
+the health professions is primarily devolved. `Answer Relevancy` scored it 1.00 and
+`Response Groundedness` scored it 1.00, because it faithfully relayed a report that said the same
+wrong thing. `Reference Answer Agreement` scores it **0.00** and names the contradiction: "Regulation of
+the health professions is a reserved matter and generally outside the Scottish Parliament's
+legislative competence." That is `eval-gap-analysis.md` item 2 closed.
+
+Also worth knowing: q3 `mistral-large-3` replies "Could you narrow this down?" on both runs. Both
+score 0.00 on both metrics rather than being recorded as capture failures, which is the correct
+reading of a non-answer.
+
+Cost and time: the full 24-record `Reference Answer Agreement` sweep takes about 9 minutes at 8 workers
+on the cheap judge. Per-call latency is highly variable (82 s to 557 s on the same prompt, measured
+directly), and it is reasoning tokens that dominate: the same call returns in 23 s with reasoning
+excluded. If the sweep needs to be faster, per-suite reasoning effort (§6.7) is the lever.
+
+**Correction, 13 August 2026, same day.** The first version of `test_reference.py` above did not
+carry over `test_groundedness.py`'s output-length gate. q3 `mistral-large-3`'s "Could you narrow
+this down?" (27 chars, both runs) was scored as a genuine 0.00 verdict on both new metrics instead
+of being excluded from the mean the way it already was on every other suite that gates it. Fixed:
+both tests now gate on `len(actual_output) <= 50` before measuring, writing the same
+"Output too short" reason `_NON_SCORED_PREFIXES` already recognises. The two affected rows were
+deleted and regenerated; no other row changed. Suite means: Citation Agreement 0.288,
+Reference Answer Agreement 0.543, both over 24 rows including the two now-gated ones.

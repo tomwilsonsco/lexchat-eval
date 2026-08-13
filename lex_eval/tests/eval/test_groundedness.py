@@ -1,22 +1,23 @@
 """
-Test answer relevancy and groundedness of LexChat responses.
+Test the groundedness of LexChat responses.
 
-Three custom single-call metrics replace the previous multi-step
-FaithfulnessMetric and AnswerRelevancyMetric:
+Two custom single-call metrics replace the previous multi-step
+FaithfulnessMetric:
 
-  - LegalAnswerRelevancyMetric   : is the final response relevant to the question?
   - ResponseGroundednessMetric   : is the final response grounded in research output?
   - ResearchGroundednessMetric   : is the research output grounded in retrieval context?
 
-All metrics use a single LLM call per test case. The judge (OpenAI or Gemini)
-is configured via JUDGE_PROVIDER in lex_eval/.env.
+Both use a single LLM call per test case. The judge is configured in
+lex_eval/.env.
+
+Whether the response actually answers the question is measured by the
+`reference` suite, against the hand written reference answers.
 """
 
 import pytest
 from deepeval.test_case import LLMTestCase
 
 from lex_eval.metrics import (
-    LegalAnswerRelevancyMetric,
     ResponseGroundednessMetric,
     ResearchGroundednessMetric,
 )
@@ -117,45 +118,6 @@ def _gate_research_output(request, record, test_name, metric_name):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
-@pytest.mark.groundedness
-@_skip_no_api_key
-def test_answer_relevancy(request, record):
-    """
-    The final response must directly and usefully answer the user's legal question.
-
-    Pre-flight gate: output must be > 50 chars.
-    """
-    test_case = record_to_test_case(record)
-
-    ok, reason = _gate_output_length(
-        request, record, test_case, "answer_relevancy", "Answer Relevancy"
-    )
-    if not ok:
-        pytest.skip(reason)
-
-    metric = LegalAnswerRelevancyMetric(model=_judge, threshold=_THRESHOLD)
-    metric.measure(test_case)
-
-    attach_metric(
-        request,
-        record=record,
-        test_name="answer_relevancy",
-        metric_name="Answer Relevancy",
-        score=metric.score,
-        threshold=metric.threshold,
-        passed=metric.is_successful(),
-        reason=metric.reason or "",
-        error=str(metric.error) if getattr(metric, "error", None) else "",
-        suite="groundedness",
-    )
-
-    assert metric.is_successful(), (
-        f"Answer Relevancy score {metric.score:.2f} < {metric.threshold}: "
-        f"{metric.reason}"
-    )
 
 
 @pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])

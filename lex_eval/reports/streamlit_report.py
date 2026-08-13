@@ -54,7 +54,8 @@ METRIC_DISPLAY_ORDER: list[str] = [
     "Genuine Gap",
     "Consistency (Cosine)",
     "Consistency (AI Judge)",
-    "Answer Relevancy",
+    "Citation Agreement",
+    "Reference Answer Agreement",
     "Response Groundedness",
     "Research Groundedness",
 ]
@@ -69,7 +70,8 @@ METRIC_TOOLTIPS: dict[str, str] = {
     "Genuine Gap": "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence.",
     "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity.",
     "Consistency (AI Judge)": "AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information.",
-    "Answer Relevancy": "AI as a judge metric: Measures how directly and completely the response addresses the user's question, penalising vague answers and irrelevant content.",
+    "Citation Agreement": "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
+    "Reference Answer Agreement": "AI as a judge metric: How many of the main points in the hand written reference answer the response also makes. A point the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
     "Research Groundedness": "AI as a judge metric: Measures whether the research summary is grounded exclusively in the legal text retrieved from the Lex API, penalising any external inferences or factual distortions.",
     "Response Groundedness": "AI as a judge metric: Evaluates whether the final response is strictly grounded in the research worker's summary, ensuring no new information or contradictions have been introduced.",
 }
@@ -90,6 +92,8 @@ _NON_SCORED_PREFIXES = (
     "No research output captured",
     "No reference outputs to compare against.",
     "No 'delegate_research' tool call found;",
+    "No reference answer for this question;",
+    "No reference answer citations to compare against;",
 )
 
 

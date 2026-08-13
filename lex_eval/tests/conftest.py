@@ -37,7 +37,7 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "groundedness: custom legal AI-judge metrics — answer relevancy, response groundedness, "
+        "groundedness: custom legal AI-judge metrics, response groundedness and "
         "research groundedness (require OPENROUTER_API_KEY)",
     )
     config.addinivalue_line(
@@ -49,6 +49,12 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "structure: tests that check mandatory Worker output structure"
+    )
+    config.addinivalue_line(
+        "markers",
+        "reference: tests that compare a response against the hand written "
+        "reference answer for the same question (Reference Answer Agreement "
+        "requires OPENROUTER_API_KEY)",
     )
 
 

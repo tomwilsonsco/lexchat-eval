@@ -67,6 +67,7 @@ SUITES = {
     "consistency": "test_consistency.py",
     "consistency_llm": "test_consistency_llm.py",
     "structure": "test_structure.py",
+    "reference": "test_reference.py",
 }
 
 # The individual test_name values each suite can write to eval_results, used
@@ -74,7 +75,7 @@ SUITES = {
 # instead of clearing the whole suite.
 SUITE_TEST_NAMES = {
     "tool_usage": ["tool_usage"],
-    "groundedness": ["answer_relevancy", "response_groundedness", "research_groundedness"],
+    "groundedness": ["response_groundedness", "research_groundedness"],
     "consistency": ["consistency"],
     "consistency_llm": ["consistency_llm"],
     "structure": [
@@ -83,6 +84,7 @@ SUITE_TEST_NAMES = {
         "citation_grounding",
         "genuine_gap",
     ],
+    "reference": ["citation_agreement", "reference_answer_agreement"],
 }
 
 _DEFAULT_WORKERS = 4
@@ -156,7 +158,6 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     for record, pid in zip(records, pytest_ids):
         if suite == "groundedness":
             for test_name, fn_name in (
-                ("answer_relevancy", "test_answer_relevancy"),
                 ("response_groundedness", "test_response_groundedness"),
                 ("research_groundedness", "test_research_groundedness"),
             ):
@@ -183,13 +184,20 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                         f"lex_eval/tests/eval/{test_file}::test_consistency[{pid}]",
                     ]
                 )
-        elif suite == "structure":
-            for test_name, fn_name in (
-                ("mandatory_structure", "test_mandatory_structure"),
-                ("citation_passthrough", "test_citation_passthrough"),
-                ("citation_grounding", "test_citation_grounding"),
-                ("genuine_gap", "test_genuine_gap"),
-            ):
+        elif suite in ("structure", "reference"):
+            fn_names = {
+                "structure": (
+                    ("mandatory_structure", "test_mandatory_structure"),
+                    ("citation_passthrough", "test_citation_passthrough"),
+                    ("citation_grounding", "test_citation_grounding"),
+                    ("genuine_gap", "test_genuine_gap"),
+                ),
+                "reference": (
+                    ("citation_agreement", "test_citation_agreement"),
+                    ("reference_answer_agreement", "test_reference_answer_agreement"),
+                ),
+            }[suite]
+            for test_name, fn_name in fn_names:
                 if _covered(record, test_name):
                     deselect_args.extend(
                         [
@@ -334,10 +342,12 @@ def main() -> int:
         epilog="""
 Suites:
   tool_usage        Check tools were invoked correctly (fast, offline)
-  groundedness      LLM-as-judge faithfulness + relevancy checks (needs OPENROUTER_API_KEY)
+  groundedness      LLM-as-judge faithfulness checks (needs OPENROUTER_API_KEY)
   consistency       Same-model repeatability checks (fast, cosine similarity)
   consistency_llm   Same-model repeatability checks (AI judge, needs OPENROUTER_API_KEY)
   structure         Worker output structure + citation checks (fast, offline)
+  reference         Compare against the hand written reference answers
+                    (Reference Answer Agreement needs OPENROUTER_API_KEY)
 
 Results:
   All suites write to the eval_results table in data/responses.db.
