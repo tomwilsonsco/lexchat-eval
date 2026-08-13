@@ -155,8 +155,8 @@ class ConsistencyMetric(BaseMetric):
         for ref_raw in self.reference_outputs:
             ref_citations = _extract_citations(ref_raw)
             if ref_citations != actual_citations:
-                missing = actual_citations - ref_citations
-                extra = ref_citations - actual_citations
+                missing = ref_citations - actual_citations
+                extra = actual_citations - ref_citations
                 return (
                     f"missing {sorted(missing)}, extra {sorted(extra)}"
                     if missing or extra
