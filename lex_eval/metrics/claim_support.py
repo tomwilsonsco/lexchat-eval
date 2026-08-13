@@ -15,9 +15,10 @@ from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 from pydantic import BaseModel
 
-# The configured judge (deepseek-v4-flash-0731) has a 1,048,576-token context
-# window. The largest stored retrieval context is ~411k chars, so on current
-# data nothing is ever omitted.
+# Budgeted for a judge with a roughly 1M-token context window (see
+# OPENROUTER_JUDGE_MODEL in .env for whichever model is currently configured).
+# The largest stored retrieval context is ~411k chars, so on current data
+# nothing is ever omitted.
 _MAX_CONTEXT_CHARS: int = (1_048_576 - 30_000) * 4  # ≈ 4 074 304 chars
 
 _MAX_CLAIMS = 8
