@@ -44,10 +44,6 @@ def pytest_configure(config):
         "markers", "consistency: same-model repeatability tests (cosine similarity)"
     )
     config.addinivalue_line(
-        "markers",
-        "consistency_llm: same-model repeatability tests (AI judge, requires OPENROUTER_API_KEY)",
-    )
-    config.addinivalue_line(
         "markers", "structure: tests that check mandatory Worker output structure"
     )
     config.addinivalue_line(

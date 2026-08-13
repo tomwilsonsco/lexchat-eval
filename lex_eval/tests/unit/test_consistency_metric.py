@@ -1,6 +1,9 @@
 """
 Unit tests for ``lex_eval.metrics.consistency.ConsistencyMetric``'s section
 citation check, synthetic responses, no DB or LexChat instance needed.
+
+The check is reported in the reason and never decides pass or fail, so these
+tests assert on ``metric.reason`` while ``is_successful()`` follows the score.
 """
 
 import pytest
@@ -15,9 +18,10 @@ def _test_case(actual_output: str) -> LLMTestCase:
     return LLMTestCase(input="q", actual_output=actual_output)
 
 
-def test_fails_when_cited_section_differs_despite_high_word_overlap():
+def test_reports_a_differing_section_without_failing_the_response():
     """Two answers can share almost all of their wording while citing a
-    different section, the failure mode cosine similarity alone can't see."""
+    different section, the difference cosine similarity alone can't see. It is
+    reported, but the score still decides the result."""
     actual = (
         "The employer must comply with the general duty. "
         "See [Health and Safety at Work Act 1974 - s.2]"
@@ -31,8 +35,25 @@ def test_fails_when_cited_section_differs_despite_high_word_overlap():
     metric = ConsistencyMetric(reference_outputs=[reference], threshold=0.4)
     metric.measure(_test_case(actual))
 
-    assert not metric.is_successful()
     assert "citations differ" in metric.reason
+    assert metric.is_successful() is (metric.score >= metric.threshold)
+    assert metric.is_successful()
+
+
+def test_a_differing_section_does_not_rescue_a_low_score():
+    """The reported difference is a note, so it must not change the verdict in
+    either direction: an unrelated answer still fails on similarity alone."""
+    actual = "See [s.2](http://www.legislation.gov.uk/ukpga/1974/37/section/2)."
+    reference = (
+        "Local authorities must publish an annual report on waste collection "
+        "arrangements. See [s.45]"
+        "(http://www.legislation.gov.uk/ukpga/1990/43/section/45)."
+    )
+    metric = ConsistencyMetric(reference_outputs=[reference], threshold=0.4)
+    metric.measure(_test_case(actual))
+
+    assert "citations differ" in metric.reason
+    assert not metric.is_successful()
 
 
 def test_passes_when_cited_sections_match():

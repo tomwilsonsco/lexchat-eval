@@ -64,7 +64,7 @@ class ResponseGroundednessMetric(BaseMetric):
     agent's output, with no hallucinated or invented facts.
 
     research_output is not a standard LLMTestCase field so it is passed
-    via the constructor, following the same pattern as LLMConsistencyMetric.
+    via the constructor, following the same pattern as ClaimSupportMetric.
 
     Args:
         research_output: The research agent's synthesised output for this question.

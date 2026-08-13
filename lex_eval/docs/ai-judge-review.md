@@ -1000,7 +1000,10 @@ needed.
   in the data. Revisit only if a specific verdict is later shown to be wrong
   because of it.
 - **Consistency (AI Judge) rubric critique** (§3.4: direction-dependent, rewards a
-  repeated non-answer) — read all 12 stored verdicts directly; they look
+  repeated non-answer) — *superseded by the 13 August update at the foot of this
+  document: the metric is retired, and the repeated-non-answer case did reproduce
+  (q3 `mistral-large-3`, 1.00 for two identical 27-character clarification
+  requests).* Original note: read all 12 stored verdicts directly; they look
   substantively correct (real contradictions scored 0.0, real scope drift scored
   0.4, real minor differences scored 0.7) and none reproduce the "rewards a
   clarifying-question loop" case on this dataset. No action; unconfirmed here.
@@ -1146,3 +1149,74 @@ What changed:
 13 new unit tests (`tests/unit/test_claim_support.py`) cover the scoring math, the quote-matching
 edge cases, the summarisation fallback, and the schema fix, all synthetic — no DB, judge, or
 LexChat instance needed. Not yet re-measured against live `responses.db` numbers.
+
+---
+
+## 13 August 2026 update — Consistency (AI Judge) retired
+
+**Done, not proposed.** `metrics/consistency_llm.py`, `tests/eval/test_consistency_llm.py`,
+`tests/unit/test_consistency_llm_metric.py` and the whole `consistency_llm` suite are deleted, and
+the 12 stored rows removed from `eval_results`. `Consistency (Cosine)` is now the only consistency
+metric. This closes §3.4 and P3 #17-#19, though not in the way either proposed.
+
+**What the 12 stored verdicts actually showed.** The distribution was **2 x 0.0, 7 x 0.4,
+3 x 1.0** — the metric never emitted rule 2 (0.2) or rule 4 (0.7) at all, so a five-rung ladder
+was in practice a three-valued one, and the modal value was rule 3, "materially different scope".
+Every 0.4 reason has the same shape: the judge affirms that the two runs agree on their
+conclusions, then applies rule 3 anyway, because the prompt's "apply the LOWEST matching rule"
+plus its closing "a superset is NOT automatically consistent" instruction leave it no choice.
+
+**Why cosine is enough on its own.** Cross-tabbing the judge against `Consistency (Cosine)` on the
+same 12 pairs:
+
+| judge verdict | pairs | cosine range |
+| --- | --- | --- |
+| 0.0, genuine contradiction | 2 | 0.343, 0.418 |
+| 0.4, scope drift | 7 | 0.512 to 0.723 |
+| 1.0, consistent | 3 | 0.712 to 1.000 |
+
+Cosine separates the two genuine contradictions cleanly at its existing 0.5 threshold: the highest
+contradiction pair is 0.418 and the lowest of everything else is 0.512. It does not separate 0.4
+from 1.0, and those two bands interleave. So the judge's only unique contribution over the free,
+deterministic metric was the rule-3 band, which is the band that measures the wrong thing. A
+metric whose distinctive output is its worst output is not worth a judge call.
+
+Contradiction detection is not left unguarded: `Reference Answer Agreement` fails a record outright
+on a contradiction, and scored q6 `mistral-large-3` 0.00 for exactly the devolved/reserved flip
+that is one of the two 0.0s here. Run-to-run comparison is the wrong instrument for correctness
+anyway; the reference answers are the right one.
+
+**Honest limits.** n = 12 pairs with 2 positives, one sample per pair. Cosine could in principle
+miss a contradiction with high lexical overlap ("the Act does apply" against "does not apply"),
+which is the standing argument for a semantic judge. It has not happened on this dataset, and the
+burden of proof sits with keeping a judge metric, not with dropping one.
+
+**§3.4's own prescription was considered and not taken.** Source Stability (Jaccard over provision
+URIs) is a softened form of the section-citation check that `consistency.py` already performs, and
+Conclusion Stability is a judge call for a job cosine currently does for nothing. Building both
+would be machinery justifying machinery.
+
+**Two fixes carried in the same change**, because retiring the judge alone would have moved the
+problem rather than solved it:
+
+- `Consistency (Cosine)`'s section-citation check no longer gates pass or fail
+  (`consistency.py`'s `success` is now the score against the threshold, full stop). Exact
+  citation-set equality was the deterministic version of rule 3: it failed **10 of 12 pairs** on
+  ordinary breadth drift, it decided nearly every verdict while the score that discriminates
+  decided almost none, and it was asymmetric — q2 and q5 `mistral-large-3` were each stored as one
+  pass row plus one fail row at an identical score, with `_AGGREGATE_ONLY_METRICS` then showing an
+  arbitrary one of the two. The citation difference is still listed in the reason as a diagnostic,
+  so a flipped section number stays visible.
+- `test_consistency.py` now applies the same `_MIN_OUTPUT_CHARS = 50` gate as
+  `test_groundedness.py` and `test_reference.py`. This is the "rewards consistent non-answers"
+  case §3.4 flagged and the 12 August update recorded as unreproducible: it does reproduce. q3
+  `mistral-large-3` replies "Could you narrow this down?" (27 chars) on both runs, which is
+  word-for-word identical and scored **1.000** on cosine and 1.00 on the judge. It is now recorded
+  as "Output too short" and kept out of the mean, matching how every other suite already treats it.
+  The 12 August note at "Checked and not carried forward" should be read as superseded.
+
+**Numbers after the change**, `--suite consistency --overwrite` over the same 24 stored responses:
+24 rows, both rows of every pair now agreeing on the verdict, 18 passing, 4 failing, 2 gated.
+The only failures are q1 and q6 `mistral-large-3` at 0.343 and 0.418 — precisely the two genuine
+contradictions the judge found, now surfaced without a judge and without seven look-alike 0.4s
+buried on top of them.

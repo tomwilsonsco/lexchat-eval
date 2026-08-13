@@ -53,7 +53,6 @@ METRIC_DISPLAY_ORDER: list[str] = [
     "Citation Domain",
     "Genuine Gap",
     "Consistency (Cosine)",
-    "Consistency (AI Judge)",
     "Citation Agreement",
     "Reference Answer Agreement",
     "Response Groundedness",
@@ -68,8 +67,7 @@ METRIC_TOOLTIPS: dict[str, str] = {
     "Citation Grounding": "Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model.",
     "Citation Domain": "Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite.",
     "Genuine Gap": "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence.",
-    "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity.",
-    "Consistency (AI Judge)": "AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information.",
+    "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
     "Citation Agreement": "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
     "Reference Answer Agreement": "AI as a judge metric: How many of the main points in the hand written reference answer the response also makes. A point the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
     "Claim Support": "AI as a judge metric: What share of the researcher's legal claims are backed by the text it actually read (a summary, if LexChat shortened the source). The judge must quote the supporting passage, and that quote is checked against the text, so invented evidence scores nothing.",
@@ -78,7 +76,7 @@ METRIC_TOOLTIPS: dict[str, str] = {
 
 # do not keep the individual response results of these metrics as only make sense
 # comparing multiple
-_AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)", "Consistency (AI Judge)"}
+_AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)"}
 
 # Reason prefixes written by judge exceptions and harness capture gates (see
 # metrics/*.py except blocks, tests/eval/test_groundedness.py gate functions,
@@ -90,7 +88,7 @@ _NON_SCORED_PREFIXES = (
     "Output too short",
     "No retrieval context captured",
     "No research output captured",
-    "No reference outputs to compare against.",
+    "No reference outputs provided.",
     "No 'delegate_research' tool call found;",
     "No reference answer for this question;",
     "No reference answer citations to compare against;",
@@ -114,7 +112,7 @@ def _aggregate_metrics(results: list[dict]) -> list[dict]:
     """
     return aggregated result per metric type.
 
-    Consistency (simple or AI judge): single aggregated entry (no per-run breakdown).
+    Consistency: single aggregated entry (no per-run breakdown).
     All other metrics:
       keep every individual run, computes mean/min/max over all of them,
       stores the full list in raw_results for the detail expander.

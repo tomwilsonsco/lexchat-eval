@@ -15,7 +15,7 @@ results.
 
 Tests run in parallel via pytest-xdist (``EVAL_WORKERS`` in lex_eval/.env,
 default 4). This mainly speeds up the AI-judge suites (groundedness,
-consistency_llm), which are otherwise a long serial chain of blocking
+reference), which are otherwise a long serial chain of blocking
 OpenRouter calls. Use ``--workers 1`` to disable and run single-process.
 
 Examples
@@ -65,7 +65,6 @@ SUITES = {
     "tool_usage": "test_tool_usage.py",
     "groundedness": "test_groundedness.py",
     "consistency": "test_consistency.py",
-    "consistency_llm": "test_consistency_llm.py",
     "structure": "test_structure.py",
     "reference": "test_reference.py",
 }
@@ -77,7 +76,6 @@ SUITE_TEST_NAMES = {
     "tool_usage": ["tool_usage"],
     "groundedness": ["response_groundedness", "claim_support"],
     "consistency": ["consistency"],
-    "consistency_llm": ["consistency_llm"],
     "structure": [
         "mandatory_structure",
         "citation_passthrough",
@@ -208,29 +206,6 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
                         ]
                     )
 
-    # consistency_llm is parametrized by (question, LLM) group, not individual
-    # record, and evaluates one result per group rather than per response — so
-    # it stays pair-based by design.
-    if suite == "consistency_llm":
-        from lex_eval.utils.test_helpers import group_by_question_and_llm
-
-        covered_pairs = {
-            (int(r["question_id"]), r["llm_name"]) for r in existing
-        }
-        deselect_args = []
-        for key, grp_records in sorted(group_by_question_and_llm().items()):
-            if len(grp_records) < 2:
-                continue
-            qid = int(grp_records[0]["question_id"])
-            rec_llm = grp_records[0]["llm_name"]
-            if (qid, rec_llm) in covered_pairs:
-                deselect_args.extend(
-                    [
-                        "--deselect",
-                        f"lex_eval/tests/eval/{test_file}::test_consistency_llm[{key}]",
-                    ]
-                )
-
     return deselect_args
 
 
@@ -346,7 +321,6 @@ Suites:
   tool_usage        Check tools were invoked correctly (fast, offline)
   groundedness      LLM-as-judge faithfulness checks (needs OPENROUTER_API_KEY)
   consistency       Same-model repeatability checks (fast, cosine similarity)
-  consistency_llm   Same-model repeatability checks (AI judge, needs OPENROUTER_API_KEY)
   structure         Worker output structure + citation checks (fast, offline)
   reference         Compare against the hand written reference answers
                     (Reference Answer Agreement needs OPENROUTER_API_KEY)

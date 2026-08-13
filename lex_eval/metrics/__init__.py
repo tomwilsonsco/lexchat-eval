@@ -3,7 +3,6 @@
 from .citation_agreement import CitationAgreementMetric
 from .claim_support import ClaimSupportMetric
 from .consistency import ConsistencyMetric
-from .consistency_llm import LLMConsistencyMetric
 from .reference_answer_agreement import ReferenceAnswerAgreementMetric
 from .response_groundedness import ResponseGroundednessMetric
 from .structure import (
@@ -19,7 +18,6 @@ __all__ = [
     "CitationAgreementMetric",
     "ClaimSupportMetric",
     "ConsistencyMetric",
-    "LLMConsistencyMetric",
     "CitationDomainMetric",
     "CitationGroundingMetric",
     "CitationPassthroughMetric",

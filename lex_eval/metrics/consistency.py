@@ -7,9 +7,10 @@ Uses TF vectorisation (no IDF) with cosine similarity. Skipping IDF ensures
 that shared legal terminology is not down-weighted when comparing a small
 number of responses, giving more meaningful scores.
 
-Cosine similarity alone can't see a single flipped section number or Act
-buried among hundreds of otherwise-identical tokens, so responses are also
-checked for citing the exact same legislation.gov.uk section citations.
+The similarity score alone decides pass or fail. Any legislation.gov.uk
+section cited in one answer but not the other is listed in the reason as a
+diagnostic, because cosine similarity can't see a single flipped section
+number buried among hundreds of otherwise-identical tokens.
 """
 
 from deepeval.metrics import BaseMetric
@@ -71,12 +72,12 @@ class ConsistencyMetric(BaseMetric):
     appearing across the small comparison corpus. Cosine similarity then
     captures directional agreement independent of response length.
 
-    Alongside the cosine score, the response fails if it cites any
-    legislation.gov.uk section that isn't cited, or omits one that is
-    cited, in every reference response. This catches a flipped section
-    number or Act that cosine similarity is too coarse to notice. The
-    check is skipped when the response has no section citations at all
-    (the Worker prompt allows bold-text citation as a fallback).
+    Pass or fail is the similarity score against the threshold, nothing
+    else. Sections cited in one answer but not the other are listed in the
+    reason so a flipped section number stays visible, but they do not
+    decide the result: an agent searching a live corpus twice will touch
+    different secondary provisions each run, which is expected rather than
+    a defect.
 
     Args:
         reference_outputs: Other answers to compare against.
@@ -132,14 +133,17 @@ class ConsistencyMetric(BaseMetric):
 
         citation_mismatch = self._find_citation_mismatch(test_case.actual_output or "")
 
-        self.success = self.score >= self.threshold and citation_mismatch is None
+        self.success = self.score >= self.threshold
         self.reason = (
             f"Mean cosine similarity: {self.score:.3f} "
             f"(across {len(all_texts)} responses, "
             f"threshold: {self.threshold})"
         )
         if citation_mismatch is not None:
-            self.reason += f". Section citations differ from a reference: {citation_mismatch}"
+            self.reason += (
+                f". For information, section citations differ from a reference "
+                f"(this does not affect the result): {citation_mismatch}"
+            )
         return self.score
 
     def _find_citation_mismatch(self, actual_raw: str) -> Optional[str]:
@@ -147,6 +151,10 @@ class ConsistencyMetric(BaseMetric):
         Return a description of the first reference whose cited
         legislation.gov.uk sections differ from the response's, or None if
         the response has no citations to check or all references agree.
+
+        Reported in the reason only. The check is skipped when the response
+        has no section citations at all (the Worker prompt allows bold-text
+        citation as a fallback).
         """
         actual_citations = _extract_citations(actual_raw)
         if not actual_citations:

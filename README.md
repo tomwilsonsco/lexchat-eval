@@ -112,7 +112,6 @@ python lex_eval/run_evals.py --suite tool_usage
 python lex_eval/run_evals.py --suite groundedness    # needs OPENROUTER_API_KEY
 # (Groundedness measures: response groundedness, research groundedness)
 python lex_eval/run_evals.py --suite consistency
-python lex_eval/run_evals.py --suite consistency_llm # needs OPENROUTER_API_KEY
 python lex_eval/run_evals.py --suite structure
 python lex_eval/run_evals.py --suite reference       # Reference Answer Agreement needs OPENROUTER_API_KEY
 # (Reference measures against the hand written answers: key authority coverage, reference agreement)
@@ -142,7 +141,7 @@ pair — use `--overwrite` to force re-running.
 | `structure` | Fast | Nothing extra |
 | `consistency` | Fast | ≥2 responses per question/LLM pair |
 | `groundedness` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
-| `consistency_llm` | Slow | `OPENROUTER_API_KEY` + ≥2 responses per pair |
+| `reference` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` + hand written reference answers |
 
 ## Step 4 Streamlit dashboard
 
@@ -324,8 +323,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |
 | Citation Domain | Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite. |
 | Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
-| Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity, and check the same legislation section citations appear in every answer. |
-| Consistency (AI Judge) | AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information. |
+| Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed for information, but does not decide pass or fail: an agent searching a live corpus twice will touch different secondary provisions each run. |
 | Citation Agreement | Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links. |
 | Reference Answer Agreement | AI as a judge metric: How many of the main points in the hand written reference answer the response also makes. A point the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
 | Claim Support | AI as a judge metric: Checks each legal claim in the researcher's report against the text the researcher actually read (a summary, if LexChat shortened the source first). A claim only passes if the judge quotes the exact words backing it up and that quote is verified as genuinely in the source, so an invented quote scores nothing. The score is the share of claims that pass. |
