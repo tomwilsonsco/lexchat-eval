@@ -91,8 +91,12 @@ class LLMConsistencyMetric(BaseMetric):
         question = test_case.input or ""
         actual = test_case.actual_output or ""
 
+        # Judge failures on individual pairs are kept separate from genuine
+        # verdicts so a failed call is excluded from the mean rather than
+        # silently averaged in as a real 0.0 (see docs/ai-judge-review.md).
         scores: list[float] = []
         reasons: list[str] = []
+        failures: list[str] = []
 
         for i, ref in enumerate(self.reference_outputs, 1):
             prompt = _PROMPT_TEMPLATE.format(
@@ -110,19 +114,37 @@ class LLMConsistencyMetric(BaseMetric):
                     data = json.loads(str(result))
                     pair_score = float(data["score"])
                     pair_reason = data["reason"]
+                scores.append(pair_score)
+                reasons.append(f"vs ref {i}: {pair_reason}")
             except Exception as exc:
-                pair_score = 0.0
-                pair_reason = f"Judge error: {exc}"
+                failures.append(f"vs ref {i}: Judge error: {exc}")
 
-            scores.append(pair_score)
-            reasons.append(f"vs ref {i}: {pair_reason}")
+        if not scores:
+            # Every pairwise judge call failed — this is a harness failure,
+            # not a quality verdict. The "Judge error:" prefix matches what
+            # the other judge metrics already write on failure, which
+            # reports/streamlit_report.py recognises and excludes from every
+            # mean/pass-rate, showing N/A instead.
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"Judge error: all {len(failures)} judge call(s) failed "
+                "(" + "; ".join(failures) + ")"
+            )
+            return self.score
 
         self.score = sum(scores) / len(scores)
         self.success = self.score >= self.threshold
+        excluded_note = (
+            f" {len(failures)} comparison(s) excluded due to judge error "
+            f"(not counted in the mean): {'; '.join(failures)}."
+            if failures
+            else ""
+        )
         self.reason = (
             f"Mean consistency score: {self.score:.3f} "
-            f"({len(scores)} comparison(s), threshold: {self.threshold}). "
-            + " | ".join(reasons)
+            f"({len(scores)} comparison(s), threshold: {self.threshold})."
+            f"{excluded_note} " + " | ".join(reasons)
         )
         return self.score
 
