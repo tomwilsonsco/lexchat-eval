@@ -118,6 +118,9 @@ python lex_eval/run_evals.py --suite structure
 # Force re-run (overwrite existing results):
 python lex_eval/run_evals.py --suite groundedness --overwrite
 
+# Force re-run a single metric only (leaves the suite's other metrics alone):
+python lex_eval/run_evals.py --suite groundedness --test-name response_groundedness --overwrite
+
 # Single LLM only:
 python lex_eval/run_evals.py --llm "model-name"
 

@@ -29,6 +29,9 @@ Run only groundedness (requires OPENROUTER_API_KEY):
 Force re-run (overwrite existing results):
     python lex_eval/run_evals.py --suite groundedness --overwrite
 
+Force re-run a single metric only (leaves the suite's other metrics alone):
+    python lex_eval/run_evals.py --suite groundedness --test-name response_groundedness --overwrite
+
 Run only tool-usage checks (fast, no LLM judge needed):
     python lex_eval/run_evals.py --suite tool_usage
 
@@ -64,6 +67,22 @@ SUITES = {
     "consistency": "test_consistency.py",
     "consistency_llm": "test_consistency_llm.py",
     "structure": "test_structure.py",
+}
+
+# The individual test_name values each suite can write to eval_results, used
+# to validate --test-name and to scope --overwrite to just that metric
+# instead of clearing the whole suite.
+SUITE_TEST_NAMES = {
+    "tool_usage": ["tool_usage"],
+    "groundedness": ["answer_relevancy", "response_groundedness", "research_groundedness"],
+    "consistency": ["consistency"],
+    "consistency_llm": ["consistency_llm"],
+    "structure": [
+        "mandatory_structure",
+        "citation_passthrough",
+        "citation_grounding",
+        "genuine_gap",
+    ],
 }
 
 _DEFAULT_WORKERS = 4
@@ -213,6 +232,7 @@ def run_evals(
     extra_args: list[str] | None = None,
     llm: str | None = None,
     workers: int | None = None,
+    test_name: str | None = None,
 ) -> int:
     """
     Launch pytest against the evaluation test suite.
@@ -241,7 +261,9 @@ def run_evals(
             init_db(conn)
             init_eval_results(conn)  # Ensure table exists first
             if overwrite:
-                clear_eval_results(conn, suite=s)
+                # Scoped to test_name when given, so re-running one metric
+                # with --overwrite never wipes its sibling metrics' results.
+                clear_eval_results(conn, suite=s, test_name=test_name)
             conn.commit()  # Commit after init and potential clear
         finally:
             conn.close()
@@ -252,9 +274,13 @@ def run_evals(
         if markers:
             cmd.extend(["-m", markers])
 
-        # filter to a single LLM via pytest keyword expression
-        if llm:
-            cmd.extend(["-k", llm])
+        # filter to a single LLM and/or a single test_name via a combined
+        # pytest keyword expression (both are plain substrings, so "and"
+        # narrows to their intersection; LLM names containing ":" are fine
+        # unquoted here, same as the single-filter case below)
+        keyword_filters = [f for f in (llm, test_name) if f]
+        if keyword_filters:
+            cmd.extend(["-k", " and ".join(keyword_filters)])
 
         # skip logic: deselect tests that already have results
         if not overwrite:
@@ -347,6 +373,15 @@ Dashboard:
         help="Overwrite existing results instead of skipping completed tests",
     )
     parser.add_argument(
+        "--test-name",
+        metavar="TEST_NAME",
+        help=(
+            "Only run/overwrite this one metric within --suite (e.g. "
+            "response_groundedness). With --overwrite, scopes the DB clear "
+            "to this test_name instead of the whole suite. Requires --suite."
+        ),
+    )
+    parser.add_argument(
         "--workers",
         type=int,
         default=None,
@@ -370,6 +405,17 @@ Dashboard:
     )
 
     args = parser.parse_args()
+
+    if args.test_name:
+        if not args.suite:
+            parser.error("--test-name requires --suite")
+        valid = SUITE_TEST_NAMES[args.suite]
+        if args.test_name not in valid:
+            parser.error(
+                f"--test-name {args.test_name!r} is not valid for --suite "
+                f"{args.suite!r}; choose from {valid}"
+            )
+
     return run_evals(
         suite=args.suite,
         markers=args.markers,
@@ -378,6 +424,7 @@ Dashboard:
         extra_args=args.extra,
         llm=args.llm,
         workers=args.workers,
+        test_name=args.test_name,
     )
 
 

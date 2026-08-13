@@ -574,11 +574,21 @@ def insert_eval_result(
 
 
 def clear_eval_results(
-    conn: duckdb.DuckDBPyConnection, suite: Optional[str] = None
+    conn: duckdb.DuckDBPyConnection,
+    suite: Optional[str] = None,
+    test_name: Optional[str] = None,
 ) -> None:
-    """Delete eval results, optionally filtered to a specific suite."""
+    """Delete eval results, optionally filtered to a specific suite and/or test_name."""
+    conditions = []
+    params: List[Any] = []
     if suite:
-        conn.execute("DELETE FROM eval_results WHERE suite = ?", [suite])
+        conditions.append("suite = ?")
+        params.append(suite)
+    if test_name:
+        conditions.append("test_name = ?")
+        params.append(test_name)
+    if conditions:
+        conn.execute(f"DELETE FROM eval_results WHERE {' AND '.join(conditions)}", params)
     else:
         conn.execute("DELETE FROM eval_results")
 
