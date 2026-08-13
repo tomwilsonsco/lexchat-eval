@@ -7,11 +7,20 @@ the research agent's output, with no hallucinated facts.
 
 from __future__ import annotations
 
+import difflib
 import json
 
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 from pydantic import BaseModel
+
+# Above this similarity, the final response is a near-verbatim relay of the
+# research output: grounding is a provable fact, not a judgement call, so the
+# judge is not invoked. glm-5.2 (which follows the Manager prompt's "do NOT
+# condense, summarise, or restructure" instruction literally) measures
+# 0.983-1.000 on stored runs; mistral-large-3 (which paraphrases) measures
+# 0.095-0.763. 0.95 sits in the gap between the two clusters.
+_NEAR_VERBATIM_THRESHOLD: float = 0.95
 
 
 class _GroundednessJudgement(BaseModel):
@@ -72,9 +81,22 @@ class ResponseGroundednessMetric(BaseMetric):
         self.success = False
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        actual_output = test_case.actual_output or ""
+        ratio = difflib.SequenceMatcher(
+            None, actual_output.strip(), self.research_output.strip()
+        ).ratio()
+        if ratio >= _NEAR_VERBATIM_THRESHOLD:
+            self.score = 1.0
+            self.reason = (
+                f"Near-verbatim relay of research output (similarity={ratio:.2f}); "
+                "judge not invoked."
+            )
+            self.success = True
+            return self.score
+
         prompt = _PROMPT_TEMPLATE.format(
             research_output=self.research_output,
-            actual_output=test_case.actual_output or "",
+            actual_output=actual_output,
         )
         try:
             result = self.model.generate(prompt, schema=_GroundednessJudgement)

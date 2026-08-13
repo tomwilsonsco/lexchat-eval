@@ -323,4 +323,4 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Consistency (AI Judge) | AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information. |
 | Answer Relevancy | AI as a judge metric: Measures how directly and completely the response addresses the user's question, penalising vague answers and irrelevant content. |
 | Research Groundedness | AI as a judge metric: Measures whether the research summary is grounded exclusively in the legal text retrieved from the Lex API, penalising any external inferences or factual distortions. |
-| Response Groundedness | AI as a judge metric: Evaluates whether the final response is strictly grounded in the research worker's summary, ensuring no new information or contradictions have been introduced. |
+| Response Groundedness | Evaluates whether the final response is strictly grounded in the research worker's summary. A near-unmodified copy is accepted automatically; anything reworded enough to matter is passed to the AI judge to check for new information or contradictions. |
