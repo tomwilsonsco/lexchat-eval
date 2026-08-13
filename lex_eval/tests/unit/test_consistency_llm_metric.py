@@ -11,10 +11,16 @@ the dashboard's mean/pass-rate instead of scoring it as a bad result.
 
 import pytest
 from deepeval.test_case import LLMTestCase
+from pydantic import ValidationError
 
 from lex_eval.metrics.consistency_llm import LLMConsistencyMetric, _ConsistencyJudgement
 
 pytestmark = pytest.mark.unit
+
+
+def test_judgement_rejects_a_rule_number_outside_one_to_five():
+    with pytest.raises(ValidationError):
+        _ConsistencyJudgement(matched_rule=6, reason="not one of the five rules")
 
 
 def _test_case() -> LLMTestCase:
@@ -49,7 +55,7 @@ def test_partial_judge_failure_excluded_from_mean():
     judge = _StubJudge(
         [
             RuntimeError("empty content"),
-            _ConsistencyJudgement(score=1.0, reason="consistent"),
+            _ConsistencyJudgement(matched_rule=5, reason="consistent"),
         ]
     )
     metric = LLMConsistencyMetric(
@@ -67,8 +73,8 @@ def test_partial_judge_failure_excluded_from_mean():
 def test_all_judge_calls_succeeding_averages_as_before():
     judge = _StubJudge(
         [
-            _ConsistencyJudgement(score=1.0, reason="consistent"),
-            _ConsistencyJudgement(score=0.4, reason="scope drift"),
+            _ConsistencyJudgement(matched_rule=5, reason="consistent"),
+            _ConsistencyJudgement(matched_rule=3, reason="scope drift"),
         ]
     )
     metric = LLMConsistencyMetric(
