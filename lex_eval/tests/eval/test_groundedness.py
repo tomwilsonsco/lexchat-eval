@@ -5,10 +5,12 @@ Two custom single-call metrics cover the two hops from retrieved legal text to
 the answer the user sees:
 
   - ResponseGroundednessMetric : is the final response grounded in research output?
+                                 Pass or fail, and a near-verbatim relay passes
+                                 without calling the judge at all.
   - ClaimSupportMetric         : are the research output's legal claims traceable
                                  to the retrieval context?
 
-Both use a single LLM call per test case. The judge is configured in
+Each uses at most a single LLM call per test case. The judge is configured in
 lex_eval/.env.
 
 Whether the response actually answers the question is measured by the
@@ -36,9 +38,11 @@ from lex_eval.utils.test_helpers import (
 # ---------------------------------------------------------------------------
 
 _MIN_OUTPUT_CHARS: int = 50
-_THRESHOLD: float = 0.6
-# Claim Support is a share of claims, not a normalised 1-5 grade: at most one
-# unsupported claim in five.
+# Response Groundedness is a pass/fail verdict, so its score is 0.0 or 1.0 and
+# nothing between the two is reachable.
+_RESPONSE_GROUNDEDNESS_THRESHOLD: float = 1.0
+# Claim Support is a share of claims, not a verdict: at most one unsupported
+# claim in five.
 _CLAIM_SUPPORT_THRESHOLD: float = 0.8
 
 
@@ -60,7 +64,12 @@ _skip_no_api_key = pytest.mark.skipif(
 
 
 def _gate_output_length(
-    request, record, test_case, test_name, metric_name, threshold=_THRESHOLD
+    request,
+    record,
+    test_case,
+    test_name,
+    metric_name,
+    threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
 ):
     """Fail fast if the output is too short to be meaningful."""
     char_count = len((test_case.actual_output or "").strip())
@@ -85,7 +94,12 @@ def _gate_output_length(
 
 
 def _gate_retrieval_context(
-    request, record, test_case, test_name, metric_name, threshold=_THRESHOLD
+    request,
+    record,
+    test_case,
+    test_name,
+    metric_name,
+    threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
 ):
     """Fail fast if no retrieval context was captured."""
     if not test_case.retrieval_context:
@@ -106,7 +120,11 @@ def _gate_retrieval_context(
 
 
 def _gate_research_output(
-    request, record, test_name, metric_name, threshold=_THRESHOLD
+    request,
+    record,
+    test_name,
+    metric_name,
+    threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
 ):
     """Fail fast if no research output was captured."""
     if not record.get("research_output", "").strip():
@@ -159,7 +177,7 @@ def test_response_groundedness(request, record):
     metric = ResponseGroundednessMetric(
         research_output=record["research_output"],
         model=_judge,
-        threshold=_THRESHOLD,
+        threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
     )
     metric.measure(test_case)
 

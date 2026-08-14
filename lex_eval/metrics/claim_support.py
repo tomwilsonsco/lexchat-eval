@@ -26,7 +26,7 @@ _MAX_CLAIMS = 8
 
 class _Claim(BaseModel):
     claim: str
-    label: Literal["supported", "unsupported"]
+    label: Literal["supported", "unsupported", "absence"]
     quote: str
 
 
@@ -53,13 +53,14 @@ A statement that something was not retrieved, or that the database does not cont
 Then label each claim:
 - "supported" if the retrieved text says it, even in different words.
 - "unsupported" if the retrieved text does not say it.
+- "absence" if the claim is that the law does NOT do something, for example that an Act imposes no consultation requirement, or that a later Act did not amend a provision.
 
-For "supported", quote the words from the RETRIEVED LEGAL TEXT that justify the label, copied exactly. For "unsupported", leave the quote empty.
+For "supported", quote the words from the RETRIEVED LEGAL TEXT that justify the label, copied exactly. For "unsupported" and "absence", leave the quote empty.
 
 Provide your evaluation in strict JSON format exactly like this:
 {{
     "claims": [
-        {{"claim": "<the claim, in one sentence>", "label": "supported|unsupported", "quote": "<exact words from the retrieved text, or empty>"}}
+        {{"claim": "<the claim, in one sentence>", "label": "supported|unsupported|absence", "quote": "<exact words from the retrieved text, or empty>"}}
     ]
 }}
 """
@@ -102,6 +103,13 @@ class ClaimSupportMetric(BaseMetric):
     unsupported, so a judge that invents its own evidence cannot pass a record.
     Judges trim and reflow the passages they quote, so the check matches the
     opening of the quote rather than the whole of it (see ``_quote_found``).
+
+    Claims that the law does NOT do something (no consultation requirement, no
+    amendment to a section) are counted but not scored: nothing can be quoted
+    to prove an absence, so scoring them would mark down a report for saying
+    something true. They are named in the reason so a reviewer can still spot a
+    wrong one. If every claim is one of these there is nothing to trace and the
+    score is 1.0.
 
     The text to judge against comes from the LLMTestCase's retrieval_context
     (joined to a single string). Callers must set that to what the agent saw:
@@ -173,23 +181,35 @@ class ClaimSupportMetric(BaseMetric):
         return self._score_claims(claims, retrieval_context_str)
 
     def _score_claims(self, claims: List[_Claim], retrieval_context: str) -> float:
+        absence = [c for c in claims if c.label == "absence"]
+        scorable = [c for c in claims if c.label != "absence"]
+
         supported = [
             c
-            for c in claims
+            for c in scorable
             if c.label == "supported" and _quote_found(c.quote, retrieval_context)
         ]
         unquoted = sum(
             1
-            for c in claims
+            for c in scorable
             if c.label == "supported" and not _quote_found(c.quote, retrieval_context)
         )
-        unsupported = [c for c in claims if c.label == "unsupported"]
+        unsupported = [c for c in scorable if c.label == "unsupported"]
 
-        self.score = len(supported) / len(claims)
+        if not scorable:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                f"All {len(absence)} claim(s) are claims of absence, which "
+                f"cannot be traced to a passage: {absence[0].claim}"
+            )
+            return self.score
+
+        self.score = len(supported) / len(scorable)
         self.success = self.score >= self.threshold
 
         self.reason = (
-            f"Traced {len(supported)} of {len(claims)} claims to the text "
+            f"Traced {len(supported)} of {len(scorable)} claims to the text "
             "the agent saw"
         )
         if unsupported:
@@ -199,6 +219,11 @@ class ClaimSupportMetric(BaseMetric):
             self.reason += (
                 f" {unquoted} further claim(s) counted unsupported because the "
                 "quoted passage is not in the retrieved text."
+            )
+        if absence:
+            self.reason += (
+                f" {len(absence)} claim(s) of absence not scored, since nothing "
+                f"can be quoted to prove one: {absence[0].claim}"
             )
 
         return self.score

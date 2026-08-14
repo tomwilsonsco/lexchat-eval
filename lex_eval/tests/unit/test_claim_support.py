@@ -52,6 +52,10 @@ def _unsupported(claim: str) -> _Claim:
     return _Claim(claim=claim, label="unsupported", quote="")
 
 
+def _absence(claim: str) -> _Claim:
+    return _Claim(claim=claim, label="absence", quote="")
+
+
 # ---------------------------------------------------------------------------
 # Scoring
 # ---------------------------------------------------------------------------
@@ -144,6 +148,57 @@ def test_a_quote_with_different_punctuation_still_counts():
     metric.measure(_test_case())
 
     assert metric.score == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Claims of absence
+# ---------------------------------------------------------------------------
+
+
+def test_a_claim_of_absence_is_left_out_of_the_score():
+    """
+    Nothing can be quoted to prove the Act is silent on something, so scoring
+    such a claim would mark a report down for saying something true. Without
+    this, the record below would score 0.67 and fail.
+    """
+    claims = [
+        _supported("The controller determines the purposes of processing.",
+                   "determines the purposes and means of the processing"),
+        _supported("Section 3 defines processing terms.",
+                   "Terms relating to the processing of personal data"),
+        _absence("The Act does not impose a consultation requirement."),
+    ]
+    metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
+    metric.measure(_test_case())
+
+    assert metric.score == 1.0
+    assert metric.is_successful()
+    assert "Traced 2 of 2 claims" in metric.reason
+
+
+def test_claims_of_absence_are_named_in_the_reason():
+    """Excluded from the score, but still visible to a reviewer."""
+    claims = [
+        _supported("The controller determines the purposes of processing.",
+                   "determines the purposes and means of the processing"),
+        _absence("The Act does not impose a consultation requirement."),
+        _absence("The 2016 Act did not amend Section G2."),
+    ]
+    metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
+    metric.measure(_test_case())
+
+    assert "2 claim(s) of absence not scored" in metric.reason
+    assert "does not impose a consultation requirement" in metric.reason
+
+
+def test_a_report_of_only_absence_claims_has_nothing_to_trace():
+    claims = [_absence("The Act does not impose a consultation requirement.")]
+    metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
+    metric.measure(_test_case())
+
+    assert metric.score == 1.0
+    assert metric.is_successful()
+    assert "All 1 claim(s) are claims of absence" in metric.reason
 
 
 # ---------------------------------------------------------------------------

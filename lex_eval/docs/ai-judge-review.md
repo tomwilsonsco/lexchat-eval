@@ -1220,3 +1220,273 @@ problem rather than solved it:
 The only failures are q1 and q6 `mistral-large-3` at 0.343 and 0.418 — precisely the two genuine
 contradictions the judge found, now surfaced without a judge and without seven look-alike 0.4s
 buried on top of them.
+
+---
+
+## 13 August 2026 update — Claim Support no longer scores claims of absence
+
+**Done, not proposed.** `metrics/claim_support.py` gains a third claim label, `absence`, whose
+claims are counted and reported but left out of the score.
+
+**The defect.** The prompt requires the judge to copy an exact supporting passage for every claim
+it labels `supported`, and code re-checks that quote against the retrieved text. That is the right
+standard for a positive claim and the whole anti-fabrication guarantee of the metric. It is
+unsatisfiable for a claim that the law does *not* do something: "the Act does not impose a
+statutory consultation requirement for appointment of the chair", "the Scotland Act 2016 did not
+amend Section G2". The evidence for those is the absence of a passage, so there is nothing to
+quote, so the judge's only available label was `unsupported` and a true statement cost a mark.
+
+Four of the 24 stored records name such a claim as their first unsupported one, and one of them is
+a fail: **q6 `glm-5.2` at 0.75** against the 0.8 threshold, on "the Scotland Act 2012, the Scotland
+Act 2016, and the listed Schedule 5 modification orders did not amend Section G2". The count is a
+floor, not a total: `reason` prints only the first unsupported claim, so records whose absence
+claim was second or later are invisible without re-running the judge.
+
+This also put the metric at odds with `Genuine Gap`, which exists to reward the Worker for
+disclosing that it has nothing rather than answering with unsupported confidence. The prompt's
+existing line "a statement that something was not retrieved is not a claim about the law" already
+excluded the retrieval-failure half of that behaviour. The substantive half, a legal conclusion
+that the law is silent, is a claim about the law, so it was extracted and then could never pass.
+
+**The fix, and what it deliberately does not do.** `absence` claims leave the denominator, and the
+reason gains "N claim(s) of absence not scored, since nothing can be quoted to prove one: ...", so
+a lawyer reading the dashboard still sees them. This is report-only treatment, the same move made
+on `Consistency (Cosine)`'s citation-set gate in the update above, and for the same reason: the
+signal is real but it cannot decide a pass.
+
+The blind spot this leaves is stated rather than engineered around. An agent that retrieves 3
+sections of a 40-section Act and then declares the Act silent on consultation is not penalised
+here. The alternative considered was to keep scoring these claims against a different evidence
+test, requiring the judge to quote *the provision the report says is silent* rather than text
+proving the claim. It was rejected as machinery justifying machinery: a third label, an extra
+prompt paragraph, and a fuzzier judgement ("is that the right provision?") that would vary run to
+run. A wrongly asserted negative that contradicts a reference answer is already a `contradicted`
+point under `Reference Answer Agreement`, which fails a record outright — though note that safety
+net is provisional while all six reference answers still have `review.verified: false`. If the
+counts now surfaced in `reason` show bogus negatives are common, the per-provision evidence test
+can be built then, with evidence for it.
+
+3 new unit tests in `tests/unit/test_claim_support.py` (excluded from the score, named in the
+reason, all-absence report scores 1.0); 16 pass, 66 across `tests/unit`.
+
+**Numbers after the change**, `--suite groundedness --test-name claim_support --overwrite` over the
+same 24 stored responses. The `absence` label fired on exactly the 4 records predicted, all
+`glm-5.2`, and every one of them improved:
+
+| pair | before | after |
+| --- | --- | --- |
+| q5 glm | 0.875, 0.875 | 1.000, 1.000 |
+| q6 glm | 0.750, 0.875 | 0.857, 1.000 |
+
+q6 glm's 0.750 was the fail this change set out to fix; at 0.857 it now passes, with "the Scotland
+Act 2012 and the Scotland Act 2016 did not amend Section G2" reported as an unscored absence claim
+rather than counted against it.
+
+**The headline pass count nonetheless fell, 14 to 12,** and this is the more important result. On
+the 8 pairs where `absence` never fired, scores moved in both directions by up to 0.250 against
+identical stored responses and identical retrieval context: q2 glm 0.800/0.875 to 0.625/0.778 (2
+passes to 0), q1 `mistral-large-3` 0.625/0.875 to 0.714/0.750, q6 `mistral-large-3` 0.750/0.750 to
+0.625/0.750, q2 `mistral-large-3` 0.875/0.875 to 0.875/1.000. The claim counts themselves move,
+between 6 and 10 per record, so every difference in what the judge chooses to extract is worth
+1/N of the score.
+
+**The spread is the judge, not the prompt change.** Run A was re-run unchanged as run B, same
+prompt, same 24 stored responses, paired by `response_id`:
+
+| | |
+| --- | --- |
+| identical score | 6 of 24, and 2 of those are the gated q3 zeros |
+| verdict flips | 6 of 24, 25% |
+| mean absolute change | 0.109 |
+| largest change | 0.375, q2 glm 0.625 to 1.000 |
+
+So the 14-to-12 drop recorded above is itself within noise and should not be read as an effect of
+the `absence` change. Aggregate passes were 12 in both A and B.
+
+**What this costs the metric.** With 7 to 10 claims per record, one claim is worth 0.11 to 0.14,
+and the mean run-to-run movement is 0.109. The metric therefore cannot resolve a difference
+smaller than about one claim, and the 0.8 threshold sits inside its own noise band. Per record it
+cannot support regression testing: a quarter of records change verdict on a re-run of identical
+data, so a "regression" caught this way is as likely to be resampling as a real change.
+
+Aggregates hold up better but not well enough to trust a single run. Per-model means moved by
+0.064 (glm 0.856 to 0.920) and 0.051 (`mistral-large-3` 0.776 to 0.725) between A and B. The
+direction of the model comparison survived, glm ahead in both, but the size of the gap went from
++0.080 to +0.195. A gap of +0.080 is smaller than the per-run drift of either mean, so a single
+run cannot establish it.
+
+Worth noting against all of this: the four records where `absence` fired are the most stable in
+the set (1.000, 1.000, 1.000, and 0.857 to 1.000). Removing unscoreable claims removed a source of
+disagreement as well as a source of unfairness.
+
+**Not yet diagnosed.** The mechanism looks like claim *selection* rather than labelling: the
+denominator itself moves between 6 and 10, and a seed test on q5 glm (three calls at `seed=42`,
+identical prompt) returned three different claim lists, differing in which marginal claim was
+picked eighth. Seed is accepted by the OpenAI and Azure endpoints for this model but does not
+deliver reproducibility, and `temperature` is not a supported parameter for
+`openai/gpt-5.6-luna` on any OpenRouter endpoint, so the `temperature` field `judge.py` sends is
+being dropped.
+
+**Raising `REASONING_EFFORT` to `medium` was tested and does not fix it.** Two further runs, C and
+D, at `medium`, same protocol:
+
+| | low (A vs B) | medium (C vs D) |
+| --- | --- | --- |
+| identical score | 6 of 24 | 10 of 24 |
+| verdict flips | 6 of 24 | 3 of 24 |
+| mean absolute change | 0.109 | 0.099 |
+| largest change | 0.375 | **0.653** |
+| passes | 12, 12 | 14, 11 |
+
+Fewer records move, but the ones that move go further, and the mean movement is unchanged at about
+one claim. The worst case is q2 glm, 0.875 in C and 0.222 in D: run C extracted 8 claims and
+traced 7, run D extracted 9 and traced 2. Nothing about the response or the retrieval changed
+between those two calls. Note also that the aggregate stability seen at `low`, 12 passes in both
+runs, did not survive: `medium` gave 14 then 11. `medium` costs more per call for a worse tail, so
+the setting was reverted to `low`.
+
+This makes the claim-selection hypothesis the live one and the reasoning-budget hypothesis dead.
+The structural fix is to stop letting the judge choose the claim set on every run: extract the
+claims once, store them against the response, and have each run only label a frozen list against
+the retrieved text. That confines the judge to the labelling decision, which is the half with a
+verifiable quote check on it, and freezes the denominator so a score can only move when a label
+moves. Until something along those lines exists, `Claim Support` should not gate regression
+testing at the record level.
+
+---
+
+## 13 August 2026 — every judge metric moves on a re-run, not just Claim Support
+
+**Measurement, no code change.** Each remaining judge metric was run twice with `--overwrite` over
+identical stored responses at `REASONING_EFFORT=low`, and the two runs paired by `response_id`.
+Rows that never reach the judge are separated out, because they otherwise flatter the result.
+
+| metric | judged rows | identical | verdict flips | mean absolute change | largest |
+| --- | --- | --- | --- | --- | --- |
+| Claim Support | 22 | 4 | 6 | 0.119 | 0.375 |
+| Response Groundedness | 10 | 6 | 1 | 0.100 | 0.250 |
+| Reference Answer Agreement | 22 | 8 | 5 | 0.085 | 0.375 |
+
+**Every deterministic row was bit-identical across both runs**, in all three metrics: the 12
+near-verbatim short-circuits and 2 short-output gates in Response Groundedness, the 2 empty-context
+gates in Claim Support, the 2 gates in Reference Answer Agreement. The harness, the DB layer and
+the scoring arithmetic are stable. The movement is the judge, all of it.
+
+**Response Groundedness is not the stable one.** On the raw 24 rows it looks far better than the
+others, 20 identical and 1 flip, but 14 of its 24 rows never call the judge at all. Restricted to
+the 10 rows that do, it moves 4 times, with a mean of 0.100, which is the same order as Claim
+Support's 0.119. Its apparent stability is the `summarisation_used` near-copy short-circuit doing
+the work, not the judge behaving better.
+
+**What the shape of the noise suggests.** The two metrics that let the judge derive the item list
+on every run flip most: Claim Support re-chooses which claims the report makes, and Reference
+Answer Agreement re-chooses which points the reference answer contains, with observed denominators
+of 6, 7, 8 and 9 for the same reference answer. Response Groundedness asks for one 1-5 grade, so it
+has a single decision per record, but a one-step change is worth 0.25 and its threshold is 0.6, so
+one grade step still flips a verdict.
+
+**Consequences.**
+
+1. No judge metric in this harness can currently resolve a per-record change smaller than about
+   0.1, and all three thresholds sit inside that band. Per-record pass/fail from a judge metric
+   cannot support regression testing or performance-slide detection as things stand.
+2. Model comparison needs repeat runs and should be read at the aggregate, not per record. A gap
+   narrower than the per-run drift of the mean is not evidence.
+3. The deterministic metrics are unaffected and are the only ones currently fit to gate:
+   `Tool Usage`, `Research Output Structure`, `Citation Grounding`, `Citation Domain`,
+   `Genuine Gap`, `Citation Agreement`, `Consistency (Cosine)`.
+
+Three levers are available and none has been built: freeze the item list so the judge only labels
+a stored list (addresses the two extraction metrics directly); run each judge metric N times and
+take the mean or the majority verdict, at N times the cost; or drop the pass/fail gate on judge
+metrics and treat them as diagnostics for human reading, as was done with cosine's citation check.
+The choice belongs with the metric owner, not in this document.
+
+---
+
+## 14 August 2026 update — Response Groundedness moved to a binary rubric
+
+**Implemented.** The 1-5 ladder is gone. The judge now returns `pass` or `fail` and the score
+is 1.0 or 0.0. The deterministic near-verbatim short-circuit is unchanged, so the metric is a
+deterministic check first and a binary judge only where the answer materially diverges from
+the report.
+
+### The prompt change
+
+Everything above the rubric (the "before scoring, explicitly identify" scaffold) is untouched.
+The rubric and the output field are replaced:
+
+```
+-Then assign a score using this rubric:
+-1 - Multiple hallucinated or contradictory claims; the response cannot be trusted.
+-2 - Several claims are unsupported by or contradict the research output.
+-3 - Mostly grounded but contains at least one unsupported claim or meaningful misrepresentation.
+-4 - Only trivial wording differences; all substantive claims present in the research output.
+-5 - Every claim is directly and accurately traceable to the research output.
++Then return exactly one verdict:
++"fail" - you identified one or more unsupported claims or a meaningful misrepresentation.
++"pass" - you identified none of those; only trivial wording differences, and all substantive
++         claims are present in the research output.
++
++A shorter response is not a failure on its own. Leaving material out is a failure only where
++the omission changes the meaning of what remains.
+
+-    "score": <integer 1-5>,
++    "verdict": "<pass or fail>",
+```
+
+The verdict is a `Literal["pass", "fail"]` in the Pydantic schema, so strict JSON-schema mode
+constrains it at the provider rather than in Python.
+
+Two notes on the wording. The pass/fail boundary is exactly where the old threshold sat: ladder
+4 normalised to 0.75 and ladder 3 to 0.50 against a threshold of 0.6, so no record changes side
+by construction. The omission sentence is load-bearing: every record that reaches the judge is
+a `mistral` run that condenses the report by half or more, and without that sentence the rubric
+invites a fail on length alone.
+
+### The measurement behind it
+
+Both variants run 10 times over the same stored responses on the configured judge
+(`openai/gpt-5.6-luna`, temperature 0, effort `low`), 200 calls. Only the 10 records that reach
+the judge are counted; of the other 14, twelve are settled by the near-verbatim short-circuit
+and two by the output-length gate, and counting them would flatter both variants equally.
+
+| | ladder (1-5) | binary |
+| --- | --- | --- |
+| Calls landing on the minority verdict | 4 / 100 (4.0%) | **1 / 100 (1.0%)** |
+| Records whose underlying score moved at all | 6 / 10 | 1 / 10 |
+| Records with an unstable verdict | 1 / 10 | 1 / 10 |
+| Majority verdict agreement with the other variant | 10 / 10 | 10 / 10 |
+
+**Binary does not make the metric deterministic.** Both variants are unstable on the same single
+record, q1 `mistral` 10:59, which is genuinely borderline. The difference is degree: the ladder
+makes it a coin flip, 4 of 10 calls disagreeing with its own majority, where binary calls it
+9-to-1.
+
+**The larger effect is on the mean, not the verdicts.** The ladder's raw score moved on 6 of 10
+records, mostly 5 to 4 and 3 to 2. Those moves never cross the threshold but they moved the
+published average on every re-run, which is the drift the 13 August section documents. Binary
+removes it by construction: there is no gradation left to wobble.
+
+**What it costs.** The metric can no longer separate "one unsupported claim" from "cannot be
+trusted at all". On the stored data the ladder only ever used rungs 3 and 5 either side of the
+line, with 2 and 4 appearing as noise, so that resolution was not carrying information. If a
+reviewer later needs severity, the place to get it is an itemised list of unsupported claims as
+`Claim Support` returns, not a holistic grade.
+
+**Caveats.** 10 records, all `mistral-large-3`, because every `glm` run short-circuits before the
+judge. One judge model at one effort setting. At N=10 a single flip cannot distinguish a truly
+stable metric from a 1%-noise one.
+
+### Also changed
+
+The threshold is now **1.0** rather than 0.6, since the score is binary and nothing between the
+two values is reachable. `_THRESHOLD` in `tests/eval/test_groundedness.py` is renamed
+`_RESPONSE_GROUNDEDNESS_THRESHOLD`; it was only ever reached by this metric, as all three
+`Claim Support` call sites pass `_CLAIM_SUPPORT_THRESHOLD` explicitly. The judge-failure path is
+unchanged and still writes `score=0.0` with a `Judge error:` reason prefix, which
+`streamlit_report.py`'s `_NON_SCORED_PREFIXES` already excludes from the mean.
+
+**This does not address the extraction noise in the other two judge metrics.** `Claim Support`
+and `Reference Answer Agreement` re-derive their item list on every run, which the 13 August
+section identifies as the reason they flip most. That is a separate change.
