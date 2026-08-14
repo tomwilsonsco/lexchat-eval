@@ -1402,6 +1402,12 @@ take the mean or the majority verdict, at N times the cost; or drop the pass/fai
 metrics and treat them as diagnostics for human reading, as was done with cosine's citation check.
 The choice belongs with the metric owner, not in this document.
 
+**Update, 14 August 2026.** The first lever was built for `Reference Answer Agreement` and works:
+identical runs rose from 8 of 22 to 19 of 21, and the denominator stopped moving. It is **ruled out
+for `Claim Support`**, whose items come from the research report rather than from a fixed document,
+so there is nothing to freeze that survives a fresh gather run. `Claim Support`'s noise was measured
+instead: stable at the aggregate, not per record. See the two 14 August sections below.
+
 ---
 
 ## 14 August 2026 update — Response Groundedness moved to a binary rubric
@@ -1578,3 +1584,57 @@ the thing it is measuring.
 to it: its items come from the model's research output, which is new text on every gather run, so
 no list can be written in advance. Freezing per stored response would make re-scoring
 reproducible but would not make two gather runs comparable.
+
+---
+
+## 14 August 2026 update — Claim Support's noise floor, measured
+
+**No behaviour change.** The description in `README.md` and the dashboard tooltip is rewritten, and
+the metric's run-to-run noise is measured and written down. The scoring is untouched.
+
+### Why the fix that worked for Reference Answer Agreement is not available here
+
+`Reference Answer Agreement` was made repeatable by writing its item list down once, because its
+items come from the hand written reference answer, which is fixed text in the repo. `Claim Support`
+cannot do that. Its items are the claims the *research report* makes, and the report is new text on
+every gather run. Freezing a claim list per stored response would make re-scoring the same rows
+reproducible, but regression testing generates fresh answers to the same questions, so the
+extraction would run again anyway and the frozen list would be stale on arrival.
+
+This rules out the first of the three levers the 13 August section left open, for this metric
+specifically. The other two, repeat runs and dropping the pass/fail gate, are still open.
+
+### The measurement
+
+Three `--suite groundedness --test-name claim_support --overwrite` sweeps over the same 24 stored
+responses, 22 of which reach the judge.
+
+| sweep | mean over scored rows | records passing |
+| --- | --- | --- |
+| 1 | 0.829 | 12 / 22 |
+| 2 | 0.806 | 10 / 22 |
+| 3 | 0.825 | 13 / 22 |
+
+**The aggregate mean is stable: spread 0.023, standard deviation 0.012.** The per-record picture is
+not: mean spread 0.124 across the three sweeps, largest 0.403, and **7 of 22 records changed pass
+or fail** with nothing about the responses changing. The mechanism is visible in the claim counts,
+which moved on 7 of 22 records (q6 `glm` ran 6, 5 and 8 claims on the same stored response).
+
+**The pass count is the wrong headline.** It moved 12, 10, 13 across the three sweeps, a swing of 3
+records, while the mean moved by 0.023. A dashboard reader comparing pass counts between two builds
+would see a regression that is not there. Compare means.
+
+### How to use it
+
+- **A movement in the aggregate mean smaller than about 0.05 is not evidence of anything.** That is
+  roughly twice the observed standard deviation, and it is the smallest change worth investigating.
+  A cliff, the failure this metric is for, is far larger than that and will show clearly.
+- **A single record's pass or fail is not evidence at all.** Roughly a third of records flip on a
+  re-run. Use the itemised unsupported claims in `reason` as a lead to read the response, not as a
+  verdict.
+- Two things make this cheap to live with: the sweep takes under a minute, and the deterministic
+  metrics (`Tool Usage`, `Research Output Structure`, `Citation Grounding`, `Citation Domain`,
+  `Genuine Gap`, `Citation Agreement`, `Consistency (Cosine)`) are unaffected and remain the ones
+  fit to gate a build.
+
+The stored `eval_results` rows are from sweep 3.
