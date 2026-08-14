@@ -78,7 +78,7 @@ def process_question(
 
             if plan_data.get("needs_clarification"):
                 logger.warning(
-                    "Q%d: Deep Research plan needs clarification (%s) — skipping",
+                    "Q%d: Deep Research plan needs clarification (%s), skipping",
                     question_id,
                     plan_data.get("question", ""),
                 )
@@ -352,7 +352,7 @@ def main() -> None:
             sys.exit(1)
         logger.info("Filtered to question ID %d", args.question_id)
 
-    # No per-question skip check exists — every question is (re-)gathered on each
+    # No per-question skip check exists, every question is (re-)gathered on each
     # run. --overwrite clears prior responses first; otherwise runs are appended.
     pending = questions
 

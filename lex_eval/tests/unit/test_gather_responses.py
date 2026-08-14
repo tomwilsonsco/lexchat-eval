@@ -1,5 +1,5 @@
 """
-Unit tests for ``lex_eval.gather_responses.process_question`` — the function
+Unit tests for ``lex_eval.gather_responses.process_question``, the function
 that runs a single question through ``audit_capture`` and returns a record dict.
 
 Tests focus on error handling:
@@ -107,7 +107,7 @@ AUDIT_SUCCESS = {
     "error": None,
 }
 
-# Audit event with an error but also a non-empty answer — tests Comment 4.
+# Audit event with an error but also a non-empty answer, tests Comment 4.
 # The capture layer returns is_error=True with a non-empty actual_output.
 AUDIT_ERROR_WITH_ANSWER = {
     "type": "audit",
@@ -133,7 +133,7 @@ AUDIT_ERROR_WITH_ANSWER = {
     "error": "Worker agent encountered an issue",
 }
 
-# Audit event with empty answer and an error — tests Comment 2.
+# Audit event with empty answer and an error, tests Comment 2.
 AUDIT_ERROR_EMPTY_ANSWER = {
     "type": "audit",
     "schema_version": 1,
@@ -160,7 +160,7 @@ AUDIT_ERROR_EMPTY_ANSWER = {
 
 
 # ---------------------------------------------------------------------------
-# Tests — Comment 4: is_error/error_message pass-through on non-empty output
+# Tests, Comment 4: is_error/error_message pass-through on non-empty output
 # ---------------------------------------------------------------------------
 
 
@@ -219,7 +219,7 @@ class TestIsErrorPassThrough:
 
 
 # ---------------------------------------------------------------------------
-# Tests — Comment 2: error_message preserved on empty output failure
+# Tests, Comment 2: error_message preserved on empty output failure
 # ---------------------------------------------------------------------------
 
 
@@ -285,7 +285,7 @@ class TestErrorMessagePreservedOnFailure:
 
 
 # ---------------------------------------------------------------------------
-# Tests — deep_research plan capture (POST /api/research/plan)
+# Tests, deep_research plan capture (POST /api/research/plan)
 # ---------------------------------------------------------------------------
 
 

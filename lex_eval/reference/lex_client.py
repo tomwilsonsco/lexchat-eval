@@ -5,7 +5,7 @@ same endpoints, the same request payloads, the same response slimming and the sa
 Phase-2 nudge. The retrieved text is therefore byte-for-byte what LexChat would have
 received for the same queries.
 
-Tool results are recorded in full — LexChat summarises anything over a size
+Tool results are recorded in full. LexChat summarises anything over a size
 threshold, but a reference answer should rest on the primary text.
 """
 
@@ -42,7 +42,7 @@ _MAX_BACKOFF_S = 8.0
 
 
 # ---------------------------------------------------------------------------
-# Response shaping — copied from LexChat/server_py/src/agent/tools/lex.py
+# Response shaping, copied from LexChat/server_py/src/agent/tools/lex.py
 # ---------------------------------------------------------------------------
 
 
@@ -118,7 +118,7 @@ def _sections_of(response: Any) -> List[dict]:
 
 @dataclass
 class ApiCall:
-    """One LEX request/response — the unit the retrieval audit is derived from."""
+    """One LEX request/response, the unit the retrieval audit is derived from."""
 
     tool: str
     url: str
@@ -269,7 +269,7 @@ class LexTools:
         return context
 
     def sources_retrieved(self) -> List[Dict[str, Any]]:
-        """Provisions whose text was actually pulled — what a citation must match."""
+        """Provisions whose text was actually pulled: what a citation must match."""
         seen: Dict[str, Dict[str, Any]] = {}
         for call in self.api_calls:
             if call.tool == "search_legislation_sections":

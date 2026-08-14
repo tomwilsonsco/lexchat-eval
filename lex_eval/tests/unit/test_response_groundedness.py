@@ -44,7 +44,7 @@ def test_near_verbatim_relay_skips_judge_and_scores_full_marks():
         "Section 6 of the Data Protection Act 2018 defines a controller as a "
         "person who determines the purposes and means of processing personal data."
     )
-    # Trivial wording tweak only — well above the 0.95 similarity threshold.
+    # Trivial wording tweak only, well above the 0.95 similarity threshold.
     actual_output = (
         "Section 6 of the Data Protection Act 2018 defines a controller as the "
         "person who determines the purposes and means of processing personal data."

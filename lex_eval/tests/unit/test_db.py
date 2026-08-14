@@ -1,5 +1,5 @@
 """
-Unit tests for ``lex_eval.utils.db`` — DuckDB storage layer.
+Unit tests for ``lex_eval.utils.db``, DuckDB storage layer.
 
 Tests focus on the ``init_db`` migration exception handling:
   - CatalogException (column already exists) → logged at DEBUG, skipped
@@ -53,7 +53,7 @@ class _FailingConnection:
 
 
 # ---------------------------------------------------------------------------
-# Tests — init_db migration exception handling
+# Tests, init_db migration exception handling
 # ---------------------------------------------------------------------------
 
 
@@ -72,7 +72,7 @@ class TestInitDbMigrationHandling:
         # Create the full table schema (same as init_db would on a fresh DB)
         conn.execute(_CREATE_TABLE)
 
-        # Run init_db again — migrations will try to add columns that
+        # Run init_db again, migrations will try to add columns that
         # already exist, raising CatalogException
         with caplog.at_level(logging.DEBUG, logger="lex_eval.utils.db"):
             init_db(conn)
@@ -85,7 +85,7 @@ class TestInitDbMigrationHandling:
             "CatalogException (column already exists)"
         )
 
-        # Should NOT have any WARNING logs — all migration statements should
+        # Should NOT have any WARNING logs, all migration statements should
         # either succeed or raise CatalogException (column already exists).
         # This is a regression test for the NOT NULL constraint issue where
         # ParserException was raised instead of CatalogException.

@@ -10,7 +10,7 @@ def get_active_model() -> Tuple[Optional[str], Optional[str]]:
     """
     Query LexChat's /api/models endpoint and find the active model.
 
-    The active model is the one configured in LexChat's admin portal — this is
+    The active model is the one configured in LexChat's admin portal, this is
     the model that will actually process requests. The eval does not select or
     override the model; it reads it from the API.
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         if summ_model == model:
             print(
                 f"Summarisation model:           {summ_model}"
-                "  (same as active model — no separate summarisation model configured)"
+                "  (same as active model, no separate summarisation model configured)"
             )
         else:
             print(

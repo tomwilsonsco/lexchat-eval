@@ -1,11 +1,11 @@
 """
 Metrics that validate Worker Agent output quality.
 
-MandatoryStructureMetric  — checks the 4-part Markdown heading structure.
-CitationPassthroughMetric — checks that Worker references reach the final response.
-CitationGroundingMetric   — checks that Worker citations were actually retrieved.
-CitationDomainMetric      — checks that Worker citation URLs are on legislation.gov.uk.
-GenuineGapMetric          — checks that an empty retrieval is disclosed, not papered over.
+MandatoryStructureMetric:  checks the 4-part Markdown heading structure.
+CitationPassthroughMetric: checks that Worker references reach the final response.
+CitationGroundingMetric:   checks that Worker citations were actually retrieved.
+CitationDomainMetric:      checks that Worker citation URLs are on legislation.gov.uk.
+GenuineGapMetric:          checks that an empty retrieval is disclosed, not papered over.
 
 All five metrics inspect the ``delegate_research`` tool-call output, which is where
 the Worker Agent's response is surfaced.
@@ -32,10 +32,10 @@ _URL_RE = re.compile(r"https?://[^\s\)\]>,\"']+")
 #
 # Each entry may be either a single string or a list of acceptable
 # alternatives. The summary heading accepts both "Summary Answer (BLUF)"
-# and "Summary Answer" — the (BLUF) qualifier is a stylistic hint in the
+# and "Summary Answer", the (BLUF) qualifier is a stylistic hint in the
 # Worker system prompt (see LexChat/server_py/src/config.py), not a
 # semantic requirement, so either form passes. Likewise "Jurisdiction &
-# Status"/"Jurisdiction & Currency" accept the spelled-out "and" — models
+# Status"/"Jurisdiction & Currency" accept the spelled-out "and", models
 # routinely paraphrase the prompt's literal "&" this way.
 REQUIRED_HEADINGS = {
     "legislation_only": [
@@ -61,7 +61,7 @@ REQUIRED_HEADINGS = {
 }
 
 # A heading match must sit at the start of its line, after only "decoration"
-# characters (whitespace, #, *, digits, '.', '-', ':') — this is what lets a
+# characters (whitespace, #, *, digits, '.', '-', ':'), this is what lets a
 # bare substring check for something like "References" tell a real heading
 # apart from the word appearing mid-sentence in ordinary legal prose (e.g.
 # "references to the 1978 Act..."), without requiring a literal Markdown
@@ -92,8 +92,8 @@ class MandatoryStructureMetric(BaseMetric):
     numbering so minor formatting variations don't cause false failures.
 
     Score:
-        1.0  — all mandatory headings present (pass)
-        0.0  — one or more headings missing, or no delegate_research call found
+        1.0: all mandatory headings present (pass)
+        0.0: one or more headings missing, or no delegate_research call found
     """
 
     def __init__(
@@ -162,10 +162,10 @@ class CitationPassthroughMetric(BaseMetric):
     the final response delivered to the user.
 
     Score:
-        0.0  — Failure A: no URLs found in Worker output at all.
-        0.5  — Failure B: one or more Worker links are missing from the
+        0.0: Failure A: no URLs found in Worker output at all.
+        0.5: Failure B: one or more Worker links are missing from the
                           final response (citation links were dropped).
-        1.0  — Pass: every Worker URL is present in the final response.
+        1.0: Pass: every Worker URL is present in the final response.
 
     Threshold defaults to 1.0, so both failure modes are recorded as fails.
     """
@@ -313,12 +313,12 @@ class CitationGroundingMetric(BaseMetric):
     rule-based check can't make).
 
     Score:
-        0.0  — no delegate_research call found; citations cannot be verified.
-        1.0  — no legislation.gov.uk citation URLs in Worker output (nothing
+        0.0: no delegate_research call found; citations cannot be verified.
+        1.0: no legislation.gov.uk citation URLs in Worker output (nothing
                to falsely ground).
-        0.0  — one or more cited Acts were never retrieved by search_legislation,
+        0.0: one or more cited Acts were never retrieved by search_legislation,
                search_legislation_sections, or get_legislation_text in this run.
-        1.0  — every cited Act was retrieved by this run.
+        1.0: every cited Act was retrieved by this run.
 
     No partial credit: unlike Reference Links, where "some links survived" is
     a meaningfully different failure from "none did", one fabricated citation
@@ -399,10 +399,10 @@ class CitationDomainMetric(BaseMetric):
     ("Do not invent URLs for domains other than legislation.gov.uk").
 
     Score:
-        0.0  — no delegate_research call found; domains cannot be verified.
-        1.0  — no citation URLs in Worker output (nothing to check).
-        0.0  — one or more citation URLs point to a different domain.
-        1.0  — every citation URL is on legislation.gov.uk.
+        0.0: no delegate_research call found; domains cannot be verified.
+        1.0: no citation URLs in Worker output (nothing to check).
+        0.0: one or more citation URLs point to a different domain.
+        1.0: every citation URL is on legislation.gov.uk.
 
     No partial credit, same reasoning as Citation Grounding: one invented
     domain is a full failure regardless of how many other citations are fine.
@@ -516,14 +516,14 @@ class GenuineGapMetric(BaseMetric):
     are specific to legislation retrieval.
 
     Score:
-        0.0  — no delegate_research call found; cannot be verified.
-        1.0  — research_mode is not legislation_only; check doesn't apply.
-        1.0  — at least one section/full-text tool call returned usable content;
+        0.0: no delegate_research call found; cannot be verified.
+        1.0: research_mode is not legislation_only; check doesn't apply.
+        1.0: at least one section/full-text tool call returned usable content;
                nothing to disclose.
-        1.0  — retrieval was empty, and the exact mandated sentence is present.
-        0.5  — retrieval was empty, and a paraphrase of it is present (disclosed
+        1.0: retrieval was empty, and the exact mandated sentence is present.
+        0.5: retrieval was empty, and a paraphrase of it is present (disclosed
                the gap, just not in the mandated wording).
-        0.0  — retrieval was empty, and nothing disclosing the gap is present.
+        0.0: retrieval was empty, and nothing disclosing the gap is present.
     """
 
     def __init__(

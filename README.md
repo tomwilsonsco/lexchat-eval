@@ -24,7 +24,7 @@ PASSWORD=admin
 
 # OpenRouter judge (judge LLM for AI-as-judge metrics)
 OPENROUTER_API_KEY=yourkeyhere
-# Any OpenRouter model — openai/gpt-4o is the default, o4-mini for more thorough evals
+# Any OpenRouter model, openai/gpt-4o is the default, o4-mini for more thorough evals
 OPENROUTER_JUDGE_MODEL=openai/gpt-4o
 
 ```
@@ -63,14 +63,14 @@ python lex_eval/gather_responses.py --question-id 1 --debug-events --verbose-cap
 
 ### Diagnosing capture issues
 
-Two flags are available when a response looks wrong — empty fields, missing tools, zero retrieval context, etc.:
+Two flags are available when a response looks wrong: empty fields, missing tools, zero retrieval context, etc.
 
 | Flag | Output | Use when… |
 |---|---|---|
-| `--debug-events` | `data/debug_events.jsonl` — one JSON line per raw SSE event, appended | You suspect the **server sent unexpected data** — field renamed, event type missing or added, payload structure changed |
-| `--verbose-capture` | `data/verbose_logs/Q{id}_{YYYYMMDD}_{HHMMSS}.log` — one file per question | You got a **wrong capture result** — `research_output` empty, `tool_sequence` incomplete, zero `retrieval_context` items |
+| `--debug-events` | `data/debug_events.jsonl`, one JSON line per raw SSE event, appended | You suspect the **server sent unexpected data**: field renamed, event type missing or added, payload structure changed |
+| `--verbose-capture` | `data/verbose_logs/Q{id}_{YYYYMMDD}_{HHMMSS}.log`, one file per question | You got a **wrong capture result**: `research_output` empty, `tool_sequence` incomplete, zero `retrieval_context` items |
 
-`--debug-events` shows what arrived **over the wire** before `audit_capture` processes it. `--verbose-capture` shows what `audit_capture` **decided to do** with each event — stack state before/after, action taken, and a final state summary.
+`--debug-events` shows what arrived **over the wire** before `audit_capture` processes it. `--verbose-capture` shows what `audit_capture` **decided to do** with each event, stack state before/after, action taken, and a final state summary.
 
 Because `--debug-events` appends all questions into a single file, it is cleanest when combined with `--question-id`. `--verbose-capture` always writes one file per question so it is safe to use across all questions concurrently.
 
@@ -85,7 +85,7 @@ diff \
 Responses are stored in `lex_eval/data/responses.db` (DuckDB).
 Each question is attempted up to 3 times; only complete responses (non-empty `actual_output`) are written to the database.
 
-**The model used for responses is always set in LexChat's Admin Portal.** The eval does not select or override the model — `gather_responses.py` reads the active model from the LexChat API and records it in `responses.db`. To evaluate a different model, change it in the Admin Portal first, then re-run.
+**The model used for responses is always set in LexChat's Admin Portal.** The eval does not select or override the model. `gather_responses.py` reads the active model from the LexChat API and records it in `responses.db`. To evaluate a different model, change it in the Admin Portal first, then re-run.
 
 We need to gather at least two responses per question per llm to evaluate response consistency. So starting from the beginning this is the recommended process.
 
@@ -131,7 +131,7 @@ python lex_eval/run_evals.py -v
 
 Results are written to the `eval_results` table in `lex_eval/data/responses.db`.
 By default, tests are skipped if results already exist for a (question, LLM)
-pair — use `--overwrite` to force re-running.
+pair, use `--overwrite` to force re-running.
 
 ### Evaluation requirements
 
@@ -175,7 +175,7 @@ responses against. Each answer is researched against the live LEX API using the 
 tools LexChat's Worker agent uses, so it rests on exactly the material LexChat would have retrieved,
 and is then written up by hand.
 
-This does **not** need a running LexChat instance — it talks to the LEX API directly, so it works
+This does **not** need a running LexChat instance. It talks to the LEX API directly, so it works
 when Steps 1-2 cannot run.
 
 > Generated answers are **unverified drafts** until a lawyer completes the review block at the foot
@@ -214,7 +214,7 @@ python -m lex_eval.reference.build --overwrite        # rebuild a question that 
 
 In `lex_eval/data/reference_answers/.authored/q{id}/`:
 
-**`searches.json`** — the LEX tool calls to make. Follow the Worker's phases: `search_legislation`
+**`searches.json`**: the LEX tool calls to make. Follow the Worker's phases: `search_legislation`
 to find the Acts, then `search_legislation_sections` to pull the provisions from each one
 (`get_legislation_text` is available as a fallback for a whole Act).
 
@@ -230,7 +230,7 @@ to find the Acts, then `search_legislation_sections` to pull the provisions from
 You will usually run the build twice here: once with the Phase 1 searches to find the
 `legislation_id`s, then again after adding the Phase 2 section searches (`--refetch`).
 
-**`plan.json`** — how the question breaks down. Recorded so the reasoning behind the answer is
+**`plan.json`**: how the question breaks down. Recorded so the reasoning behind the answer is
 reviewable, not just the conclusion.
 
 ```json
@@ -240,7 +240,7 @@ reviewable, not just the conclusion.
 }
 ```
 
-**`answer.md`** — the answer itself, written from `retrieved.md`. Ground every statement in the
+**`answer.md`**: the answer itself, written from `retrieved.md`. Ground every statement in the
 retrieved text and cite it. Use the four headings the Worker system prompt mandates:
 **Summary Answer (BLUF)**, **Detailed Analysis**, **Jurisdiction & Status**, **References**.
 
@@ -269,8 +269,8 @@ flagged `stale: true`.
 
 Each answer records two lists of sources, and the distinction matters when checking citations:
 
-- **`sources_retrieved`** — provisions whose text was actually pulled. Citing one is grounded.
-- **`sources_discovered`** — Acts and SIs that appeared in a search result but were never read. They
+- **`sources_retrieved`**: provisions whose text was actually pulled. Citing one is grounded.
+- **`sources_discovered`**: Acts and SIs that appeared in a search result but were never read. They
   exist and were found, but the answer never saw their text, and should say so.
 
 Both appear in the Markdown so a reviewer can check every citation against them.

@@ -81,7 +81,7 @@ _AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)"}
 # Reason prefixes written by judge exceptions and harness capture gates (see
 # metrics/*.py except blocks, tests/eval/test_groundedness.py gate functions,
 # and structure.py's delegate_research precondition). Rows carrying one of
-# these are not a genuine quality verdict — excluded from the mean, reported
+# these are not a genuine quality verdict, excluded from the mean, reported
 # separately instead of averaged in as 0.0.
 _NON_SCORED_PREFIXES = (
     "Judge error:",
@@ -333,7 +333,7 @@ def _render_metric_summary_table(metrics: list[dict]) -> None:
         not_scored_count = m.get("not_scored_count", 0)
 
         if not m.get("scored", True):
-            # Every run in this group was a judge error or capture gate —
+            # Every run in this group was a judge error or capture gate,
             # nothing to show a score or pass/fail status for.
             score_cell = (
                 '<span style="background:#30363d;color:#8b949e;padding:2px 8px;'

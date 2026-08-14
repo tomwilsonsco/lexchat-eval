@@ -2,9 +2,9 @@
 
 Two artefacts per question:
 
-* `q{id}.md` — for a lawyer to review: the plan, the answer, the retrieval audit and
+* `q{id}.md`, for a lawyer to review: the plan, the answer, the retrieval audit and
   a sign-off block.
-* an entry in `reference_answers.json` — the machine-readable manifest metrics read.
+* an entry in `reference_answers.json`, the machine-readable manifest metrics read.
 """
 
 from __future__ import annotations
@@ -148,7 +148,7 @@ def _fmt_discovered(sources: List[Dict[str, Any]]) -> str:
     if not sources:
         return "_Every Act and SI found in search was also retrieved._"
     return "\n".join(
-        f"- `{s.get('legislation_id', '')}` — {s.get('title', '')}" for s in sources
+        f"- `{s.get('legislation_id', '')}`, {s.get('title', '')}" for s in sources
     )
 
 
@@ -156,11 +156,11 @@ def render_markdown(record: Dict[str, Any]) -> str:
     """Render one reference answer for lawyer review."""
     r = record
     review = r.get("review", {})
-    status = "VERIFIED" if review.get("verified") else "UNVERIFIED — draft"
+    status = "VERIFIED" if review.get("verified") else "UNVERIFIED, draft"
     if review.get("stale"):
         status += " (review is STALE: the answer changed after sign-off)"
 
-    return f"""# Q{r['question_id']} — {r['question']}
+    return f"""# Q{r['question_id']}: {r['question']}
 
 > **Status: {status}.** Researched against the live LEX API using LexChat's own
 > legislation tools, and written by {r.get('author', 'unknown')}. This becomes a

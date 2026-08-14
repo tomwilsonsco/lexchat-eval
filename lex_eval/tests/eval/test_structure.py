@@ -4,7 +4,7 @@ headings required by its system prompt for the given research mode.
 
 For ``legislation_only`` the expected headings are:
 
-    **Summary Answer (BLUF):**   (or **Summary Answer:** — the (BLUF)
+    **Summary Answer (BLUF):**   (or **Summary Answer:**, the (BLUF)
                                   qualifier is optional)
     **Detailed Analysis:**
     **Jurisdiction & Status:**

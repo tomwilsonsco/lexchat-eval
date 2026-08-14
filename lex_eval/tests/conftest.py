@@ -29,7 +29,7 @@ def pytest_configure(config):
 
     config.addinivalue_line(
         "markers",
-        "unit: unit tests for the lex_eval harness itself (capture, DB, gather) — fast, offline, no LLM",
+        "unit: unit tests for the lex_eval harness itself (capture, DB, gather), fast, offline, no LLM",
     )
     config.addinivalue_line(
         "markers",
@@ -73,7 +73,7 @@ def pytest_sessionfinish(session, exitstatus):
     subprocesses collecting/running a slice of the tests) or the controller
     (the process that dispatches to workers and merges their results). DuckDB
     allows only one read-write connection to a file at a time, so only the
-    controller may write here — if every worker wrote independently, their
+    controller may write here, if every worker wrote independently, their
     near-simultaneous connections would race and lock-error. Workers are
     identified by ``session.config.workerinput``, an attribute xdist sets
     only on worker processes; ship each worker's records to the controller
@@ -112,7 +112,7 @@ def pytest_testnodedown(node, error):
     """Merge a finished pytest-xdist worker's metric records into the controller's.
 
     Runs only on the controller, once per worker, before the controller's own
-    ``pytest_sessionfinish`` — so by the time that hook writes to DuckDB, every
+    ``pytest_sessionfinish``, so by the time that hook writes to DuckDB, every
     worker's results have already been folded into ``_metric_records``.
     """
     worker_records = (node.workeroutput or {}).get("metric_records", {})

@@ -1,6 +1,6 @@
 """
 Unit tests for ``lex_eval.metrics.structure.MandatoryStructureMetric``'s
-heading matching — synthetic Worker output, no DB or LexChat instance needed.
+heading matching, synthetic Worker output, no DB or LexChat instance needed.
 """
 
 import pytest
@@ -26,7 +26,7 @@ def _test_case(delegate_output: str) -> LLMTestCase:
 def test_prose_use_of_references_does_not_count_as_heading():
     """A missing References *section* must still fail, even when the word
     "references" appears earlier in ordinary prose (real failure mode found
-    in captured glm-5.2:cloud output — see structure.py)."""
+    in captured glm-5.2:cloud output, see structure.py)."""
     output = """### **Summary Answer (BLUF)**
 Some answer text.
 
@@ -64,7 +64,7 @@ Applies to Scotland.
 def test_jurisdiction_and_status_spelled_out_passes():
     """Model paraphrasing the prompt's literal "&" as "and" is compliant,
     not a missing-heading failure (real failure mode found in captured
-    mistral-large-3 output — see structure.py)."""
+    mistral-large-3 output, see structure.py)."""
     output = """### **Summary Answer (BLUF)**
 Some answer text.
 

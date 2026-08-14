@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS responses (
 # exists, which the exception handler in init_db catches and skips. This preserves
 # existing data.
 #
-# NOTE: DuckDB does not support ADD COLUMN with NOT NULL constraints — it raises
+# NOTE: DuckDB does not support ADD COLUMN with NOT NULL constraints, it raises
 # ParserException ("Adding columns with constraints not yet supported"). DEFAULT
 # alone is fine, but we omit it here for consistency. Columns are added without
 # constraints; the application code provides defaults via dict.get() with fallback
@@ -144,7 +144,7 @@ def get_connection(
 
     Pass ``read_only=True`` for read-only access. DuckDB's single-file format
     allows multiple concurrent read-only connections but only one read-write
-    connection at a time — read-only mode is required for callers that may run
+    connection at a time, read-only mode is required for callers that may run
     alongside other processes reading the same file (e.g. pytest-xdist workers
     collecting tests in parallel).
     """
@@ -162,7 +162,7 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
         try:
             conn.execute(stmt)
         except duckdb.CatalogException:
-            # Column already exists — roll back the aborted statement so the
+            # Column already exists, roll back the aborted statement so the
             # connection remains usable, then skip.
             try:
                 conn.execute("ROLLBACK")
@@ -174,7 +174,7 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
             logger.debug("Migration skipped (column may already exist): %s", col_hint)
         except Exception:
             # Unexpected migration failure (syntax error, type mismatch, etc.)
-            # — roll back and surface it at WARNING so real failures aren't
+            #, roll back and surface it at WARNING so real failures aren't
             # silently hidden at the default INFO log level.
             try:
                 conn.execute("ROLLBACK")
@@ -412,7 +412,7 @@ def clean_incomplete_responses(
                 OR retrieval_context = '[]' OR retrieval_context IS NULL
                 ORDER BY question_id, llm_name
                 """).fetchall()
-            print(f"Dry run — {count} row(s) would be deleted:")
+            print(f"Dry run, {count} row(s) would be deleted:")
             for row in rows:
                 rid, qid, llm, is_err, ctx = row
                 if is_err:
@@ -507,7 +507,7 @@ CREATE TABLE IF NOT EXISTS eval_results (
 # Columns added after the initial schema; applied to existing databases via
 # init_eval_results, mirroring the _MIGRATE_RESPONSES pattern above.
 _MIGRATE_EVAL_RESULTS = [
-    # Foreign key to responses.id. NULL on rows written before this migration —
+    # Foreign key to responses.id. NULL on rows written before this migration,
     # there is no reliable way to backfill which response they scored.
     "ALTER TABLE eval_results ADD COLUMN response_id INTEGER",
 ]

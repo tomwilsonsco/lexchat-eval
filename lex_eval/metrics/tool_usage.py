@@ -2,18 +2,18 @@
 Custom metric to validate that the LLM used all expected legislation tools
 *and* invoked them in the correct phase order.
 
-Presence scoring — 1/3 for each of the three required tools:
+Presence scoring, 1/3 for each of the three required tools:
     - delegate_research
     - Worker: search_legislation
     - Worker: search_legislation_sections
 
-Order scoring (legislation_only mode only) — the Worker tools must appear in
+Order scoring (legislation_only mode only), the Worker tools must appear in
 the phase order mandated by the Worker system prompt
 (see ``LexChat/server_py/src/prompts.py``):
 
-    1. Worker: search_legislation          (Phase 1 — DISCOVER)
-    2. Worker: search_legislation_sections (Phase 2 — RETRIEVE PROVISIONS)
-    3. Worker: get_legislation_text        (Phase 3 — FALLBACK, optional)
+    1. Worker: search_legislation          (Phase 1, DISCOVER)
+    2. Worker: search_legislation_sections (Phase 2, RETRIEVE PROVISIONS)
+    3. Worker: get_legislation_text        (Phase 3, FALLBACK, optional)
 
 A response must not only start the phases in this order, it must not loop
 back to an earlier phase once a later one has begun. For example, calling
@@ -72,7 +72,7 @@ def _check_tool_order(
     and that the Worker never loops back to an earlier phase once a later one
     has begun.
 
-    Only the ``Worker:``-prefixed entries are considered — ``delegate_research``
+    Only the ``Worker:``-prefixed entries are considered, ``delegate_research``
     is a Manager-level call and is excluded from the phase ordering.
 
     Returns ``(order_ok, detail)`` where *detail* is a short human-readable
@@ -165,7 +165,7 @@ class ToolUsageMetric(BaseMetric):
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
         tools_used: Set[str] = set()
         # Tools whose completion event was never received from the stream (server-side
-        # stream fault — the LLM did call them, but the result was never streamed back).
+        # stream fault, the LLM did call them, but the result was never streamed back).
         incomplete_tools: Set[str] = set()
 
         if test_case.tools_called:
@@ -206,7 +206,7 @@ class ToolUsageMetric(BaseMetric):
         if missing:
             self.reason += f" | Missing: {missing}"
 
-        # Order section — always shown for legislation_only when a sequence
+        # Order section, always shown for legislation_only when a sequence
         # was supplied, even on missing-tool fails, for transparency.
         if self.research_mode == "legislation_only" and self.tool_sequence:
             order_icon = "✓" if order_ok else "✗"
@@ -216,7 +216,7 @@ class ToolUsageMetric(BaseMetric):
 
         if incomplete_tools:
             self.reason += (
-                f" | WARNING — stream incomplete (no result event received) for: "
+                f" | WARNING, stream incomplete (no result event received) for: "
                 f"{sorted(incomplete_tools)}. LLM called the tool correctly; "
                 f"server failed to return the completion event."
             )

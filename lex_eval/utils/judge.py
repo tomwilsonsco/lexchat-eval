@@ -94,7 +94,7 @@ OPENROUTER_JUDGE_TEMPERATURE: float = _parse_temperature(
     os.getenv("OPENROUTER_JUDGE_TEMPERATURE")
 )
 
-# Retries for transient errors (rate limits, 5xx) — running multiple
+# Retries for transient errors (rate limits, 5xx), running multiple
 # pytest-xdist workers concurrently makes these more likely than in a fully
 # serial run. Backoff: 1s, 2s, 4s.
 _MAX_RETRIES = 3
@@ -149,7 +149,7 @@ class OpenRouterJudge:
     ) -> Any:
         """Make one judge call (with retry on transient rate-limit/5xx errors).
 
-        Raises ValueError if the model returns empty content — that is a
+        Raises ValueError if the model returns empty content, that is a
         reasoning-budget exhaustion, not a transient error, and is handled by
         the retry/fallback ladder in generate().
         """
