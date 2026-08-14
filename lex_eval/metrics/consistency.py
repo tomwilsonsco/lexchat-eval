@@ -22,7 +22,7 @@ import numpy as np
 import re
 
 _SECTION_CITATION_RE = re.compile(
-    r"(?:https?://)?(?:www\.)?legislation\.gov\.uk/[^\s)]+?/section/\d+",
+    r"(?:https?://)?(?:www\.)?legislation\.gov\.uk/[^\s)]+?/section/\d+[A-Za-z]*",
     re.IGNORECASE,
 )
 

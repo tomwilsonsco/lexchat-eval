@@ -173,8 +173,8 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
             )
             logger.debug("Migration skipped (column may already exist): %s", col_hint)
         except Exception:
-            # Unexpected migration failure (syntax error, type mismatch, etc.)
-            #, roll back and surface it at WARNING so real failures aren't
+            # Unexpected migration failure (syntax error, type mismatch, etc.).
+            # Roll back and surface it at WARNING so real failures aren't
             # silently hidden at the default INFO log level.
             try:
                 conn.execute("ROLLBACK")

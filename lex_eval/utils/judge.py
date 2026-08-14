@@ -49,6 +49,13 @@ def _parse_max_tokens(raw: str | None) -> int:
             _DEFAULT_MAX_TOKENS,
         )
         return _DEFAULT_MAX_TOKENS
+    if value <= 0:
+        logger.warning(
+            "OPENROUTER_JUDGE_MAX_TOKENS=%s must be positive; falling back to %s",
+            value,
+            _DEFAULT_MAX_TOKENS,
+        )
+        return _DEFAULT_MAX_TOKENS
     return value
 
 

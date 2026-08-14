@@ -71,6 +71,17 @@ def test_passes_when_cited_sections_match():
     assert metric.is_successful()
 
 
+def test_reports_a_differing_alphanumeric_section():
+    """Section numbers are not always plain digits, e.g. inserted sections
+    like s.10C, so the citation check must recognise those too."""
+    actual = "See [s.10C](http://www.legislation.gov.uk/ukpga/1974/37/section/10C)."
+    reference = "See [s.10](http://www.legislation.gov.uk/ukpga/1974/37/section/10)."
+    metric = ConsistencyMetric(reference_outputs=[reference], threshold=0.1)
+    metric.measure(_test_case(actual))
+
+    assert "citations differ" in metric.reason
+
+
 def test_preprocess_strips_link_target_but_keeps_link_text():
     """Citation URLs share a constant legislation.gov.uk prefix that would
     otherwise inflate cosine similarity with content-free boilerplate."""

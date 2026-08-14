@@ -29,6 +29,10 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 LEX_API_URL = os.getenv("LEX_API_URL", "https://lex.lab.i.ai.gov.uk").rstrip("/")
 
+# The target deployment sits behind SSL inspection, so TLS verification is off
+# by default to match LexChat. Set to "true" if pointed at a normal HTTPS endpoint.
+LEX_API_TLS_VERIFY = os.getenv("LEX_API_TLS_VERIFY", "false").strip().lower() == "true"
+
 # LexChat's production values (executor.py), with no research filters active.
 SEARCH_LIMIT = 5
 SECTION_LIMIT = 10
@@ -131,10 +135,15 @@ class ApiCall:
 class LexTools:
     """Executes the legislation tools and records everything it did."""
 
-    def __init__(self, *, timeout: float = 60.0, base_url: str = LEX_API_URL) -> None:
+    def __init__(
+        self,
+        *,
+        timeout: float = 60.0,
+        base_url: str = LEX_API_URL,
+        verify: bool = LEX_API_TLS_VERIFY,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
-        # verify=False matches LexChat, which runs behind SSL inspection on the target.
-        self._client = httpx.Client(timeout=timeout, verify=False)
+        self._client = httpx.Client(timeout=timeout, verify=verify)
         self.api_calls: List[ApiCall] = []
         self.outputs: List[str] = []
 
