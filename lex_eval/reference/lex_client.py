@@ -93,7 +93,12 @@ def _phase2_nudge(slimmed: dict) -> str:
 
 
 def _section_text(section: dict) -> str:
-    return section.get("content") or section.get("text") or section.get("section_text") or ""
+    return (
+        section.get("content")
+        or section.get("text")
+        or section.get("section_text")
+        or ""
+    )
 
 
 def _sections_of(response: Any) -> List[dict]:
@@ -155,7 +160,9 @@ class LexTools:
                 if attempt >= _MAX_RETRIES:
                     raise
                 delay = min(_BASE_BACKOFF_S * (2**attempt), _MAX_BACKOFF_S)
-                logger.warning("[LEX] %s network error (%r); retrying in %.1fs", tool, exc, delay)
+                logger.warning(
+                    "[LEX] %s network error (%r); retrying in %.1fs", tool, exc, delay
+                )
                 time.sleep(delay)
                 attempt += 1
                 continue
@@ -163,7 +170,9 @@ class LexTools:
 
             if resp.status_code in _RETRY_STATUS and attempt < _MAX_RETRIES:
                 delay = min(_BASE_BACKOFF_S * (2**attempt), _MAX_BACKOFF_S)
-                logger.warning("[LEX] %s HTTP %d; retrying in %.1fs", tool, resp.status_code, delay)
+                logger.warning(
+                    "[LEX] %s HTTP %d; retrying in %.1fs", tool, resp.status_code, delay
+                )
                 time.sleep(delay)
                 attempt += 1
                 continue
@@ -174,7 +183,9 @@ class LexTools:
                 resp_json = {"text": resp.text}
 
             self.api_calls.append(
-                ApiCall(tool, url, payload, resp.status_code, round(elapsed_ms), resp_json)
+                ApiCall(
+                    tool, url, payload, resp.status_code, round(elapsed_ms), resp_json
+                )
             )
             resp.raise_for_status()
             return resp_json
@@ -200,7 +211,9 @@ class LexTools:
                 "limit": SEARCH_LIMIT,
                 "include_text": False,
             }
-            slimmed = slim_search_results(self._post(name, "/legislation/search", payload))
+            slimmed = slim_search_results(
+                self._post(name, "/legislation/search", payload)
+            )
             slimmed["results"] = slimmed["results"][:SEARCH_LIMIT]
             slimmed["total"] = len(slimmed["results"])
             return json.dumps(slimmed) + _phase2_nudge(slimmed)
@@ -276,9 +289,11 @@ class LexTools:
                 if uri not in seen:
                     seen[uri] = {
                         "uri": uri,
-                        "title": call.response.get("title", "")
-                        if isinstance(call.response, dict)
-                        else "",
+                        "title": (
+                            call.response.get("title", "")
+                            if isinstance(call.response, dict)
+                            else ""
+                        ),
                         "legislation_id": lid,
                         "provision_type": "full_text",
                         "extent": [],

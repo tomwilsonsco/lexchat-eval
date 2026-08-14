@@ -55,9 +55,9 @@ def _parse_max_tokens(raw: str | None) -> int:
 OPENROUTER_JUDGE_MAX_TOKENS: int = _parse_max_tokens(
     os.getenv("OPENROUTER_JUDGE_MAX_TOKENS")
 )
-OPENROUTER_JUDGE_REASONING_EFFORT: str | None = os.getenv(
-    "OPENROUTER_JUDGE_REASONING_EFFORT"
-) or None
+OPENROUTER_JUDGE_REASONING_EFFORT: str | None = (
+    os.getenv("OPENROUTER_JUDGE_REASONING_EFFORT") or None
+)
 OPENROUTER_JUDGE_FALLBACK_MODEL: str | None = (
     os.getenv("OPENROUTER_JUDGE_FALLBACK_MODEL") or None
 )

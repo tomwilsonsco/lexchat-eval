@@ -142,7 +142,8 @@ def _aggregate_metrics(results: list[dict]) -> list[dict]:
                     "n_runs": len(metric_results),
                     "test_names": [r["test_name"] for r in metric_results],
                     "raw_results": metric_results,
-                    "passed": bool(scores) and mean_score >= metric_results[0]["threshold"],
+                    "passed": bool(scores)
+                    and mean_score >= metric_results[0]["threshold"],
                     "scored": bool(scores),
                     "not_scored_count": len(not_scored),
                     "not_scored_reasons": [r["reason"] for r in not_scored],
@@ -305,9 +306,7 @@ def _render_top_summary(hierarchy: dict) -> None:
 
 def _render_llm_summary_bar(llm: str, q_data: dict[int, list[dict]]) -> None:
     """header stats for an LLM"""
-    all_m = [
-        r for results in q_data.values() for r in results if r.get("scored", True)
-    ]
+    all_m = [r for results in q_data.values() for r in results if r.get("scored", True)]
     total = len(all_m)
     passed = sum(1 for r in all_m if r["passed"])
     pct = passed / total * 100 if total else 0.0
@@ -338,13 +337,11 @@ def _render_metric_summary_table(metrics: list[dict]) -> None:
             # nothing to show a score or pass/fail status for.
             score_cell = (
                 '<span style="background:#30363d;color:#8b949e;padding:2px 8px;'
-                'border-radius:4px;font-family:monospace;font-size:0.85em;'
+                "border-radius:4px;font-family:monospace;font-size:0.85em;"
                 'font-weight:600;" title="No run produced a quality verdict '
                 '(judge error or capture gate)">N/A</span>'
             )
-            status = (
-                '<span style="color:#8b949e;font-weight:600;">Not scored</span>'
-            )
+            status = '<span style="color:#8b949e;font-weight:600;">Not scored</span>'
         else:
             badge = _score_badge(score)
             status = _status_icon(passed)

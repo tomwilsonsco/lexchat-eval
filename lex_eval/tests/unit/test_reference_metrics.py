@@ -150,7 +150,9 @@ def test_a_contradiction_fails_the_metric_despite_a_high_score():
 
 def test_a_contradiction_quoting_words_not_in_the_response_is_counted_as_missing():
     judge = _StubJudge(
-        _labels(("stated", "words one"), ("contradicted", "words the response never used"))
+        _labels(
+            ("stated", "words one"), ("contradicted", "words the response never used")
+        )
     )
     metric = ReferenceAnswerAgreementMetric(
         statements=_STATEMENTS[:2], model=judge, threshold=0.5

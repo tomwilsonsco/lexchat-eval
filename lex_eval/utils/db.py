@@ -588,7 +588,9 @@ def clear_eval_results(
         conditions.append("test_name = ?")
         params.append(test_name)
     if conditions:
-        conn.execute(f"DELETE FROM eval_results WHERE {' AND '.join(conditions)}", params)
+        conn.execute(
+            f"DELETE FROM eval_results WHERE {' AND '.join(conditions)}", params
+        )
     else:
         conn.execute("DELETE FROM eval_results")
 

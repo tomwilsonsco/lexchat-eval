@@ -98,9 +98,7 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
                     (default 0.6).
     """
 
-    def __init__(
-        self, statements: List[str], model, threshold: float = 0.6
-    ) -> None:
+    def __init__(self, statements: List[str], model, threshold: float = 0.6) -> None:
         self.statements = list(statements)
         self.model = model
         self.threshold = threshold
@@ -109,9 +107,7 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
         self.success = False
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        numbered = "\n".join(
-            f"{i + 1}. {s}" for i, s in enumerate(self.statements)
-        )
+        numbered = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(self.statements))
         prompt = _PROMPT_TEMPLATE.format(
             input=test_case.input or "",
             statements=numbered,
@@ -182,9 +178,7 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
                 f"(states {len(stated)} of {len(ordered)} reference points)."
             )
         else:
-            self.reason = (
-                f"States {len(stated)} of {len(ordered)} reference points."
-            )
+            self.reason = f"States {len(stated)} of {len(ordered)} reference points."
         if unevidenced:
             self.reason += (
                 f" {unevidenced} further contradiction(s) counted as missing "

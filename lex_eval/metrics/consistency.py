@@ -39,7 +39,10 @@ def _preprocess(text: str) -> str:
 
 def _extract_citations(text: str) -> Set[str]:
     """Return the set of legislation.gov.uk section citation URLs in *text*."""
-    return {m.group(0).lower().rstrip("/") for m in _SECTION_CITATION_RE.finditer(text or "")}
+    return {
+        m.group(0).lower().rstrip("/")
+        for m in _SECTION_CITATION_RE.finditer(text or "")
+    }
 
 
 def _vectorize(texts: List[str]):

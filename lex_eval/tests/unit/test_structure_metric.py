@@ -16,7 +16,9 @@ def _test_case(delegate_output: str) -> LLMTestCase:
         input="q",
         actual_output="final answer",
         tools_called=[
-            ToolCall(name="delegate_research", input_parameters={}, output=delegate_output)
+            ToolCall(
+                name="delegate_research", input_parameters={}, output=delegate_output
+            )
         ],
     )
 

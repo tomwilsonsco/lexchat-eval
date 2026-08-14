@@ -160,7 +160,10 @@ def test_citation_agreement(request, record):
     Pre-flight gate: output must be > 50 chars.
     """
     ok, reason = _gate_output_length(
-        request, record, "citation_agreement", "Citation Agreement",
+        request,
+        record,
+        "citation_agreement",
+        "Citation Agreement",
         _COVERAGE_THRESHOLD,
     )
     if not ok:
@@ -212,7 +215,10 @@ def test_reference_answer_agreement(request, record):
     Pre-flight gate: output must be > 50 chars.
     """
     ok, reason = _gate_output_length(
-        request, record, "reference_answer_agreement", "Reference Answer Agreement",
+        request,
+        record,
+        "reference_answer_agreement",
+        "Reference Answer Agreement",
         _AGREEMENT_THRESHOLD,
     )
     if not ok:

@@ -402,7 +402,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             parser.error(f"No question with id {args.question_id} in questions.json")
 
     skipped = [
-        q for q in questions if q.get("research_mode", "legislation_only") not in SUPPORTED_MODES
+        q
+        for q in questions
+        if q.get("research_mode", "legislation_only") not in SUPPORTED_MODES
     ]
     if skipped:
         print(
@@ -432,7 +434,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                 )
             else:
                 message, record = process(
-                    question, args.answers_dir, args.author, previous.get(qid), refetch=args.refetch
+                    question,
+                    args.answers_dir,
+                    args.author,
+                    previous.get(qid),
+                    refetch=args.refetch,
                 )
         except Exception as exc:
             logger.debug("Q%s failed", qid, exc_info=True)

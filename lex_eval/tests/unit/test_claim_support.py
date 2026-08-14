@@ -63,10 +63,14 @@ def _absence(claim: str) -> _Claim:
 
 def test_every_claim_supported_scores_full_marks():
     claims = [
-        _supported("The controller determines the purposes of processing.",
-                   "determines the purposes and means of the processing"),
-        _supported("Section 3 defines processing terms.",
-                   "Terms relating to the processing of personal data"),
+        _supported(
+            "The controller determines the purposes of processing.",
+            "determines the purposes and means of the processing",
+        ),
+        _supported(
+            "Section 3 defines processing terms.",
+            "Terms relating to the processing of personal data",
+        ),
     ]
     metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
     metric.measure(_test_case())
@@ -78,12 +82,18 @@ def test_every_claim_supported_scores_full_marks():
 
 def test_one_unsupported_claim_in_four_fails_the_threshold():
     claims = [
-        _supported("The controller determines the purposes of processing.",
-                   "determines the purposes and means of the processing"),
-        _supported("Section 3 defines processing terms.",
-                   "Terms relating to the processing of personal data"),
-        _supported("The controller is the person who decides how data is used.",
-                   "the person who determines the purposes"),
+        _supported(
+            "The controller determines the purposes of processing.",
+            "determines the purposes and means of the processing",
+        ),
+        _supported(
+            "Section 3 defines processing terms.",
+            "Terms relating to the processing of personal data",
+        ),
+        _supported(
+            "The controller is the person who decides how data is used.",
+            "the person who determines the purposes",
+        ),
         _unsupported("Section 209 concerns intelligence services processing."),
     ]
     metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
@@ -99,10 +109,14 @@ def test_one_unsupported_claim_in_four_fails_the_threshold():
 def test_quote_not_in_retrieval_context_does_not_earn_support():
     """A judge that invents its own evidence cannot pass a record."""
     claims = [
-        _supported("The controller determines the purposes of processing.",
-                   "determines the purposes and means of the processing"),
-        _supported("The maximum fine is 20 million euros.",
-                   "the maximum penalty is 20 million euros"),
+        _supported(
+            "The controller determines the purposes of processing.",
+            "determines the purposes and means of the processing",
+        ),
+        _supported(
+            "The maximum fine is 20 million euros.",
+            "the maximum penalty is 20 million euros",
+        ),
     ]
     metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
     metric.measure(_test_case())
@@ -114,8 +128,10 @@ def test_quote_not_in_retrieval_context_does_not_earn_support():
 
 def test_quote_matching_ignores_whitespace_and_case():
     claims = [
-        _supported("The controller determines the purposes of processing.",
-                   "DETERMINES   the purposes\nand means of the processing"),
+        _supported(
+            "The controller determines the purposes of processing.",
+            "DETERMINES   the purposes\nand means of the processing",
+        ),
     ]
     metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
     metric.measure(_test_case())
@@ -129,9 +145,11 @@ def test_a_quote_trimmed_mid_sentence_still_counts():
     39 of 42 rejected quotes were genuine text trimmed like this.
     """
     claims = [
-        _supported("The controller determines the purposes of processing.",
-                   "The controller in relation to personal data is the person who "
-                   "determines the purposes and means of the proces"),
+        _supported(
+            "The controller determines the purposes of processing.",
+            "The controller in relation to personal data is the person who "
+            "determines the purposes and means of the proces",
+        ),
     ]
     metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
     metric.measure(_test_case())
@@ -141,8 +159,10 @@ def test_a_quote_trimmed_mid_sentence_still_counts():
 
 def test_a_quote_with_different_punctuation_still_counts():
     claims = [
-        _supported("The controller determines the purposes of processing.",
-                   "Section 6 -- the controller, in relation to personal data, is the person"),
+        _supported(
+            "The controller determines the purposes of processing.",
+            "Section 6 -- the controller, in relation to personal data, is the person",
+        ),
     ]
     metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
     metric.measure(_test_case())
@@ -162,10 +182,14 @@ def test_a_claim_of_absence_is_left_out_of_the_score():
     this, the record below would score 0.67 and fail.
     """
     claims = [
-        _supported("The controller determines the purposes of processing.",
-                   "determines the purposes and means of the processing"),
-        _supported("Section 3 defines processing terms.",
-                   "Terms relating to the processing of personal data"),
+        _supported(
+            "The controller determines the purposes of processing.",
+            "determines the purposes and means of the processing",
+        ),
+        _supported(
+            "Section 3 defines processing terms.",
+            "Terms relating to the processing of personal data",
+        ),
         _absence("The Act does not impose a consultation requirement."),
     ]
     metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
@@ -179,8 +203,10 @@ def test_a_claim_of_absence_is_left_out_of_the_score():
 def test_claims_of_absence_are_named_in_the_reason():
     """Excluded from the score, but still visible to a reviewer."""
     claims = [
-        _supported("The controller determines the purposes of processing.",
-                   "determines the purposes and means of the processing"),
+        _supported(
+            "The controller determines the purposes of processing.",
+            "determines the purposes and means of the processing",
+        ),
         _absence("The Act does not impose a consultation requirement."),
         _absence("The 2016 Act did not amend Section G2."),
     ]
@@ -239,13 +265,21 @@ _TOOLS = [
 
 
 def test_unsummarised_run_is_judged_against_the_raw_retrieval():
-    record = {"summarisation_used": False, "retrieval_context": _RAW, "tools_called": _TOOLS}
+    record = {
+        "summarisation_used": False,
+        "retrieval_context": _RAW,
+        "tools_called": _TOOLS,
+    }
     assert agent_visible_context(record) == _RAW
 
 
 def test_summarised_run_is_judged_against_what_the_agent_saw():
     """The agent never saw the full Act, so the full Act must not be judged against."""
-    record = {"summarisation_used": True, "retrieval_context": _RAW, "tools_called": _TOOLS}
+    record = {
+        "summarisation_used": True,
+        "retrieval_context": _RAW,
+        "tools_called": _TOOLS,
+    }
     assert agent_visible_context(record) == [
         "summary of section 6",
         "summary of the Act",
@@ -255,7 +289,11 @@ def test_summarised_run_is_judged_against_what_the_agent_saw():
 def test_the_report_itself_is_never_used_as_context():
     """delegate_research's output is the report; including it would let the
     report support its own claims."""
-    record = {"summarisation_used": True, "retrieval_context": _RAW, "tools_called": _TOOLS}
+    record = {
+        "summarisation_used": True,
+        "retrieval_context": _RAW,
+        "tools_called": _TOOLS,
+    }
     assert "the finished report" not in agent_visible_context(record)
 
 
@@ -285,7 +323,10 @@ def test_strict_schema_sets_additional_properties_false_everywhere():
     def objects_missing_flag(node, path="root"):
         missing = []
         if isinstance(node, dict):
-            if node.get("type") == "object" and node.get("additionalProperties") is not False:
+            if (
+                node.get("type") == "object"
+                and node.get("additionalProperties") is not False
+            ):
                 missing.append(path)
             for key, value in node.items():
                 missing += objects_missing_flag(value, f"{path}.{key}")

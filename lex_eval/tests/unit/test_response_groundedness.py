@@ -67,9 +67,7 @@ _DIVERGENT_RESEARCH_OUTPUT = (
     "necessity requirement before relying on section 8(2), and that power "
     "is limited by section 9."
 )
-_DIVERGENT_ACTUAL_OUTPUT = (
-    "The Act lets controllers process data under section 8(2)."
-)
+_DIVERGENT_ACTUAL_OUTPUT = "The Act lets controllers process data under section 8(2)."
 
 
 def test_divergent_response_failed_by_judge_scores_zero():
