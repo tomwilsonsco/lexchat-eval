@@ -73,7 +73,7 @@ class ResponseGroundednessMetric(BaseMetric):
     The verdict is asked for directly rather than as a 1-5 grade because the grade
     was unstable. Re-run on the same stored responses, the 1-5 version moved on 6
     of the 10 records that reach the judge, and one grade step was enough to flip a
-    verdict. See docs/ai-judge-review.md, 14 August 2026.
+    verdict. See docs/metrics.md.
 
     research_output is not a standard LLMTestCase field so it is passed
     via the constructor, following the same pattern as ClaimSupportMetric.

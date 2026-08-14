@@ -78,7 +78,7 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
     what makes the metric repeatable: when the judge picked the points on every
     run, 48% of calls disagreed with their own record's usual labelling and the
     denominator wandered between 6 and 9 for the same answer. Labelling a fixed
-    list, that fell to 7%. See docs/ai-judge-review.md.
+    list, that fell to 7%. See docs/metrics.md.
 
     This is the only metric that compares the response against material a person
     researched, so it is the only one that can catch a response that is faithful
