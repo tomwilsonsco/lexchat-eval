@@ -74,6 +74,30 @@ _PLAN_TEMPLATE = {
     ],
 }
 
+# The most statements Reference Answer Agreement will score against. A cap, not
+# a quota: a narrow question may only have two or three points a correct answer
+# has to make, and padding the list out to the cap adds statements no answer
+# needs to make, which lowers every score without telling them apart.
+MAX_STATEMENTS = 5
+
+_STATEMENTS_TEMPLATE = {
+    "_comment": (
+        "The statements Reference Answer Agreement scores a response against. "
+        f"Write only the points a correct answer MUST make, at most "
+        f"{MAX_STATEMENTS}, most important first. Do not pad the list to reach "
+        f"{MAX_STATEMENTS}: a statement no correct answer needs to make just "
+        "lowers every score. Each must be one sentence, must stand on its own "
+        "(the judge is shown these and the response under test, never the "
+        "reference answer), and must say what the law is rather than what this "
+        "document does. Delete the unused entries and this _comment key."
+    ),
+    "statements": [
+        f"REPLACE ME — statement {i + 1}, the {'most' if i == 0 else 'next most'} "
+        "important thing a correct answer must say (delete if not needed)."
+        for i in range(MAX_STATEMENTS)
+    ],
+}
+
 
 # ---------------------------------------------------------------------------
 # Per-question stages
@@ -92,6 +116,24 @@ def _is_template(text: str) -> bool:
     return not text or _TODO in text or "REPLACE ME" in text
 
 
+def read_statements(src: Path) -> List[str]:
+    """The authored statements for one question, most important first.
+
+    Between 1 and MAX_STATEMENTS of them. The cap is enforced because the judge
+    labels every statement it is given and the score is the share it states, so
+    a long list makes each point cheap; the lower bound is enforced because a
+    question with no statements cannot be scored at all.
+    """
+    raw = json.loads(_read(src / "statements.json"))
+    statements = [s.strip() for s in raw.get("statements") or [] if s.strip()]
+    if not 1 <= len(statements) <= MAX_STATEMENTS:
+        raise ValueError(
+            f"{src / 'statements.json'} has {len(statements)} statement(s); "
+            f"between 1 and {MAX_STATEMENTS} are required"
+        )
+    return statements
+
+
 def scaffold(src: Path, question: Dict[str, Any]) -> None:
     """Stage 1 — create the files the author fills in."""
     src.mkdir(parents=True, exist_ok=True)
@@ -100,6 +142,10 @@ def scaffold(src: Path, question: Dict[str, Any]) -> None:
     )
     (src / "plan.json").write_text(
         json.dumps(_PLAN_TEMPLATE, indent=2) + "\n", encoding="utf-8"
+    )
+    (src / "statements.json").write_text(
+        json.dumps(_STATEMENTS_TEMPLATE, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
     )
     (src / "answer.md").write_text(
         f"# {question['question']}\n\n{_TODO}\n\n"
@@ -188,6 +234,7 @@ def build(
     the `searches.json` that produced the answer.
     """
     answer = _read(src / "answer.md")
+    statements = read_statements(src)
     plan_raw = json.loads(_read(src / "plan.json"))
     plan = {
         "scope_note": plan_raw.get("scope_note", "").strip(),
@@ -208,6 +255,10 @@ def build(
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "author": author,
             "plan": plan,
+            # What Reference Answer Agreement scores against, frozen at authoring
+            # time so the judge labels a fixed list instead of re-choosing one on
+            # every run.
+            "statements": statements,
             # Two fields, same text: the `responses` table separates the Worker's
             # report from the Manager's reply to the user, and metrics read both.
             # There is no Manager here, so nothing rewrites the answer between them.
@@ -273,6 +324,8 @@ def process(
         return (f"WAITING     {src}/answer.md is still the template", None)
     if _is_template(_read(src / "plan.json")):
         return (f"WAITING     {src}/plan.json is still the template", None)
+    if _is_template(_read(src / "statements.json")):
+        return (f"WAITING     {src}/statements.json is still the template", None)
 
     record = build(question, src, searches, author, previous)
     return (
@@ -280,6 +333,29 @@ def process(
         f"{len(record['tool_sequence'])} tool calls",
         record,
     )
+
+
+def attach_statements(
+    question: Dict[str, Any], answers_dir: Path, previous: Optional[Dict[str, Any]]
+) -> tuple[str, Optional[Dict[str, Any]]]:
+    """Add authored statements to an answer that already exists.
+
+    Used to fit statements to answers written before they were introduced. The
+    searches are deliberately NOT replayed: the LEX corpus moves, and rebuilding
+    would leave the recorded retrieval audit no longer matching the text the
+    answer was actually written from.
+    """
+    qid = question["id"]
+    if not previous:
+        return (f"SKIPPED     no existing q{qid}.md to add statements to", None)
+
+    src = authored_dir(answers_dir, qid)
+    if _is_template(_read(src / "statements.json")):
+        return (f"WAITING     {src}/statements.json is still the template", None)
+
+    record = dict(previous)
+    record["statements"] = read_statements(src)
+    return (f"STATEMENTS  q{qid}.md — {len(record['statements'])} statements", record)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -301,6 +377,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--refetch",
         action="store_true",
         help="Re-run the searches even if retrieved.md exists (after editing searches.json).",
+    )
+    parser.add_argument(
+        "--statements-only",
+        action="store_true",
+        help=(
+            "Only add statements.json to answers that already exist, without "
+            "replaying their searches or touching their retrieval audit."
+        ),
     )
     parser.add_argument("--answers-dir", type=Path, default=ANSWERS_DIR)
     parser.add_argument("--verbose", action="store_true")
@@ -334,13 +418,22 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     for question in questions:
         qid = question["id"]
-        if not args.overwrite and (args.answers_dir / f"q{qid}.md").is_file():
+        if (
+            not args.overwrite
+            and not args.statements_only
+            and (args.answers_dir / f"q{qid}.md").is_file()
+        ):
             done.append(qid)
             continue
         try:
-            message, record = process(
-                question, args.answers_dir, args.author, previous.get(qid), refetch=args.refetch
-            )
+            if args.statements_only:
+                message, record = attach_statements(
+                    question, args.answers_dir, previous.get(qid)
+                )
+            else:
+                message, record = process(
+                    question, args.answers_dir, args.author, previous.get(qid), refetch=args.refetch
+                )
         except Exception as exc:
             logger.debug("Q%s failed", qid, exc_info=True)
             message, record = f"FAILED      {type(exc).__name__}: {exc}", None

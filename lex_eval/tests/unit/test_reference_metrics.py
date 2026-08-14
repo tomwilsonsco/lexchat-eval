@@ -96,16 +96,27 @@ def test_reference_citing_nothing_is_not_scored():
 # ---------------------------------------------------------------------------
 
 
-def _point(label: str, quote: str = "", point: str = "a point") -> _Point:
-    return _Point(point=point, label=label, quote=quote)
+def _labels(*pairs: tuple[str, str]) -> list[_Point]:
+    """One _Point per (label, quote), indexed from 1 as the judge must return them."""
+    return [
+        _Point(index=i + 1, label=label, quote=quote)
+        for i, (label, quote) in enumerate(pairs)
+    ]
 
 
-def test_score_is_the_share_of_points_stated():
+_STATEMENTS = [
+    "s.6 qualifies the UK GDPR definition of controller",
+    "s.6(2) allocates controllership where an enactment requires the processing",
+    "s.6 sits in Part 2, Chapter 2 of the Act",
+]
+
+
+def test_score_is_the_share_of_statements_stated():
     judge = _StubJudge(
-        [_point("stated", "words one"), _point("stated", "words two"), _point("missing")]
+        _labels(("stated", "words one"), ("stated", "words two"), ("missing", ""))
     )
     metric = ReferenceAnswerAgreementMetric(
-        reference_answer=_REFERENCE, model=judge, threshold=0.6
+        statements=_STATEMENTS, model=judge, threshold=0.6
     )
     metric.measure(_test_case("words one and words two"))
 
@@ -115,15 +126,17 @@ def test_score_is_the_share_of_points_stated():
 
 def test_a_contradiction_fails_the_metric_despite_a_high_score():
     judge = _StubJudge(
-        [
-            _point("stated", "words one"),
-            _point("stated", "words two"),
-            _point("stated", "words three"),
-            _point("contradicted", "is not the controller", point="s.6 defines the controller"),
-        ]
+        _labels(
+            ("stated", "words one"),
+            ("stated", "words two"),
+            ("stated", "words three"),
+            ("contradicted", "is not the controller"),
+        )
     )
     metric = ReferenceAnswerAgreementMetric(
-        reference_answer=_REFERENCE, model=judge, threshold=0.6
+        statements=_STATEMENTS + ["s.6 defines the controller"],
+        model=judge,
+        threshold=0.6,
     )
     metric.measure(
         _test_case("words one, words two, words three, but it is not the controller")
@@ -131,18 +144,16 @@ def test_a_contradiction_fails_the_metric_despite_a_high_score():
 
     assert metric.score == 0.75
     assert not metric.is_successful()
+    # The reason names the statement that was contradicted, looked up by index.
     assert "s.6 defines the controller" in metric.reason
 
 
 def test_a_contradiction_quoting_words_not_in_the_response_is_counted_as_missing():
     judge = _StubJudge(
-        [
-            _point("stated", "words one"),
-            _point("contradicted", "words the response never used"),
-        ]
+        _labels(("stated", "words one"), ("contradicted", "words the response never used"))
     )
     metric = ReferenceAnswerAgreementMetric(
-        reference_answer=_REFERENCE, model=judge, threshold=0.5
+        statements=_STATEMENTS[:2], model=judge, threshold=0.5
     )
     metric.measure(_test_case("words one"))
 
@@ -153,9 +164,51 @@ def test_a_contradiction_quoting_words_not_in_the_response_is_counted_as_missing
 
 def test_judge_failure_is_flagged_not_scored_as_a_bad_answer():
     metric = ReferenceAnswerAgreementMetric(
-        reference_answer=_REFERENCE, model=_FailingJudge()
+        statements=_STATEMENTS, model=_FailingJudge()
     )
     metric.measure(_test_case("anything"))
 
     assert metric.reason.startswith("Judge error:")
     assert not metric.is_successful()
+
+
+def test_a_wrong_label_count_is_retried_once():
+    """The judge returns a short or padded list on roughly 1 call in 22."""
+
+    class _FlakyJudge:
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, prompt, schema=None):
+            self.calls += 1
+            if self.calls == 1:
+                return _AgreementJudgement(points=_labels(("stated", "words one")))
+            return _AgreementJudgement(
+                points=_labels(
+                    ("stated", "words one"), ("stated", "words two"), ("missing", "")
+                )
+            )
+
+    judge = _FlakyJudge()
+    metric = ReferenceAnswerAgreementMetric(
+        statements=_STATEMENTS, model=judge, threshold=0.6
+    )
+    metric.measure(_test_case("words one and words two"))
+
+    assert judge.calls == 2
+    assert metric.score == pytest.approx(2 / 3)
+    assert metric.is_successful()
+
+
+def test_a_short_label_list_is_a_judge_error_not_a_shrunken_denominator():
+    """The whole point of a frozen list is that the denominator cannot move."""
+    judge = _StubJudge(_labels(("stated", "words one"), ("stated", "words two")))
+    metric = ReferenceAnswerAgreementMetric(
+        statements=_STATEMENTS, model=judge, threshold=0.6
+    )
+    metric.measure(_test_case("words one and words two"))
+
+    assert metric.score == 0.0
+    assert not metric.is_successful()
+    assert metric.reason.startswith("Judge error:")
+    assert "2 label(s) for 3 statements" in metric.reason

@@ -69,7 +69,7 @@ METRIC_TOOLTIPS: dict[str, str] = {
     "Genuine Gap": "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence.",
     "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
     "Citation Agreement": "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
-    "Reference Answer Agreement": "AI as a judge metric: How many of the main points in the hand written reference answer the response also makes. A point the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
+    "Reference Answer Agreement": "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
     "Claim Support": "AI as a judge metric: What share of the researcher's legal claims are backed by the text it actually read (a summary, if LexChat shortened the source). The judge must quote the supporting passage, and that quote is checked against the text, so invented evidence scores nothing. Claims that the law does not do something are listed in the detail but not scored, since no passage can be quoted to prove an absence.",
     "Response Groundedness": "AI as a judge metric: Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which fails it on any unsupported claim or meaningful misrepresentation and passes only trivial wording differences. There is no partial credit, so the average is a pass rate.",
 }
@@ -91,6 +91,7 @@ _NON_SCORED_PREFIXES = (
     "No reference outputs provided.",
     "No 'delegate_research' tool call found;",
     "No reference answer for this question;",
+    "No reference statements for this question;",
     "No reference answer citations to compare against;",
 )
 

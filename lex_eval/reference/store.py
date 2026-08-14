@@ -122,6 +122,15 @@ def _fmt_plan(plan: Optional[Dict[str, Any]]) -> str:
     return "\n".join(lines).rstrip()
 
 
+def _fmt_statements(statements: Optional[List[str]]) -> str:
+    if not statements:
+        return (
+            "_None recorded. Write them in `.authored/q{id}/statements.json`, then "
+            "run `python -m lex_eval.reference.build --statements-only`._"
+        )
+    return "\n".join(f"{i + 1}. {s}" for i, s in enumerate(statements))
+
+
 def _fmt_retrieved(sources: List[Dict[str, Any]]) -> str:
     if not sources:
         return "_Nothing retrieved._"
@@ -180,7 +189,18 @@ def render_markdown(record: Dict[str, Any]) -> str:
 
 ---
 
-## 3. Retrieval audit
+## 3. Key statements
+
+The points a correct answer has to make, most important first. These are the
+fixed list the `Reference Answer Agreement` metric scores a response against: the
+judge is shown these and the response, and labels each one stated, contradicted
+or missing. Editing them changes what that metric measures.
+
+{_fmt_statements(r.get('statements'))}
+
+---
+
+## 4. Retrieval audit
 
 Every provision the answer was permitted to rely on. A citation in section 2 that
 does not appear below is unsupported by this run's retrieval.
@@ -195,7 +215,7 @@ citing a provision above, and the answer should say so.
 
 ---
 
-## 4. Lawyer review
+## 5. Lawyer review
 
 Complete this section, then set `verified: true` for this question in
 `reference_answers.json`.

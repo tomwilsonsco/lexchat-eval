@@ -193,8 +193,14 @@ printing what it needs from you next:
 | Stage | What the script does | What you do next |
 | --- | --- | --- |
 | **SCAFFOLD** | Creates `.authored/q{id}/` with template files | Fill in `searches.json` |
-| **RETRIEVE** | Runs your searches, writes `retrieved.md` | Read it, then write `plan.json` and `answer.md` |
+| **RETRIEVE** | Runs your searches, writes `retrieved.md` | Read it, then write `plan.json`, `answer.md` and `statements.json` |
 | **BUILT** | Writes `q{id}.md` and updates the manifest | Send it for lawyer review |
+
+`statements.json` holds the key statements a correct answer has to make, most important first, at most 5.
+They are what `Reference Answer Agreement` scores a response against, and they are written once and
+stored with the answer so that the judge labels a fixed list instead of choosing the points again on
+every run. Each one should be a single self-contained sentence about what the law says, since the
+judge sees the statements and the response under test but never the reference answer itself.
 
 Useful flags:
 
@@ -325,6 +331,6 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed for information, but does not decide pass or fail: an agent searching a live corpus twice will touch different secondary provisions each run. |
 | Citation Agreement | Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links. |
-| Reference Answer Agreement | AI as a judge metric: How many of the main points in the hand written reference answer the response also makes. A point the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
+| Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
 | Claim Support | AI as a judge metric: Checks each legal claim in the researcher's report against the text the researcher actually read (a summary, if LexChat shortened the source first). A claim only passes if the judge quotes the exact words backing it up and that quote is verified as genuinely in the source, so an invented quote scores nothing. The score is the share of claims that pass. Claims that the law does not do something (no consultation requirement, no amendment to a section) are listed in the detail but left out of the score, since no passage can be quoted to prove an absence. |
 | Response Groundedness | Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which either passes it or fails it: it fails on any unsupported claim or meaningful misrepresentation, and passes only trivial wording differences. There is no partial credit, so the average for this metric is a pass rate. |

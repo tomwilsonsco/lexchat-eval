@@ -1490,3 +1490,91 @@ unchanged and still writes `score=0.0` with a `Judge error:` reason prefix, whic
 **This does not address the extraction noise in the other two judge metrics.** `Claim Support`
 and `Reference Answer Agreement` re-derive their item list on every run, which the 13 August
 section identifies as the reason they flip most. That is a separate change.
+
+---
+
+## 14 August 2026 update — Reference Answer Agreement labels a frozen statement list
+
+**Implemented.** The judge no longer decides what the reference answer's points are. Each
+question now carries five statements, written by the answer's author at the same time as the
+answer and stored with it, and the judge is given that list and asked only to label each entry
+stated, contradicted or missing.
+
+### Why the item list and not the labels
+
+The 13 August section suspected that the metrics letting the judge derive the item list on every
+run were the ones that flip most, and left it as one of three untested levers. It was tested:
+three arms over 6 records, 5 repeats each, same judge, same records.
+
+| arm | items per call | calls differing from that record's modal labelling |
+| --- | --- | --- |
+| judge extracts and labels | 8, re-chosen each run | **29 / 60 (48%)** |
+| list frozen, judge only labels | 8, fixed | **4 / 60 (7%)** |
+| deterministic sentence split, judge labels every sentence | 19-73, fixed | 29 / 60 (48%) |
+
+Claim sets overlapped only **0.44** between two runs of the same record, so more than half the
+items differed run to run while the count barely moved. Two other explanations were tested and
+both failed: rejoining list stems to their bullets so units carry a proposition (no effect,
+11.7% to 11.2%), and requiring a verbatim evidence span for every label (no effect either way).
+What separates the stable arm from the unstable ones is that it labels a small, curated list.
+Those two properties are confounded in these runs and were not separated.
+
+### Measured effect on this metric
+
+Two runs with `--overwrite` over identical stored responses, paired by response, the same
+protocol as the 13 August measurement.
+
+| | 13 August (judge picks the points) | 14 August (frozen statements) |
+| --- | --- | --- |
+| Rows scored in both runs | 22 | 21 |
+| Identical | 8 | **19** |
+| Verdict flips | 5 | **1** |
+| Mean absolute change | 0.085 | **0.019** |
+| Largest change | 0.375 | 0.200 |
+| Denominators observed | 6, 7, 8, 9 | **5, always** |
+
+**The level barely moved**, so the extra stability is not bought by making the metric easier or
+harder: mean over scored rows was 0.648 before, and 0.638 then 0.609 on the two runs after. That
+matters because the new prompt drops the reference answer itself and shows the judge only the
+statements and the response.
+
+### The new failure mode, and the retry it needed
+
+The judge returned the wrong number of labels on about 1 call in 22: **2 labels for 5
+statements** on one run, and **6 labels for 5** on another. Under the old design this was
+invisible, because the denominator was whatever the judge returned, so a short list scored 2 of 2
+and read as a perfect record. It is now rejected rather than scored.
+
+Because it recurred, `_label()` retries once on a mismatched index set. `utils/judge.py`'s ladder
+does not cover this: it fires on empty content, and these responses are schema-valid, just the
+wrong length. One retry was enough on every occurrence seen, and the sweep after adding it had
+**0 judge errors across 22 scored rows**.
+
+### The cap is a cap, not a quota
+
+The first version required exactly 5 statements per question, which padded the narrow questions.
+Labelling every statement across the 22 records showed the miss rate climbing with position (5%,
+18%, 45%, 41%, 50%) and, more tellingly, **3 of 30 statements were never stated by any response
+on any run**: q1's chapter placement and amendment history, and q4's Schedule 16 procedure.
+
+Those three are not the same kind of thing, which is the point. A correct answer to "what does
+section 6 say?" does not have to recite which chapter the section sits in or its amendment
+history, so those two were padding written to reach the quota, and they cost q1 `glm` 0.40 on
+every run for statements no correct answer needed to make. q4's Schedule 16 procedure is
+genuinely required for "what powers does the Commissioner have to impose penalties", so every
+model missing it is a finding about LexChat, not a defect in the statement. It stays.
+
+`read_statements()` now accepts 1 to 5. On this question set that gives q1 three statements and
+q5 four, and q1 `glm` moves from 0.60 to 1.00 on both runs. Mean over scored rows moved 0.609 to
+0.662, which is the padding coming out rather than the metric getting easier.
+
+The rule for writing them is whether a correct answer would **have** to say it, not whether the
+models happen to say it. Dropping a statement because responses miss it would tune the metric to
+the thing it is measuring.
+
+### Scope
+
+`Claim Support` is unchanged and still derives its own claim list. The same fix is not available
+to it: its items come from the model's research output, which is new text on every gather run, so
+no list can be written in advance. Freezing per stored response would make re-scoring
+reproducible but would not make two gather runs comparable.

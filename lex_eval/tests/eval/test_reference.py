@@ -5,9 +5,9 @@ Two metrics, both anchored to the reference answer for the same question:
 
   - CitationAgreementMetric      : does the response cite the legislation the
                                    reference answer cites? (no AI judge)
-  - ReferenceAnswerAgreementMetric : does the response make the same points as
-                                     the reference answer, and contradict none
-                                     of them?
+  - ReferenceAnswerAgreementMetric : does the response make the statements
+                                     written alongside the reference answer,
+                                     and contradict none of them?
 
 Reference answers are drafts until a lawyer signs one off, so an unverified
 answer's scores carry a "[DRAFT REFERENCE - unverified]" note. Such a score
@@ -47,6 +47,7 @@ _DRAFT_NOTE = "[DRAFT REFERENCE - unverified]"
 # Written at the front of the reason when a question has no reference answer,
 # so reports/streamlit_report.py keeps the row out of the mean.
 _NO_REFERENCE = "No reference answer for this question;"
+_NO_STATEMENTS = "No reference statements for this question;"
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +112,27 @@ def _gate_reference(request, record, test_name, metric_name, threshold):
         return reference, ""
 
     reason = f"{_NO_REFERENCE} {metric_name} not measured"
+    _attach_not_measured(request, record, test_name, metric_name, threshold, reason)
+    return None, reason
+
+
+def _gate_statements(request, record, reference, test_name, metric_name, threshold):
+    """Fail fast if the reference answer has no statements written for it yet."""
+    statements = reference.get("statements") or []
+    if statements:
+        return statements, ""
+
+    qid = record["question_id"]
+    reason = (
+        f"{_NO_STATEMENTS} {metric_name} not measured. Write them in "
+        f"reference_answers/.authored/q{qid}/statements.json."
+    )
+    _attach_not_measured(request, record, test_name, metric_name, threshold, reason)
+    return None, reason
+
+
+def _attach_not_measured(request, record, test_name, metric_name, threshold, reason):
+    """Record a row that carries no verdict, keeping it out of the dashboard mean."""
     attach_metric(
         request,
         record=record,
@@ -122,7 +144,6 @@ def _gate_reference(request, record, test_name, metric_name, threshold):
         reason=reason,
         suite="reference",
     )
-    return None, reason
 
 
 # ---------------------------------------------------------------------------
@@ -207,9 +228,20 @@ def test_reference_answer_agreement(request, record):
     if reference is None:
         pytest.skip(reason)
 
+    statements, reason = _gate_statements(
+        request,
+        record,
+        reference,
+        "reference_answer_agreement",
+        "Reference Answer Agreement",
+        _AGREEMENT_THRESHOLD,
+    )
+    if statements is None:
+        pytest.skip(reason)
+
     test_case: LLMTestCase = record_to_test_case(record)
     metric = ReferenceAnswerAgreementMetric(
-        reference_answer=reference["final_answer"],
+        statements=statements,
         model=_judge,
         threshold=_AGREEMENT_THRESHOLD,
     )
