@@ -1,0 +1,29 @@
+{
+  "scope_note": "Covers the extent to which regulation of the health professions falls within or outside the legislative competence of the Scottish Parliament: the general competence test, the specific reservation and its exceptions, how the reserved subject-matter is defined and delimited, and the interpretive rules that determine the reservation's reach. Confined to legislation; case law on the competence test is out of scope in this mode.",
+  "steps": [
+    {
+      "title": "Establish the general test for legislative competence",
+      "detail": "Find the provision setting out when a provision of an Act of the Scottish Parliament is outside legislative competence, including the reserved-matters limb and the rule by which it is determined whether a provision relates to a reserved matter."
+    },
+    {
+      "title": "Locate the specific reservation covering the health professions",
+      "detail": "Find the entry in the schedule of reserved matters that reserves regulation of the health professions, and set out its exact terms, its exceptions, and any interpretation provision defining the professions covered."
+    },
+    {
+      "title": "Establish how the reserved subject-matter is delimited",
+      "detail": "Establish how the schedule defines the professions within the reservation — whether by an open description or a closed list of regulating enactments — and identify what consequently falls outside it."
+    },
+    {
+      "title": "Establish the interpretive rules governing the reservation's reach",
+      "detail": "Find the preliminary and general provisions of the schedule governing how a reservation is read: whether exceptions and interpretation provisions apply beyond their own entry, and the date by reference to which the subject-matter of a referenced enactment is fixed."
+    },
+    {
+      "title": "Retrieve the enactments named in the exceptions and check their current status",
+      "detail": "Retrieve the provisions of the National Health Service (Scotland) Act 1978 named in the exceptions to the reservation, confirm whether they remain in force, and establish what follows for the exceptions if they do not."
+    },
+    {
+      "title": "Identify the mechanism by which the reservation may be altered",
+      "detail": "Find the provision permitting modification of the schedule of reserved matters, and any recent modification bearing on health, together with the effect of an alteration on legislation already enacted."
+    }
+  ]
+}

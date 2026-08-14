@@ -1,0 +1,56 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Public Bodies (Joint Working) (Scotland) Act 2014"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "integration joint board strategic plan preparation review consultation"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "strategic plan preparation consultation publication review replacement, strategic planning group, integration joint board, content of strategic plan",
+      "legislation_id": "asp/2014/9"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "integration delivery principles, national health and wellbeing outcomes, establishment of integration joint board, constituent authorities meaning, integration authority definition",
+      "legislation_id": "asp/2014/9"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Public Bodies Joint Working Scotland prescribed groups strategic planning consultation Regulations"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "integration delivery principles section 31, national health and wellbeing outcomes section 5",
+      "legislation_id": "asp/2014/9"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Public Bodies (Joint Working) (Scotland) Act 2014 Prescribed Consultees Regulations",
+      "year_from": 2014,
+      "year_to": 2016
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "prescribed groups of persons having an interest, strategic planning group membership, consultation on strategic plan",
+      "legislation_id": "ssi/2014/283"
+    }
+  }
+]

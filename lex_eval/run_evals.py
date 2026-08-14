@@ -13,6 +13,11 @@ already has 1+ results in the suite's records, the test is skipped.
 Use ``--overwrite`` to force re-running all tests and replacing existing
 results.
 
+Tests run in parallel via pytest-xdist (``EVAL_WORKERS`` in lex_eval/.env,
+default 4). This mainly speeds up the AI-judge suites (groundedness,
+reference), which are otherwise a long serial chain of blocking
+OpenRouter calls. Use ``--workers 1`` to disable and run single-process.
+
 Examples
 --------
 Run everything (skipping already-completed tests):
@@ -23,6 +28,9 @@ Run only groundedness (requires OPENROUTER_API_KEY):
 
 Force re-run (overwrite existing results):
     python lex_eval/run_evals.py --suite groundedness --overwrite
+
+Force re-run a single metric only (leaves the suite's other metrics alone):
+    python lex_eval/run_evals.py --suite groundedness --test-name response_groundedness --overwrite
 
 Run only tool-usage checks (fast, no LLM judge needed):
     python lex_eval/run_evals.py --suite tool_usage
@@ -38,13 +46,18 @@ Verbose output:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 _REPO_ROOT = str(Path(__file__).resolve().parent.parent)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
+
+load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 TESTS_DIR = Path(__file__).parent / "tests" / "eval"
 
@@ -52,9 +65,43 @@ SUITES = {
     "tool_usage": "test_tool_usage.py",
     "groundedness": "test_groundedness.py",
     "consistency": "test_consistency.py",
-    "consistency_llm": "test_consistency_llm.py",
     "structure": "test_structure.py",
+    "reference": "test_reference.py",
 }
+
+# The individual test_name values each suite can write to eval_results, used
+# to validate --test-name and to scope --overwrite to just that metric
+# instead of clearing the whole suite.
+SUITE_TEST_NAMES = {
+    "tool_usage": ["tool_usage"],
+    "groundedness": ["response_groundedness", "claim_support"],
+    "consistency": ["consistency"],
+    "structure": [
+        "mandatory_structure",
+        "citation_passthrough",
+        "citation_grounding",
+        "citation_domain",
+        "genuine_gap",
+    ],
+    "reference": ["citation_agreement", "reference_answer_agreement"],
+}
+
+_DEFAULT_WORKERS = 4
+
+
+def _default_workers() -> int:
+    """Resolve the pytest-xdist worker count: EVAL_WORKERS env var, else 4."""
+    raw = os.getenv("EVAL_WORKERS")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_WORKERS
+    try:
+        return int(raw)
+    except ValueError:
+        print(
+            f"⚠️  EVAL_WORKERS={raw!r} is not a valid integer; "
+            f"falling back to {_DEFAULT_WORKERS}"
+        )
+        return _DEFAULT_WORKERS
 
 
 def _load_existing_results(suite: str) -> list[dict]:
@@ -64,33 +111,15 @@ def _load_existing_results(suite: str) -> list[dict]:
     return load_eval_results(DEFAULT_DB, suite=suite)
 
 
-def _covered_pairs(results: list[dict]) -> set[tuple[int, str]]:
-    """
-    Return the set of (question_id, llm_name) pairs that already have
-    at least one result in the `eval_results` DuckDB table.
-    """
-    pairs: set[tuple[int, str]] = set()
-    for r in results:
-        pairs.add((int(r["question_id"]), r["llm_name"]))
-    return pairs
-
-
-def _covered_triples(results: list[dict]) -> set[tuple[int, str, str]]:
-    """
-    Return the set of (question_id, llm_name, test_name) triples that already
-    have a result. Used for suites with multiple test functions per pair so that
-    a partially-run pair is not fully skipped.
-    """
-    triples: set[tuple[int, str, str]] = set()
-    for r in results:
-        triples.add((int(r["question_id"]), r["llm_name"], r["test_name"]))
-    return triples
+def _covered_triples(results: list[dict]) -> set[tuple[int, str]]:
+    """Return the set of (response_id, test_name) pairs already covered."""
+    return {(int(r["response_id"]), r["test_name"]) for r in results}
 
 
 def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     """
-    Build pytest ``--deselect`` arguments for test IDs whose (question_id, llm_name)
-    pairs already have results.
+    Build pytest ``--deselect`` arguments for test IDs that already have a
+    result for that *specific* response (via ``response_id``).
 
     If *llm* is given, only records matching that LLM name are considered.
 
@@ -103,11 +132,7 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
     if not existing:
         return []
 
-    covered = _covered_pairs(existing)
-    if not covered:
-        return []
-
-    covered_triples = _covered_triples(existing)
+    covered = _covered_triples(existing)
 
     # Pytest appends a numeric suffix (0, 1, …) when multiple records share
     # the same base ID, so we must replicate that here.
@@ -125,83 +150,61 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
         pytest_ids.append(f"{bid}{n}")
         id_counts[bid] = n + 1
 
+    def _covered(record: dict, test_name: str) -> bool:
+        return (int(record["response_id"]), test_name) in covered
+
     deselect_args: list[str] = []
     for record, pid in zip(records, pytest_ids):
-        qid = int(record["question_id"])
-        rec_llm = record["llm_name"]
-        if (qid, rec_llm) in covered:
-            # deselect all test functions in this suite file for this parametrize ID
-            if suite == "groundedness":
-                # Check per-test-function so a partially-run pair isn't fully skipped
-                if (qid, rec_llm, "answer_relevancy") in covered_triples:
+        if suite == "groundedness":
+            for test_name, fn_name in (
+                ("response_groundedness", "test_response_groundedness"),
+                ("claim_support", "test_claim_support"),
+            ):
+                if _covered(record, test_name):
                     deselect_args.extend(
                         [
                             "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_answer_relevancy[{pid}]",
+                            f"lex_eval/tests/eval/{test_file}::{fn_name}[{pid}]",
                         ]
                     )
-                if (qid, rec_llm, "response_groundedness") in covered_triples:
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_response_groundedness[{pid}]",
-                        ]
-                    )
-                if (qid, rec_llm, "research_groundedness") in covered_triples:
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_research_groundedness[{pid}]",
-                        ]
-                    )
-            elif suite == "tool_usage":
+        elif suite == "tool_usage":
+            if _covered(record, "tool_usage"):
                 deselect_args.extend(
                     [
                         "--deselect",
                         f"lex_eval/tests/eval/{test_file}::test_tool_usage[{pid}]",
                     ]
                 )
-            elif suite == "consistency":
+        elif suite == "consistency":
+            if _covered(record, "consistency"):
                 deselect_args.extend(
                     [
                         "--deselect",
                         f"lex_eval/tests/eval/{test_file}::test_consistency[{pid}]",
                     ]
                 )
-            elif suite == "structure":
-                # check per-test-function so a partially-run pair isn't fully skipped
-                if (qid, rec_llm, "mandatory_structure") in covered_triples:
+        elif suite in ("structure", "reference"):
+            fn_names = {
+                "structure": (
+                    ("mandatory_structure", "test_mandatory_structure"),
+                    ("citation_passthrough", "test_citation_passthrough"),
+                    ("citation_grounding", "test_citation_grounding"),
+                    ("citation_domain", "test_citation_domain"),
+                    ("genuine_gap", "test_genuine_gap"),
+                ),
+                "reference": (
+                    ("citation_agreement", "test_citation_agreement"),
+                    ("reference_answer_agreement", "test_reference_answer_agreement"),
+                ),
+            }[suite]
+            for test_name, fn_name in fn_names:
+                if _covered(record, test_name):
                     deselect_args.extend(
                         [
                             "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_mandatory_structure[{pid}]",
+                            f"lex_eval/tests/eval/{test_file}::{fn_name}[{pid}]",
                         ]
                     )
-                if (qid, rec_llm, "citation_passthrough") in covered_triples:
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::test_citation_passthrough[{pid}]",
-                        ]
-                    )
-
-    # consistency_llm is parametrized by (question, LLM) group, not individual record
-    if suite == "consistency_llm":
-        from lex_eval.utils.test_helpers import group_by_question_and_llm
-
-        deselect_args = []
-        for key, grp_records in sorted(group_by_question_and_llm().items()):
-            if len(grp_records) < 2:
-                continue
-            qid = int(grp_records[0]["question_id"])
-            rec_llm = grp_records[0]["llm_name"]
-            if (qid, rec_llm) in covered:
-                deselect_args.extend(
-                    [
-                        "--deselect",
-                        f"lex_eval/tests/eval/{test_file}::test_consistency_llm[{key}]",
-                    ]
-                )
 
     return deselect_args
 
@@ -213,6 +216,8 @@ def run_evals(
     overwrite: bool = False,
     extra_args: list[str] | None = None,
     llm: str | None = None,
+    workers: int | None = None,
+    test_name: str | None = None,
 ) -> int:
     """
     Launch pytest against the evaluation test suite.
@@ -227,14 +232,23 @@ def run_evals(
             DEFAULT_DB,
             clear_eval_results,
             get_connection,
+            init_db,
             init_eval_results,
         )
 
         conn = get_connection(DEFAULT_DB)
         try:
+            # Migrate both tables' schemas here, up front, in this single
+            # read-write connection. Eval test modules load records/results
+            # via read-only connections (safe under parallel pytest-xdist
+            # workers) and skip migration themselves, so it must happen once
+            # before pytest starts.
+            init_db(conn)
             init_eval_results(conn)  # Ensure table exists first
             if overwrite:
-                clear_eval_results(conn, suite=s)
+                # Scoped to test_name when given, so re-running one metric
+                # with --overwrite never wipes its sibling metrics' results.
+                clear_eval_results(conn, suite=s, test_name=test_name)
             conn.commit()  # Commit after init and potential clear
         finally:
             conn.close()
@@ -245,9 +259,13 @@ def run_evals(
         if markers:
             cmd.extend(["-m", markers])
 
-        # filter to a single LLM via pytest keyword expression
-        if llm:
-            cmd.extend(["-k", llm])
+        # filter to a single LLM and/or a single test_name via a combined
+        # pytest keyword expression (both are plain substrings, so "and"
+        # narrows to their intersection; LLM names containing ":" are fine
+        # unquoted here, same as the single-filter case below)
+        keyword_filters = [f for f in (llm, test_name) if f]
+        if keyword_filters:
+            cmd.extend(["-k", " and ".join(keyword_filters)])
 
         # skip logic: deselect tests that already have results
         if not overwrite:
@@ -259,6 +277,14 @@ def run_evals(
                     f"ℹ️  {s}: skipping {n_skipped} test(s) with existing results "
                     f"(use --overwrite to force)"
                 )
+
+        # parallelise via pytest-xdist unless disabled (--workers 1); applied
+        # uniformly across suites so any future AI-judge suite benefits with
+        # no extra wiring, and fast/offline suites just pay a small
+        # worker-startup cost
+        n_workers = workers if workers is not None else _default_workers()
+        if n_workers != 1:
+            cmd.extend(["-n", str(n_workers)])
 
         # display
         cmd.extend(["-v" if verbose else "-q", "--tb=short"])
@@ -293,10 +319,11 @@ def main() -> int:
         epilog="""
 Suites:
   tool_usage        Check tools were invoked correctly (fast, offline)
-  groundedness      LLM-as-judge faithfulness + relevancy checks (needs OPENROUTER_API_KEY)
+  groundedness      LLM-as-judge faithfulness checks (needs OPENROUTER_API_KEY)
   consistency       Same-model repeatability checks (fast, cosine similarity)
-  consistency_llm   Same-model repeatability checks (AI judge, needs OPENROUTER_API_KEY)
   structure         Worker output structure + citation checks (fast, offline)
+  reference         Compare against the hand written reference answers
+                    (Reference Answer Agreement needs OPENROUTER_API_KEY)
 
 Results:
   All suites write to the eval_results table in data/responses.db.
@@ -332,6 +359,26 @@ Dashboard:
         help="Overwrite existing results instead of skipping completed tests",
     )
     parser.add_argument(
+        "--test-name",
+        metavar="TEST_NAME",
+        help=(
+            "Only run/overwrite this one metric within --suite (e.g. "
+            "response_groundedness). With --overwrite, scopes the DB clear "
+            "to this test_name instead of the whole suite. Requires --suite."
+        ),
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Parallel pytest-xdist workers for AI-judge calls (default: "
+            "EVAL_WORKERS env var, or 4). Use --workers 1 to disable "
+            "parallelism, e.g. for easier-to-read debugging output."
+        ),
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -344,6 +391,17 @@ Dashboard:
     )
 
     args = parser.parse_args()
+
+    if args.test_name:
+        if not args.suite:
+            parser.error("--test-name requires --suite")
+        valid = SUITE_TEST_NAMES[args.suite]
+        if args.test_name not in valid:
+            parser.error(
+                f"--test-name {args.test_name!r} is not valid for --suite "
+                f"{args.suite!r}; choose from {valid}"
+            )
+
     return run_evals(
         suite=args.suite,
         markers=args.markers,
@@ -351,6 +409,8 @@ Dashboard:
         overwrite=args.overwrite,
         extra_args=args.extra,
         llm=args.llm,
+        workers=args.workers,
+        test_name=args.test_name,
     )
 
 

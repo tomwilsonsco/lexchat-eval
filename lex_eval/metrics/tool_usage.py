@@ -2,18 +2,26 @@
 Custom metric to validate that the LLM used all expected legislation tools
 *and* invoked them in the correct phase order.
 
-Presence scoring — 1/3 for each of the three required tools:
+Presence scoring, 1/3 for each of the three required tools:
     - delegate_research
     - Worker: search_legislation
     - Worker: search_legislation_sections
 
-Order scoring (legislation_only mode only) — the Worker tools must appear in
+Order scoring (legislation_only mode only), the Worker tools must appear in
 the phase order mandated by the Worker system prompt
-(see ``LexChat/server_py/src/config.py``):
+(see ``LexChat/server_py/src/prompts.py``):
 
-    1. Worker: search_legislation          (Phase 1 — DISCOVER)
-    2. Worker: search_legislation_sections (Phase 2 — RETRIEVE PROVISIONS)
-    3. Worker: get_legislation_text        (Phase 3 — FALLBACK, optional)
+    1. Worker: search_legislation          (Phase 1, DISCOVER)
+    2. Worker: search_legislation_sections (Phase 2, RETRIEVE PROVISIONS)
+    3. Worker: get_legislation_text        (Phase 3, FALLBACK, optional)
+
+A response must not only start the phases in this order, it must not loop
+back to an earlier phase once a later one has begun. For example, calling
+search_legislation again after search_legislation_sections has already
+started is a violation, even though search_legislation's *first* call was
+correctly before search_legislation_sections's first call. This catches
+interleaved, multi-round re-querying that a first-occurrence-only check
+would miss entirely.
 
 Final score:
     - 1.0  all three required tools present AND correct order
@@ -60,9 +68,11 @@ def _first_occurrence(tool_sequence: List[str], name: str) -> Optional[int]:
 def _check_tool_order(
     tool_sequence: Optional[List[str]], research_mode: str
 ) -> tuple[bool, str]:
-    """Validate that Worker legislation tools appear in the expected phase order.
+    """Validate that Worker legislation tools appear in the expected phase order,
+    and that the Worker never loops back to an earlier phase once a later one
+    has begun.
 
-    Only the ``Worker:``-prefixed entries are considered — ``delegate_research``
+    Only the ``Worker:``-prefixed entries are considered, ``delegate_research``
     is a Manager-level call and is excluded from the phase ordering.
 
     Returns ``(order_ok, detail)`` where *detail* is a short human-readable
@@ -85,21 +95,36 @@ def _check_tool_order(
 
     order_ok = all(present[i][1] < present[i + 1][1] for i in range(len(present) - 1))
 
-    if order_ok:
-        return True, " → ".join(name for name, _ in present)
+    if not order_ok:
+        # Report the first inversion.
+        for i in range(len(present) - 1):
+            if present[i][1] >= present[i + 1][1]:
+                return False, f"{present[i + 1][0]} called before {present[i][0]}"
+        return False, "order violation"
 
-    # Report the first inversion.
+    # First occurrences are in order. Now check the Worker didn't loop back to
+    # an earlier phase after a later phase had already started, e.g. calling
+    # search_legislation again after search_legislation_sections has begun.
     for i in range(len(present) - 1):
-        if present[i][1] >= present[i + 1][1]:
-            return False, f"{present[i + 1][0]} called before {present[i][0]}"
-    return False, "order violation"
+        earlier_name, _ = present[i]
+        later_name, later_idx = present[i + 1]
+        earlier_full = f"Worker: {earlier_name}"
+        for j in range(later_idx + 1, len(worker_seq)):
+            if worker_seq[j] == earlier_full:
+                return False, (
+                    f"{earlier_name} called again at step {j + 1} after "
+                    f"{later_name} had already started (step {later_idx + 1})"
+                )
+
+    return True, " → ".join(name for name, _ in present)
 
 
 class ToolUsageMetric(BaseMetric):
     """
     Scores tool usage by awarding 1/3 for each required tool present, and
     (for ``legislation_only`` mode) additionally validates that the Worker
-    tools were invoked in the correct phase order.
+    tools were invoked in the correct phase order and that the Worker never
+    looped back to an earlier phase after a later one had begun.
 
     Score:
         - 1.0  all three required tools present AND correct order
@@ -140,7 +165,7 @@ class ToolUsageMetric(BaseMetric):
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
         tools_used: Set[str] = set()
         # Tools whose completion event was never received from the stream (server-side
-        # stream fault — the LLM did call them, but the result was never streamed back).
+        # stream fault, the LLM did call them, but the result was never streamed back).
         incomplete_tools: Set[str] = set()
 
         if test_case.tools_called:
@@ -181,7 +206,7 @@ class ToolUsageMetric(BaseMetric):
         if missing:
             self.reason += f" | Missing: {missing}"
 
-        # Order section — always shown for legislation_only when a sequence
+        # Order section, always shown for legislation_only when a sequence
         # was supplied, even on missing-tool fails, for transparency.
         if self.research_mode == "legislation_only" and self.tool_sequence:
             order_icon = "✓" if order_ok else "✗"
@@ -191,7 +216,7 @@ class ToolUsageMetric(BaseMetric):
 
         if incomplete_tools:
             self.reason += (
-                f" | WARNING — stream incomplete (no result event received) for: "
+                f" | WARNING, stream incomplete (no result event received) for: "
                 f"{sorted(incomplete_tools)}. LLM called the tool correctly; "
                 f"server failed to return the completion event."
             )

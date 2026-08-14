@@ -1,14 +1,19 @@
 """
 Metrics that validate Worker Agent output quality.
 
-MandatoryStructureMetric  — checks the 4-part Markdown heading structure.
-CitationPassthroughMetric — checks that Worker references reach the final response.
+MandatoryStructureMetric:  checks the 4-part Markdown heading structure.
+CitationPassthroughMetric: checks that Worker references reach the final response.
+CitationGroundingMetric:   checks that Worker citations were actually retrieved.
+CitationDomainMetric:      checks that Worker citation URLs are on legislation.gov.uk.
+GenuineGapMetric:          checks that an empty retrieval is disclosed, not papered over.
 
-Both metrics inspect the ``delegate_research`` tool-call output, which is where
+All five metrics inspect the ``delegate_research`` tool-call output, which is where
 the Worker Agent's response is surfaced.
 """
 
+import json
 import re
+from urllib.parse import urlparse
 
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
@@ -27,31 +32,41 @@ _URL_RE = re.compile(r"https?://[^\s\)\]>,\"']+")
 #
 # Each entry may be either a single string or a list of acceptable
 # alternatives. The summary heading accepts both "Summary Answer (BLUF)"
-# and "Summary Answer" — the (BLUF) qualifier is a stylistic hint in the
+# and "Summary Answer", the (BLUF) qualifier is a stylistic hint in the
 # Worker system prompt (see LexChat/server_py/src/config.py), not a
-# semantic requirement, so either form passes.
+# semantic requirement, so either form passes. Likewise "Jurisdiction &
+# Status"/"Jurisdiction & Currency" accept the spelled-out "and", models
+# routinely paraphrase the prompt's literal "&" this way.
 REQUIRED_HEADINGS = {
     "legislation_only": [
         ["Summary Answer (BLUF)", "Summary Answer"],
         "Detailed Analysis",
-        "Jurisdiction & Status",
+        ["Jurisdiction & Status", "Jurisdiction and Status"],
         "References",
     ],
     "case_law_only": [
         ["Summary Answer (BLUF)", "Summary Answer"],
         "Key Cases",
         "Analysis",
-        "Jurisdiction & Currency",
+        ["Jurisdiction & Currency", "Jurisdiction and Currency"],
         "References",
     ],
     "legislation_and_case_law": [
         ["Summary Answer (BLUF)", "Summary Answer"],
         "Statutory Framework",
         "Key Cases",
-        "Jurisdiction & Status",
+        ["Jurisdiction & Status", "Jurisdiction and Status"],
         "References",
     ],
 }
+
+# A heading match must sit at the start of its line, after only "decoration"
+# characters (whitespace, #, *, digits, '.', '-', ':'), this is what lets a
+# bare substring check for something like "References" tell a real heading
+# apart from the word appearing mid-sentence in ordinary legal prose (e.g.
+# "references to the 1978 Act..."), without requiring a literal Markdown
+# '#' that real Worker output doesn't always use.
+_HEADING_LINE_PREFIX = r"[\s#*\d.\-:]*"
 
 
 def _get_delegate_output(test_case: LLMTestCase) -> str | None:
@@ -77,8 +92,8 @@ class MandatoryStructureMetric(BaseMetric):
     numbering so minor formatting variations don't cause false failures.
 
     Score:
-        1.0  — all mandatory headings present (pass)
-        0.0  — one or more headings missing, or no delegate_research call found
+        1.0: all mandatory headings present (pass)
+        0.0: one or more headings missing, or no delegate_research call found
     """
 
     def __init__(
@@ -109,7 +124,12 @@ class MandatoryStructureMetric(BaseMetric):
 
         def _heading_present(heading) -> bool:
             variants = heading if isinstance(heading, list) else [heading]
-            return any(v.lower() in lowered for v in variants)
+            return any(
+                re.search(
+                    rf"(?m)^{_HEADING_LINE_PREFIX}{re.escape(v.lower())}", lowered
+                )
+                for v in variants
+            )
 
         missing = [h for h in headings if not _heading_present(h)]
 
@@ -138,14 +158,14 @@ class MandatoryStructureMetric(BaseMetric):
 
 class CitationPassthroughMetric(BaseMetric):
     """
-    Checks that at least one reference link from the Worker output is present
-    in the final response delivered to the user.
+    Checks that every reference link from the Worker output is present in
+    the final response delivered to the user.
 
     Score:
-        0.0  — Failure A: no URLs found in Worker output at all.
-        0.5  — Failure B: Worker output contains URLs but none appear in the
+        0.0: Failure A: no URLs found in Worker output at all.
+        0.5: Failure B: one or more Worker links are missing from the
                           final response (citation links were dropped).
-        1.0  — Pass: at least one Worker URL is present in the final response.
+        1.0: Pass: every Worker URL is present in the final response.
 
     Threshold defaults to 1.0, so both failure modes are recorded as fails.
     """
@@ -177,21 +197,22 @@ class CitationPassthroughMetric(BaseMetric):
             return self.score
 
         actual = test_case.actual_output or ""
-        passed_through = [link for link in worker_links if link in actual]
+        passed_through = {link for link in worker_links if link in actual}
+        missing = worker_links - passed_through
 
-        if not passed_through:
+        if missing:
             self.score = 0.5
             self.success = False
             self.reason = (
-                f"Failure B: {len(worker_links)} link(s) in Worker output "
-                "but none present in final response."
+                f"Failure B: {len(missing)} of {len(worker_links)} Worker "
+                "link(s) missing from final response."
             )
         else:
             self.score = 1.0
             self.success = True
             self.reason = (
-                f"Pass: {len(passed_through)} of {len(worker_links)} Worker "
-                "link(s) present in final response."
+                f"Pass: all {len(worker_links)} Worker link(s) present in "
+                "final response."
             )
 
         return self.score
@@ -205,3 +226,377 @@ class CitationPassthroughMetric(BaseMetric):
     @property
     def __name__(self) -> str:  # type: ignore[override]
         return "Reference Links"
+
+
+def _url_path(url: str) -> str:
+    """
+    The legislation.gov.uk path a URL points at, lowercased, without a leading
+    ``id/`` segment or a trailing slash, e.g. ``ukpga/1978/29/section/10c``.
+
+    Mirrors how the LexChat server builds legislation_id from a search result
+    URI (``LexChat/server_py/src/agent/tools/lex.py::_slim_search_results``:
+    URL path, minus a leading ``id/`` segment).
+    """
+    path = urlparse(url).path.strip("/").lower().rstrip(".,;:")
+    if path.startswith("id/"):
+        path = path[3:]
+    return path
+
+
+def provision_id_from_url(url: str) -> str:
+    """
+    Derive the provision-level id (e.g. ``ukpga/2018/12/section/6``) from a
+    legislation.gov.uk URL.
+
+    Unlike ``_legislation_id_from_url`` this keeps the section or schedule, so
+    a citation to section 3 of an Act is not treated as a citation to
+    section 6 of the same Act.
+    """
+    return _url_path(url)
+
+
+def _legislation_id_from_url(url: str) -> str:
+    """
+    Derive the Act-level legislation_id (e.g. ``ukpga/1978/29``) from a
+    legislation.gov.uk URL, whether it points at the Act itself or a specific
+    section/schedule within it (e.g. ``ukpga/1978/29/section/10C``).
+
+    Keeps only the first three path segments (type/year/number) since that's
+    the granularity search_legislation_sections and get_legislation_text are
+    called at.
+    """
+    return "/".join(_url_path(url).split("/")[:3])
+
+
+def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:
+    """
+    Return the set of legislation_ids the run's own tool calls actually
+    retrieved: results returned by ``search_legislation``, plus the
+    legislation_id argument passed to ``search_legislation_sections`` /
+    ``get_legislation_text``.
+    """
+    ids: set = set()
+    if not test_case.tools_called:
+        return ids
+
+    for tool in test_case.tools_called:
+        if tool.name == "Worker: search_legislation":
+            raw = tool.output
+            try:
+                data = json.loads(raw) if isinstance(raw, str) else raw
+                for r in (data or {}).get("results", []):
+                    lid = r.get("legislation_id")
+                    if lid:
+                        ids.add(lid)
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                continue
+        elif tool.name in (
+            "Worker: search_legislation_sections",
+            "Worker: get_legislation_text",
+        ):
+            params = tool.input_parameters or {}
+            lid = params.get("legislation_id")
+            if lid:
+                ids.add(lid)
+
+    return ids
+
+
+class CitationGroundingMetric(BaseMetric):
+    """
+    Checks that every Act cited in the Worker's report was actually retrieved
+    by this run's own tool calls, rather than invented from pattern-matching.
+
+    Catches fabrication (a citation to something never retrieved), not
+    wrongness (a citation to a real, retrieved Act that doesn't actually
+    answer the question, which is a substantive-correctness question this
+    rule-based check can't make).
+
+    Score:
+        0.0: no delegate_research call found; citations cannot be verified.
+        1.0: no legislation.gov.uk citation URLs in Worker output (nothing
+               to falsely ground).
+        0.0: one or more cited Acts were never retrieved by search_legislation,
+               search_legislation_sections, or get_legislation_text in this run.
+        1.0: every cited Act was retrieved by this run.
+
+    No partial credit: unlike Reference Links, where "some links survived" is
+    a meaningfully different failure from "none did", one fabricated citation
+    is a full failure regardless of how many others were genuine.
+    """
+
+    def __init__(self, threshold: float = 1.0) -> None:
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        dr_output = _get_delegate_output(test_case)
+
+        if dr_output is None:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "citation grounding cannot be verified."
+            )
+            return self.score
+
+        cited_urls = set(_URL_RE.findall(dr_output))
+        cited_ids = {
+            lid for lid in (_legislation_id_from_url(u) for u in cited_urls) if lid
+        }
+
+        if not cited_ids:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                "No legislation.gov.uk citations found in Worker output; "
+                "nothing to ground."
+            )
+            return self.score
+
+        retrieved_ids = _retrieved_legislation_ids(test_case)
+        fabricated = cited_ids - retrieved_ids
+
+        if fabricated:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"Fabricated citation(s): {sorted(fabricated)} cited in Worker "
+                "output but never retrieved by search_legislation, "
+                "search_legislation_sections, or get_legislation_text in this run."
+            )
+        else:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                f"All {len(cited_ids)} cited Act(s) were retrieved by this "
+                "run's tool calls."
+            )
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Citation Grounding"
+
+
+_ALLOWED_CITATION_DOMAIN = "legislation.gov.uk"
+
+
+class CitationDomainMetric(BaseMetric):
+    """
+    Checks that every citation URL in the Worker's report points to
+    legislation.gov.uk, the only domain the Worker's system prompt permits
+    ("Do not invent URLs for domains other than legislation.gov.uk").
+
+    Score:
+        0.0: no delegate_research call found; domains cannot be verified.
+        1.0: no citation URLs in Worker output (nothing to check).
+        0.0: one or more citation URLs point to a different domain.
+        1.0: every citation URL is on legislation.gov.uk.
+
+    No partial credit, same reasoning as Citation Grounding: one invented
+    domain is a full failure regardless of how many other citations are fine.
+    """
+
+    def __init__(self, threshold: float = 1.0) -> None:
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        dr_output = _get_delegate_output(test_case)
+
+        if dr_output is None:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "citation domains cannot be verified."
+            )
+            return self.score
+
+        cited_urls = set(_URL_RE.findall(dr_output))
+
+        if not cited_urls:
+            self.score = 1.0
+            self.success = True
+            self.reason = "No citation URLs found in Worker output; nothing to check."
+            return self.score
+
+        def _on_allowed_domain(url: str) -> bool:
+            netloc = urlparse(url).netloc.lower()
+            return netloc == _ALLOWED_CITATION_DOMAIN or netloc.endswith(
+                f".{_ALLOWED_CITATION_DOMAIN}"
+            )
+
+        off_domain = {u for u in cited_urls if not _on_allowed_domain(u)}
+
+        if off_domain:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"Off-domain citation(s): {sorted(off_domain)} do not point to "
+                f"{_ALLOWED_CITATION_DOMAIN}, the only domain the Worker's "
+                "system prompt permits."
+            )
+        else:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                f"All {len(cited_urls)} citation URL(s) are on "
+                f"{_ALLOWED_CITATION_DOMAIN}."
+            )
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Citation Domain"
+
+
+# The Worker system prompt's mandated sentence for an empty result
+# (LexChat/server_py/src/prompts.py, WORKER_SYSTEM_PROMPT, legislation-only block):
+# "If the API data does not answer the specific question, state: ... DO NOT attempt
+# to fill gaps with internal training data."
+_GENUINE_GAP_PHRASE = (
+    "The available database does not contain information on this specific issue."
+)
+
+# Paraphrases of the mandated sentence that still count as disclosing the gap,
+# just not in the exact required wording (0.5 partial credit).
+_GENUINE_GAP_KEYWORDS = (
+    "does not contain information",
+    "no relevant",
+    "could not find",
+    "no information",
+    "unable to find",
+)
+
+
+def _has_usable_section_result(test_case: LLMTestCase) -> bool:
+    """
+    True if any ``search_legislation_sections`` or ``get_legislation_text`` Worker
+    tool call in this run returned non-empty output, i.e. retrieval wasn't empty.
+    """
+    if not test_case.tools_called:
+        return False
+    return any(
+        tool.name
+        in ("Worker: search_legislation_sections", "Worker: get_legislation_text")
+        and tool.output
+        for tool in test_case.tools_called
+    )
+
+
+class GenuineGapMetric(BaseMetric):
+    """
+    When a run's own tool calls failed to retrieve any usable legislation section
+    text, checks that the Worker's report says so plainly instead of presenting a
+    confident but unsupported answer.
+
+    Only applies to ``legislation_only`` mode: the mandated disclosure sentence and
+    the tools this check inspects (search_legislation_sections, get_legislation_text)
+    are specific to legislation retrieval.
+
+    Score:
+        0.0: no delegate_research call found; cannot be verified.
+        1.0: research_mode is not legislation_only; check doesn't apply.
+        1.0: at least one section/full-text tool call returned usable content;
+               nothing to disclose.
+        1.0: retrieval was empty, and the exact mandated sentence is present.
+        0.5: retrieval was empty, and a paraphrase of it is present (disclosed
+               the gap, just not in the mandated wording).
+        0.0: retrieval was empty, and nothing disclosing the gap is present.
+    """
+
+    def __init__(
+        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+    ) -> None:
+        self.threshold = threshold
+        self.research_mode = research_mode
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        dr_output = _get_delegate_output(test_case)
+
+        if dr_output is None:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "genuine gap disclosure cannot be verified."
+            )
+            return self.score
+
+        if self.research_mode != "legislation_only":
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                f"Not applicable: research_mode is '{self.research_mode}', "
+                "not legislation_only."
+            )
+            return self.score
+
+        if _has_usable_section_result(test_case):
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                "Retrieval returned usable section/full-text content; "
+                "nothing to disclose."
+            )
+            return self.score
+
+        lowered = dr_output.lower()
+
+        if _GENUINE_GAP_PHRASE.lower() in lowered:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                "Retrieval was empty and the Worker used the mandated "
+                "disclosure sentence."
+            )
+        elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
+            self.score = 0.5
+            self.success = False
+            self.reason = (
+                "Retrieval was empty; the Worker disclosed the gap but not in "
+                "the mandated wording."
+            )
+        else:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                "Retrieval was empty and the Worker's report does not disclose "
+                "this; answered without an honest gap statement."
+            )
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Genuine Gap"

@@ -24,7 +24,7 @@ PASSWORD=admin
 
 # OpenRouter judge (judge LLM for AI-as-judge metrics)
 OPENROUTER_API_KEY=yourkeyhere
-# Any OpenRouter model — openai/gpt-4o is the default, o4-mini for more thorough evals
+# Any OpenRouter model, openai/gpt-4o is the default, o4-mini for more thorough evals
 OPENROUTER_JUDGE_MODEL=openai/gpt-4o
 
 ```
@@ -63,14 +63,14 @@ python lex_eval/gather_responses.py --question-id 1 --debug-events --verbose-cap
 
 ### Diagnosing capture issues
 
-Two flags are available when a response looks wrong — empty fields, missing tools, zero retrieval context, etc.:
+Two flags are available when a response looks wrong: empty fields, missing tools, zero retrieval context, etc.
 
 | Flag | Output | Use when… |
 |---|---|---|
-| `--debug-events` | `data/debug_events.jsonl` — one JSON line per raw SSE event, appended | You suspect the **server sent unexpected data** — field renamed, event type missing or added, payload structure changed |
-| `--verbose-capture` | `data/verbose_logs/Q{id}_{YYYYMMDD}_{HHMMSS}.log` — one file per question | You got a **wrong capture result** — `research_output` empty, `tool_sequence` incomplete, zero `retrieval_context` items |
+| `--debug-events` | `data/debug_events.jsonl`, one JSON line per raw SSE event, appended | You suspect the **server sent unexpected data**: field renamed, event type missing or added, payload structure changed |
+| `--verbose-capture` | `data/verbose_logs/Q{id}_{YYYYMMDD}_{HHMMSS}.log`, one file per question | You got a **wrong capture result**: `research_output` empty, `tool_sequence` incomplete, zero `retrieval_context` items |
 
-`--debug-events` shows what arrived **over the wire** before `audit_capture` processes it. `--verbose-capture` shows what `audit_capture` **decided to do** with each event — stack state before/after, action taken, and a final state summary.
+`--debug-events` shows what arrived **over the wire** before `audit_capture` processes it. `--verbose-capture` shows what `audit_capture` **decided to do** with each event, stack state before/after, action taken, and a final state summary.
 
 Because `--debug-events` appends all questions into a single file, it is cleanest when combined with `--question-id`. `--verbose-capture` always writes one file per question so it is safe to use across all questions concurrently.
 
@@ -85,7 +85,7 @@ diff \
 Responses are stored in `lex_eval/data/responses.db` (DuckDB).
 Each question is attempted up to 3 times; only complete responses (non-empty `actual_output`) are written to the database.
 
-**The model used for responses is always set in LexChat's Admin Portal.** The eval does not select or override the model — `gather_responses.py` reads the active model from the LexChat API and records it in `responses.db`. To evaluate a different model, change it in the Admin Portal first, then re-run.
+**The model used for responses is always set in LexChat's Admin Portal.** The eval does not select or override the model. `gather_responses.py` reads the active model from the LexChat API and records it in `responses.db`. To evaluate a different model, change it in the Admin Portal first, then re-run.
 
 We need to gather at least two responses per question per llm to evaluate response consistency. So starting from the beginning this is the recommended process.
 
@@ -110,13 +110,17 @@ python lex_eval/run_evals.py
 # Specific suite:
 python lex_eval/run_evals.py --suite tool_usage
 python lex_eval/run_evals.py --suite groundedness    # needs OPENROUTER_API_KEY
-# (Groundedness measures: answer relevancy, response groundedness, research groundedness)
+# (Groundedness measures: response groundedness, research groundedness)
 python lex_eval/run_evals.py --suite consistency
-python lex_eval/run_evals.py --suite consistency_llm # needs OPENROUTER_API_KEY
 python lex_eval/run_evals.py --suite structure
+python lex_eval/run_evals.py --suite reference       # Reference Answer Agreement needs OPENROUTER_API_KEY
+# (Reference measures against the hand written answers: key authority coverage, reference agreement)
 
 # Force re-run (overwrite existing results):
 python lex_eval/run_evals.py --suite groundedness --overwrite
+
+# Force re-run a single metric only (leaves the suite's other metrics alone):
+python lex_eval/run_evals.py --suite groundedness --test-name response_groundedness --overwrite
 
 # Single LLM only:
 python lex_eval/run_evals.py --llm "model-name"
@@ -127,7 +131,7 @@ python lex_eval/run_evals.py -v
 
 Results are written to the `eval_results` table in `lex_eval/data/responses.db`.
 By default, tests are skipped if results already exist for a (question, LLM)
-pair — use `--overwrite` to force re-running.
+pair, use `--overwrite` to force re-running.
 
 ### Evaluation requirements
 
@@ -137,7 +141,7 @@ pair — use `--overwrite` to force re-running.
 | `structure` | Fast | Nothing extra |
 | `consistency` | Fast | ≥2 responses per question/LLM pair |
 | `groundedness` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
-| `consistency_llm` | Slow | `OPENROUTER_API_KEY` + ≥2 responses per pair |
+| `reference` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` + hand written reference answers |
 
 ## Step 4 Streamlit dashboard
 
@@ -164,6 +168,113 @@ python -m lex_eval.utils.db --deploy-db path/to/output.db
 Commit `deploy.db` (not `responses.db`) to the repository. Configure
 Streamlit Cloud to point at `deploy.db`.
 
+## Reference ("gold") answers
+
+A set of expected answers for the questions in `questions.json`, for tests to compare LexChat's
+responses against. Each answer is researched against the live LEX API using the same legislation
+tools LexChat's Worker agent uses, so it rests on exactly the material LexChat would have retrieved,
+and is then written up by hand.
+
+This does **not** need a running LexChat instance. It talks to the LEX API directly, so it works
+when Steps 1-2 cannot run.
+
+> Generated answers are **unverified drafts** until a lawyer completes the review block at the foot
+> of each Markdown file. `load_reference_answers()` returns only signed-off answers by default.
+
+### Building them
+
+```bash
+python -m lex_eval.reference.build --author "Your Name"
+```
+
+Run it repeatedly. It looks for questions with no `q{id}.md` yet and advances each one a stage,
+printing what it needs from you next:
+
+| Stage | What the script does | What you do next |
+| --- | --- | --- |
+| **SCAFFOLD** | Creates `.authored/q{id}/` with template files | Fill in `searches.json` |
+| **RETRIEVE** | Runs your searches, writes `retrieved.md` | Read it, then write `plan.json`, `answer.md` and `statements.json` |
+| **BUILT** | Writes `q{id}.md` and updates the manifest | Send it for lawyer review |
+
+`statements.json` holds the key statements a correct answer has to make, most important first, at most 5.
+They are what `Reference Answer Agreement` scores a response against, and they are written once and
+stored with the answer so that the judge labels a fixed list instead of choosing the points again on
+every run. Each one should be a single self-contained sentence about what the law says, since the
+judge sees the statements and the response under test but never the reference answer itself.
+
+Useful flags:
+
+```bash
+python -m lex_eval.reference.build --question-id 7    # one question only
+python -m lex_eval.reference.build --refetch          # re-run searches after editing searches.json
+python -m lex_eval.reference.build --overwrite        # rebuild a question that already has an answer
+```
+
+### The three files you write
+
+In `lex_eval/data/reference_answers/.authored/q{id}/`:
+
+**`searches.json`**: the LEX tool calls to make. Follow the Worker's phases: `search_legislation`
+to find the Acts, then `search_legislation_sections` to pull the provisions from each one
+(`get_legislation_text` is available as a fallback for a whole Act).
+
+```json
+[
+  {"tool": "search_legislation",
+   "args": {"query": "Data Protection Act 2018", "year_from": 2018, "year_to": 2018}},
+  {"tool": "search_legislation_sections",
+   "args": {"legislation_id": "ukpga/2018/12", "query": "meaning of controller, definitions"}}
+]
+```
+
+You will usually run the build twice here: once with the Phase 1 searches to find the
+`legislation_id`s, then again after adding the Phase 2 section searches (`--refetch`).
+
+**`plan.json`**: how the question breaks down. Recorded so the reasoning behind the answer is
+reviewable, not just the conclusion.
+
+```json
+{
+  "scope_note": "What this answer covers and what it deliberately excludes.",
+  "steps": [{"title": "Short imperative title", "detail": "What exactly to find, in domain terms."}]
+}
+```
+
+**`answer.md`**: the answer itself, written from `retrieved.md`. Ground every statement in the
+retrieved text and cite it. Use the four headings the Worker system prompt mandates:
+**Summary Answer (BLUF)**, **Detailed Analysis**, **Jurisdiction & Status**, **References**.
+
+### Output
+
+```text
+lex_eval/data/reference_answers/
+├── q1.md                      # for review: plan, answer, retrieval audit, sign-off block
+├── reference_answers.json     # machine-readable manifest, all questions
+└── .authored/q1/              # your three files, plus the generated retrieved.md
+```
+
+Read the manifest from a test with:
+
+```python
+from lex_eval.reference import load_reference_answers
+
+answers = load_reference_answers()                      # signed-off answers only
+answers = load_reference_answers(verified_only=False)   # including drafts
+```
+
+A completed review survives a rebuild; if the answer changes after sign-off the review is kept but
+flagged `stale: true`.
+
+### The retrieval audit
+
+Each answer records two lists of sources, and the distinction matters when checking citations:
+
+- **`sources_retrieved`**: provisions whose text was actually pulled. Citing one is grounded.
+- **`sources_discovered`**: Acts and SIs that appeared in a search result but were never read. They
+  exist and were found, but the answer never saw their text, and should say so.
+
+Both appear in the Markdown so a reviewer can check every citation against them.
+
 ## Database utilities
 
 ```bash
@@ -184,8 +295,14 @@ lex_eval/
 ├── data/
 │   ├── questions.json       # evaluation questions
 │   ├── deploy.db            # committed compact database for Streamlit Cloud
+│   ├── reference_answers/   # gold answers: q{id}.md + reference_answers.json
 │   └── verbose_logs/        # per-question capture audit logs (gitignored)
+├── docs/                    # gap analysis, reference-answer notes
 ├── metrics/                 # custom DeepEval metric classes
+├── reference/               # reference ("gold") answers
+│   ├── build.py             # the build script
+│   ├── lex_client.py        # the three LEX tools, as LexChat calls them
+│   └── store.py             # manifest + Markdown for review
 ├── reports/
 │   └── streamlit_report.py  # Streamlit dashboard
 ├── tests/                   # pytest evaluation suites
@@ -196,7 +313,7 @@ lex_eval/
 ```
 
 ## A note on LLM judge models
-The judge LLM is accessed via OpenRouter, which provides access to hundreds of models from many providers. The default model is `openai/gpt-4o`, which offers a good balance of thoroughness and cost. More expensive or capable models may produce more critical judgments, leading to lower scores for answer relevancy, response groundedness, and research groundedness.
+The judge LLM is accessed via OpenRouter, which provides access to hundreds of models from many providers. The default model is `openai/gpt-4o`, which offers a good balance of thoroughness and cost. More expensive or capable models may produce more critical judgments, leading to lower scores for reference agreement, response groundedness, and research groundedness.
 
 For example, `openai/o4-mini` is a thinking model available through OpenRouter and will produce lower scores than `openai/gpt-4o-mini`. However, o4-mini does a better job picking up on subtleties that smaller models may ignore. You can change `OPENROUTER_JUDGE_MODEL` in your `.env` file to any model available on OpenRouter (e.g. `google/gemini-2.5-flash`, `openai/o4-mini`, `anthropic/claude-sonnet-4-6`).
 
@@ -206,11 +323,14 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 
 | Metric | Description |
 |--------|-------------|
-| Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed). |
+| Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed), and does the Worker stick to that order rather than looping back to an earlier step later in the same run? |
 | Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. |
-| Reference Links | Are reference links included in the answer provided to the user. |
-| Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. |
-| Consistency (AI Judge) | AI as a judge metric: Decide if multiple answers to the same question have contradictions, omissions, or additional irrelevant information. |
-| Answer Relevancy | AI as a judge metric: Measures how directly and completely the response addresses the user's question, penalising vague answers and irrelevant content. |
-| Research Groundedness | AI as a judge metric: Measures whether the research summary is grounded exclusively in the legal text retrieved from the Lex API, penalising any external inferences or factual distortions. |
-| Response Groundedness | AI as a judge metric: Evaluates whether the final response is strictly grounded in the research worker's summary, ensuring no new information or contradictions have been introduced. |
+| Reference Links | Are all reference links found by the researcher included in the final answer given to the user. |
+| Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |
+| Citation Domain | Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite. |
+| Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
+| Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed for information, but does not decide pass or fail: an agent searching a live corpus twice will touch different secondary provisions each run. |
+| Citation Agreement | Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links. |
+| Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
+| Claim Support | AI as a judge metric: What share of the report's verifiable legal claims are backed by text the researcher actually read? Claims whose truth depends on the absence of a provision are reported separately because absence generally cannot be established from retrieved excerpts or summaries. |
+| Response Groundedness | Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which either passes it or fails it: it fails on any unsupported claim or meaningful misrepresentation, and passes only trivial wording differences. There is no partial credit, so the average for this metric is a pass rate. |

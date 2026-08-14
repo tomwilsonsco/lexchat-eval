@@ -1,5 +1,5 @@
 """
-Unit tests for ``audit_capture`` — the SSE stream parser that derives the
+Unit tests for ``audit_capture``, the SSE stream parser that derives the
 result dict from the structured ``audit`` event emitted by LexChat
 (commit da3070d+).
 
@@ -339,7 +339,7 @@ AUDIT_MISSING_TOOL_NAME = {
 
 
 # ---------------------------------------------------------------------------
-# Tests — standard legislation_only
+# Tests, standard legislation_only
 # ---------------------------------------------------------------------------
 
 
@@ -420,7 +420,7 @@ class TestStandardLegislation:
 
 
 # ---------------------------------------------------------------------------
-# Tests — deep research
+# Tests, deep research
 # ---------------------------------------------------------------------------
 
 
@@ -469,7 +469,7 @@ class TestDeepResearch:
 
 
 # ---------------------------------------------------------------------------
-# Tests — failed run
+# Tests, failed run
 # ---------------------------------------------------------------------------
 
 
@@ -490,7 +490,7 @@ class TestFailedRun:
 
 
 # ---------------------------------------------------------------------------
-# Tests — missing audit event
+# Tests, missing audit event
 # ---------------------------------------------------------------------------
 
 
@@ -508,7 +508,7 @@ class TestMissingAuditEvent:
 
 
 # ---------------------------------------------------------------------------
-# Tests — unknown schema version
+# Tests, unknown schema version
 # ---------------------------------------------------------------------------
 
 
@@ -523,7 +523,7 @@ class TestUnknownSchemaVersion:
 
 
 # ---------------------------------------------------------------------------
-# Tests — tool with missing/empty name
+# Tests, tool with missing/empty name
 # ---------------------------------------------------------------------------
 
 

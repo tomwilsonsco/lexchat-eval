@@ -7,20 +7,30 @@ the research agent's output, with no hallucinated facts.
 
 from __future__ import annotations
 
+import difflib
 import json
+from typing import Literal
 
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 from pydantic import BaseModel
 
+# Above this similarity, the final response is a near-verbatim relay of the
+# research output: grounding is a provable fact, not a judgement call, so the
+# judge is not invoked. glm-5.2 (which follows the Manager prompt's "do NOT
+# condense, summarise, or restructure" instruction literally) measures
+# 0.983-1.000 on stored runs; mistral-large-3 (which paraphrases) measures
+# 0.095-0.763. 0.95 sits in the gap between the two clusters.
+_NEAR_VERBATIM_THRESHOLD: float = 0.95
+
 
 class _GroundednessJudgement(BaseModel):
     analysis: str
-    score: int  # 1–5
+    verdict: Literal["pass", "fail"]
     reason: str
 
 
-_PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to score whether a final response is strictly grounded in the provided research output.
+_PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to decide whether a final response is strictly grounded in the provided research output.
 
 Research Output:
 {research_output}
@@ -28,22 +38,21 @@ Research Output:
 Final Response:
 {actual_output}
 
-Before scoring, explicitly identify:
+Before deciding, explicitly identify:
 - Any fact, legal assertion, or claim in the final response that does NOT appear in the research output.
 - Any place where the response contradicts or misrepresents the research output.
 - Any hedging, qualifications, or caveats present in the research output that are omitted in the final response in a way that changes meaning.
 
-Then assign a score using this rubric:
-1 - Multiple hallucinated or contradictory claims; the response cannot be trusted.
-2 - Several claims are unsupported by or contradict the research output.
-3 - Mostly grounded but contains at least one unsupported claim or meaningful misrepresentation.
-4 - Only trivial wording differences; all substantive claims present in the research output.
-5 - Every claim is directly and accurately traceable to the research output.
+Then return exactly one verdict:
+"fail" - you identified one or more unsupported claims or a meaningful misrepresentation.
+"pass" - you identified none of those; only trivial wording differences, and all substantive claims are present in the research output.
+
+A shorter response is not a failure on its own. Leaving material out is a failure only where the omission changes the meaning of what remains.
 
 Provide your evaluation in strict JSON format exactly like this:
 {{
     "analysis": "<A short paragraph explicitly identifying any hallucinated facts, contradictions, or omitted caveats you found above>",
-    "score": <integer 1–5>,
+    "verdict": "<pass or fail>",
     "reason": "<One sentence citing the specific hallucination or confirming full grounding>"
 }}
 """
@@ -54,16 +63,29 @@ class ResponseGroundednessMetric(BaseMetric):
     Evaluates whether the final response is grounded in the research
     agent's output, with no hallucinated or invented facts.
 
+    Two steps. A response that is a near-verbatim copy of the research output
+    passes without an LLM call, since grounding is then a provable fact. Anything
+    reworded enough to matter goes to the judge, which returns pass or fail: fail
+    if it finds an unsupported claim or a meaningful misrepresentation, pass if it
+    finds only trivial wording differences. The score is 1.0 for a pass and 0.0
+    for a fail.
+
+    The verdict is asked for directly rather than as a 1-5 grade because the grade
+    was unstable. Re-run on the same stored responses, the 1-5 version moved on 6
+    of the 10 records that reach the judge, and one grade step was enough to flip a
+    verdict. See docs/metrics.md.
+
     research_output is not a standard LLMTestCase field so it is passed
-    via the constructor, following the same pattern as LLMConsistencyMetric.
+    via the constructor, following the same pattern as ClaimSupportMetric.
 
     Args:
         research_output: The research agent's synthesised output for this question.
         model:           A DeepEval-compatible judge model.
-        threshold:       Minimum normalised score to pass (default 0.7).
+        threshold:       Minimum score to pass. The score is binary, so this is
+                         1.0 by default and there is no middle ground.
     """
 
-    def __init__(self, research_output: str, model, threshold: float = 0.7) -> None:
+    def __init__(self, research_output: str, model, threshold: float = 1.0) -> None:
         self.research_output = research_output
         self.model = model
         self.threshold = threshold
@@ -72,24 +94,42 @@ class ResponseGroundednessMetric(BaseMetric):
         self.success = False
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        actual_output = test_case.actual_output or ""
+        ratio = difflib.SequenceMatcher(
+            None, actual_output.strip(), self.research_output.strip()
+        ).ratio()
+        if ratio >= _NEAR_VERBATIM_THRESHOLD:
+            self.score = 1.0
+            self.reason = (
+                f"Near-verbatim relay of research output (similarity={ratio:.2f}); "
+                "judge not invoked."
+            )
+            self.success = True
+            return self.score
+
         prompt = _PROMPT_TEMPLATE.format(
             research_output=self.research_output,
-            actual_output=test_case.actual_output or "",
+            actual_output=actual_output,
         )
         try:
             result = self.model.generate(prompt, schema=_GroundednessJudgement)
             if isinstance(result, _GroundednessJudgement):
-                raw_score = float(result.score)
+                verdict = result.verdict
                 self.reason = result.reason
             else:
                 data = json.loads(str(result))
-                raw_score = float(data["score"])
+                verdict = str(data["verdict"]).strip().lower()
                 self.reason = data["reason"]
+            if verdict not in ("pass", "fail"):
+                raise ValueError(f"judge returned verdict={verdict!r}")
+            self.score = 1.0 if verdict == "pass" else 0.0
         except Exception as exc:
-            raw_score = 1.0
+            # Scored 0 and flagged: the dashboard keeps rows whose reason starts
+            # with "Judge error:" out of the mean (streamlit_report.py's
+            # _NON_SCORED_PREFIXES), since no verdict exists for them.
+            self.score = 0.0
             self.reason = f"Judge error: {exc}"
 
-        self.score = (raw_score - 1) / 4  # normalise 1–5 → 0.0–1.0
         self.success = self.score >= self.threshold
         return self.score
 

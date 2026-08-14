@@ -175,19 +175,19 @@ def audit_capture(
                 event_type = data.get("type", "")
 
                 # ----------------------------------------------------------
-                # audit  — structured request trace (canonical source)
+                # audit: structured request trace (canonical source)
                 # ----------------------------------------------------------
                 if event_type == "audit":
                     _audit_event = data
 
                 # ----------------------------------------------------------
-                # token  — streaming token from final LLM response
+                # token: streaming token from final LLM response
                 # ----------------------------------------------------------
                 elif event_type == "token":
                     actual_output += data.get("content", "")
 
                 # ----------------------------------------------------------
-                # result  — final complete message
+                # result: final complete message
                 # ----------------------------------------------------------
                 elif event_type == "result":
                     message = data.get("message", {})
@@ -238,19 +238,19 @@ def audit_capture(
             _vlog(
                 _vf,
                 f"ERROR: Unsupported audit schema_version "
-                f"{_audit_event.get('schema_version')!r} — expected 1.",
+                f"{_audit_event.get('schema_version')!r}, expected 1.",
             )
             if _vf:
                 _vf.close()
             raise RuntimeError(
                 f"Unsupported audit schema_version "
-                f"{_audit_event.get('schema_version')!r} — expected 1. "
+                f"{_audit_event.get('schema_version')!r}, expected 1. "
                 "Update lex_eval to match the new LexChat schema."
             )
 
         # The server emits the audit event on BOTH the success path and the
         # exception path (system.py), setting audit["error"] on failures. A
-        # failed run is still an eval data point — record it as an error row.
+        # failed run is still an eval data point, record it as an error row.
         if _audit_event.get("error"):
             is_error = True
             error_message = _audit_event["error"]
@@ -270,24 +270,24 @@ def audit_capture(
         ):
             is_error = True
             _first_err = next(d["error"] for d in _delegations if d.get("error"))
-            error_message = f"All delegations failed — first error: {_first_err}"
+            error_message = f"All delegations failed, first error: {_first_err}"
 
     # ------------------------------------------------------------------
     # Derive the return dict from the audit event
     # ------------------------------------------------------------------
     audit = _audit_event or {}
 
-    # actual_output — prefer the structured field, fall back to token stream
+    # actual_output, prefer the structured field, fall back to token stream
     actual_output = audit.get("answer") or actual_output
     if not isinstance(actual_output, str):
         actual_output = str(actual_output) if actual_output else ""
 
-    # research_output — join all delegation reports
+    # research_output, join all delegation reports
     research_output = "\n\n".join(
         d.get("report", "") for d in audit.get("delegations", []) if d.get("report")
     )
 
-    # tools_called and tool_sequence — built together to preserve ordering
+    # tools_called and tool_sequence, built together to preserve ordering
     tools_called: List[Dict[str, Any]] = []
     tool_sequence: List[str] = []
 
@@ -307,7 +307,7 @@ def audit_capture(
             tool_name = t.get("name") or ""
             if not tool_name:
                 logger.warning(
-                    "audit event: tool entry missing 'name' field — "
+                    "audit event: tool entry missing 'name' field, "
                     "using 'unknown' placeholder"
                 )
                 tool_name = "unknown"
@@ -411,7 +411,7 @@ def audit_capture(
         if t.get("summarised") and t.get("final_result")
     ] or None  # None = SQL NULL when no summarisation occurred
 
-    # research_mode — prefer the server's resolved mode
+    # research_mode, prefer the server's resolved mode
     research_mode_out = audit.get("research_mode") or research_mode
 
     # New fields
@@ -491,7 +491,7 @@ def audit_capture(
         _vf.close()
 
     return {
-        # existing keys — unchanged types and values
+        # existing keys, unchanged types and values
         "actual_output": actual_output,
         "retrieval_context": retrieval_context,
         "tools_called": tools_called,

@@ -16,6 +16,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 def load_records(
     filepath: Optional[Path] = None,
+    read_only: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Load all records from the DuckDB responses database.
@@ -25,8 +26,12 @@ def load_records(
          actual_output, retrieval_context, tools_called}
 
     Error rows are excluded.
+
+    Pass ``read_only=True`` at pytest collection time, since multiple
+    pytest-xdist workers may call this concurrently (see
+    ``db.load_records``).
     """
-    return _db_load_records(path=filepath)
+    return _db_load_records(path=filepath, read_only=read_only)
 
 
 def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
@@ -55,6 +60,38 @@ def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
     )
 
 
+_WORKER_TOOL_PREFIX = "Worker: "
+
+
+def agent_visible_context(record: Dict[str, Any]) -> List[str]:
+    """
+    Return the legal text the research agent actually had to work from.
+
+    LexChat summarises a tool result before handing it back to the research
+    agent when the result is large (see LexChat's ``run_worker_tool``). When
+    that happens the agent never sees the full Act, only the summary, so
+    ``retrieval_context`` (built from the raw API responses) is not what the
+    agent worked from and must not be used to judge its report.
+
+    Returns the agent's own tool results when the run summarised anything,
+    and ``retrieval_context`` unchanged when it did not.
+    """
+    if not record.get("summarisation_used"):
+        return record.get("retrieval_context") or []
+
+    seen: List[str] = []
+    for tool in record.get("tools_called") or []:
+        if not str(tool.get("name", "")).startswith(_WORKER_TOOL_PREFIX):
+            continue
+        output = str(tool.get("output") or "").strip()
+        if output:
+            seen.append(output)
+
+    # Fall back rather than hand the judge nothing, so a capture gap reads as
+    # a capture gap rather than as an agent that invented everything.
+    return list(dict.fromkeys(seen)) or (record.get("retrieval_context") or [])
+
+
 def group_by_question(
     records: Optional[List[Dict[str, Any]]] = None,
     filepath: Optional[Path] = None,
@@ -78,17 +115,20 @@ def group_by_question(
 def group_by_question_and_llm(
     records: Optional[List[Dict[str, Any]]] = None,
     filepath: Optional[Path] = None,
+    read_only: bool = False,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Group records by (question_id, llm_name) tuple key.
 
     Useful for testing repeatability of the same LLM on the same question
     when ``gather_responses.py`` is run with ``--append``.
+
+    Pass ``read_only=True`` at pytest collection time (see ``load_records``).
     """
     if records is None:
         from .db import group_by_question_and_llm as _db_group
 
-        return _db_group(path=filepath)
+        return _db_group(path=filepath, read_only=read_only)
 
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in records:

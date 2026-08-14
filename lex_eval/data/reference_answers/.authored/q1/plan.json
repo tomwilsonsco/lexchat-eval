@@ -1,0 +1,21 @@
+{
+  "scope_note": "Covers the current text, statutory context, and amendment/commencement status of section 6 of the Data Protection Act 2018, together with any subordinate legislation made under or affecting it. Limited to legislation (Acts and SIs); case law interpreting the provision is out of scope in this mode.",
+  "steps": [
+    {
+      "title": "Retrieve the full current text of s.6 Data Protection Act 2018",
+      "detail": "Obtain the in-force text of section 6 of the Data Protection Act 2018 in full, including all subsections, and note its position in the Act (Part, Chapter and any cross-headings) and the marginal/section heading as enacted and as currently in force."
+    },
+    {
+      "title": "Identify surrounding provisions and defined terms that s.6 depends on or feeds into",
+      "detail": "Identify the provisions of the Data Protection Act 2018 that s.6 cross-refers to or that cross-refer to s.6 (including any interpretation or definitions sections applying to the relevant Part/Chapter, and any Schedules referenced), and set out how terms used in s.6 are defined for the purposes of the Act."
+    },
+    {
+      "title": "Check commencement, amendments and extent of s.6",
+      "detail": "Establish the commencement date of s.6 of the Data Protection Act 2018 (including any commencement SI made under the Act's commencement provisions), list all amendments, substitutions, insertions or repeals affecting s.6 with the amending Act or SI and dates in force, and confirm the territorial extent and application of the section."
+    },
+    {
+      "title": "Identify any secondary legislation or regulation-making powers connected to s.6",
+      "detail": "Identify any statutory instruments made under the Data Protection Act 2018 that modify, supplement or operate by reference to s.6, and any regulation-making power in the Act that permits amendment of s.6 or of the terms it uses, noting whether any such power has been exercised."
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "National Health Service (Scotland) Act 1978",
+      "year_from": 1978,
+      "year_to": 1978
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scottish Ministers directions Health Boards National Health Service Scotland"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "power of Scottish Ministers to give directions to Health Boards, constitution of Health Boards, exercise of functions, default powers, directions as to exercise of functions",
+      "legislation_id": "ukpga/1978/29"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "regulations orders and directions general provisions, directions to be in writing, may be varied or revoked, exercise of functions by Scottish Ministers, default powers, inquiries",
+      "legislation_id": "ukpga/1978/29"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scotland Act 1998",
+      "year_from": 1998,
+      "year_to": 1998
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "query": "general transfer of functions of a Minister of the Crown to the Scottish Ministers, exercisable within devolved competence, section 53",
+      "legislation_id": "ukpga/1998/46"
+    }
+  }
+]

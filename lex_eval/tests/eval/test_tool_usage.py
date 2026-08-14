@@ -2,15 +2,16 @@
 Test that every captured response used all required legislation tools *and*
 invoked them in the correct phase order.
 
-Presence — 1/3 per required tool (delegate_research, Worker: search_legislation,
+Presence, 1/3 per required tool (delegate_research, Worker: search_legislation,
 Worker: search_legislation_sections).
 
-Order (legislation_only only) — Worker tools must appear in the phase order
-mandated by the Worker system prompt:
+Order (legislation_only only), Worker tools must appear in the phase order
+mandated by the Worker system prompt, and must not loop back to an earlier
+phase once a later one has begun:
 
-    1. Worker: search_legislation          (Phase 1 — DISCOVER)
-    2. Worker: search_legislation_sections (Phase 2 — RETRIEVE PROVISIONS)
-    3. Worker: get_legislation_text        (Phase 3 — FALLBACK, optional)
+    1. Worker: search_legislation          (Phase 1, DISCOVER)
+    2. Worker: search_legislation_sections (Phase 2, RETRIEVE PROVISIONS)
+    3. Worker: get_legislation_text        (Phase 3, FALLBACK, optional)
 
 Score:
     - 1.0  all three required tools present AND correct order
@@ -30,7 +31,7 @@ from lex_eval.utils.test_helpers import (
 )
 from lex_eval.utils.collector import attach_metric
 
-records = load_records()
+records = load_records(read_only=True)
 
 
 def _tools_list(test_case):
