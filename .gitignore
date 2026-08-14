@@ -226,3 +226,6 @@ dist/
 .clinerules
 /docs/
 lexchat/
+
+# Local-only project instructions, not published to GitHub
+/CLAUDE.md
