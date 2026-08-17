@@ -445,14 +445,23 @@ def _metric_row_label(m: dict) -> str:
     return label
 
 
-def _render_metric_rows(metrics: list[dict]) -> None:
+def _is_failure(m: dict) -> bool:
+    """A scored metric that did not meet its threshold.
+
+    Not-scored metrics are excluded: a judge error is not a failure.
+    """
+    return m.get("scored", True) and not m["passed"]
+
+
+def _render_metric_rows(metrics: list[dict], failures_only: bool = False) -> None:
     """One expander per metric: the label is the summary row, the body is that
     metric's per-run detail.
 
     Failed metrics open by default, passed ones stay shut, so the reasons you
     need are on screen and the rest is one line each.
     """
-    for m in metrics:
+    shown = [m for m in metrics if _is_failure(m)] if failures_only else metrics
+    for m in shown:
         scored = m.get("scored", True)
         with st.expander(
             _metric_row_label(m),
@@ -856,32 +865,43 @@ def _render_question_block(
     question_text: str,
     metrics: list[dict],
     response_records: list[dict],
+    chat_key: str,
+    failures_only: bool = False,
 ) -> None:
     """Full block for one question within an LLM section."""
     scored_metrics = [m for m in metrics if m.get("scored", True)]
     n_pass = sum(1 for m in scored_metrics if m["passed"])
     n_total = len(scored_metrics)
     n_na = len(metrics) - n_total
+    n_fail = sum(1 for m in metrics if _is_failure(m))
 
     count = f"{n_pass}/{n_total} passed" if n_total else "nothing scored"
     count = f":green[{count}]" if n_pass == n_total and n_total else f":red[{count}]"
     if n_na:
         count += f" &nbsp; :gray[{n_na} N/A]"
 
+    # In failures-only mode the failing questions are the point, so open them
+    # rather than making the reader click through to what they asked to see.
     with st.expander(
         f"**Q{qid}:** {question_text[:120]}{'…' if len(question_text) > 120 else ''}"
         f" &nbsp; {count}",
-        expanded=False,
+        expanded=failures_only and bool(n_fail),
     ):
-        _render_metric_rows(metrics)
-        with st.expander("💬 Chat Interaction", expanded=False):
+        _render_metric_rows(metrics, failures_only=failures_only)
+
+        # Loaded on demand. Streamlit runs an expander's body whether or not it
+        # is open, so rendering every question's transcript on every rerun cost
+        # about 1.6 of the 1.8 seconds each filter change used to take. The
+        # toggle keeps its own state, so this builds only for a question the
+        # reader actually opened.
+        if st.toggle("💬 Chat interaction", key=chat_key):
             _render_chat_interaction(response_records)
 
 
 _ALL_MODES = "All research types"
 
 
-def _render_mode_filter(modes_present: list[str]) -> str:
+def _render_mode_filter(container, modes_present: list[str]) -> str:
     """Dropdown selecting which chat_mode to show. Returns the selection.
 
     Only rendered when the database holds more than one research type, since
@@ -889,19 +909,74 @@ def _render_mode_filter(modes_present: list[str]) -> str:
     """
     if len(modes_present) < 2:
         return _ALL_MODES
-    options = [_ALL_MODES, *modes_present]
-    col, _ = st.columns([1, 3])
-    with col:
-        return st.selectbox(
-            "Research type",
-            options,
-            index=0,
-            format_func=lambda m: m
-            if m == _ALL_MODES
-            else _chat_mode_badge(m).replace("_", " "),
-            help="Deep research and single-shot runs are scored and averaged "
-            "separately, never blended into one number.",
-        )
+    return container.selectbox(
+        "Research type",
+        [_ALL_MODES, *modes_present],
+        index=0,
+        format_func=lambda m: m
+        if m == _ALL_MODES
+        else _chat_mode_badge(m).replace("_", " "),
+        help="Deep research and single-shot runs are scored and averaged "
+        "separately, never blended into one number.",
+    )
+
+
+def _render_model_selector(container, llms: list[str]) -> str:
+    """Dropdown selecting which model's detail to show.
+
+    A selectbox rather than st.tabs because Streamlit renders every tab's
+    contents on every rerun, so tabs made the page cost grow with the number of
+    models evaluated even though only one is ever on screen.
+    """
+    return container.selectbox(
+        "Model", llms, index=0, help="Worst pass rate first."
+    )
+
+
+_ALL_RESULTS = "All results"
+_FAILURES_ONLY = "Failures only"
+
+
+def _render_show_filter(container) -> str:
+    """Dropdown selecting whether to show every metric or only the failures."""
+    return container.selectbox(
+        "Show",
+        [_ALL_RESULTS, _FAILURES_ONLY],
+        index=0,
+        help="Failures only hides passing metrics and questions, and opens what "
+        "is left, so the reasons are on screen without hunting.",
+    )
+
+
+def _render_mode_comparison(
+    llm: str, keys: list[tuple[str, str]], hierarchy: dict, failures_only: bool
+) -> None:
+    """Metrics passed per question, one column per research type.
+
+    Only shown when a model has been run under more than one research type,
+    which is the case where the numbers are otherwise only comparable by
+    flipping the filter and remembering what was there.
+    """
+    qids = sorted({q for k in keys for q in hierarchy[k]})
+    rows = []
+    for qid in qids:
+        row = {"Question": f"Q{qid}"}
+        for _llm, mode in keys:
+            metrics = hierarchy[(llm, mode)].get(qid, [])
+            scored = [m for m in metrics if m.get("scored", True)]
+            n_fail = sum(1 for m in metrics if _is_failure(m))
+            if not scored:
+                row[mode] = "-"
+            elif failures_only:
+                row[mode] = str(n_fail)
+            else:
+                row[mode] = f"{len(scored) - n_fail}/{len(scored)}"
+        rows.append(row)
+
+    st.caption(
+        "Failures per question" if failures_only else "Metrics passed per question"
+    )
+    st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
 def main() -> None:
@@ -935,7 +1010,7 @@ def main() -> None:
 
     if not responses:
         st.warning(
-            f"responses.db not found at {RESPONSES_DB} - chat interaction tab will be empty."
+            f"responses.db not found at {RESPONSES_DB} - chat interaction will be empty."
         )
 
     st.markdown(
@@ -948,35 +1023,61 @@ def main() -> None:
     )
 
     modes_present = sorted({mode for _llm, mode in hierarchy})
-    selected_mode = _render_mode_filter(modes_present)
-    if selected_mode != _ALL_MODES:
-        hierarchy = {k: v for k, v in hierarchy.items() if k[1] == selected_mode}
+    multiple_modes = len(modes_present) > 1
 
-    # Only worth naming the mode on every group when more than one is in view.
-    show_mode = selected_mode == _ALL_MODES and len(modes_present) > 1
-
-    _render_top_summary(hierarchy, show_mode)
+    # Every model and research type in the database, rendered above the filters
+    # because the filters do not narrow it. They control the per question detail
+    # below, and a control that changed something above it would not read that
+    # way.
+    _render_top_summary(hierarchy, multiple_modes)
     st.divider()
 
-    group_keys = _sorted_group_keys(hierarchy)
-    if not group_keys:
-        st.info("No eval results for this research type.")
+    model_col, mode_col, show_col = st.columns([2, 1, 1])
+
+    # Models worst pass rate first, matching the summary above.
+    llms = list(dict.fromkeys(llm for llm, _mode in _sorted_group_keys(hierarchy)))
+    llm = _render_model_selector(model_col, llms)
+    selected_mode = _render_mode_filter(mode_col, modes_present)
+    failures_only = _render_show_filter(show_col) == _FAILURES_ONLY
+
+    # Model and research type are independent axes, so "All research types" for a
+    # model that has several shows them one after another rather than picking one.
+    keys = [
+        k
+        for k in _sorted_group_keys(hierarchy)
+        if k[0] == llm and (selected_mode == _ALL_MODES or k[1] == selected_mode)
+    ]
+    if not keys:
+        st.info(f"No {selected_mode} results for {llm}.")
         return
 
-    group_tabs = st.tabs([_group_label(k, show_mode) for k in group_keys])
+    if len(keys) > 1:
+        _render_mode_comparison(llm, keys, hierarchy, failures_only)
+        st.markdown("")
 
-    for tab, key in zip(group_tabs, group_keys):
-        llm, mode = key
-        with tab:
-            q_data = hierarchy[key]
-            _render_llm_summary_bar(q_data)
-            st.markdown("")
+    for key in keys:
+        _llm, mode = key
+        q_data = hierarchy[key]
+        st.subheader(_group_label(key, show_mode=multiple_modes))
+        _render_llm_summary_bar(q_data)
+        st.markdown("")
 
-            for qid in sorted(q_data.keys()):
-                metrics = q_data[qid]
-                question_text = metrics[0].get("question", "")
-                response_records = responses.get((llm, mode, qid), [])
-                _render_question_block(qid, question_text, metrics, response_records)
+        shown_any = False
+        for qid in sorted(q_data.keys()):
+            metrics = q_data[qid]
+            if failures_only and not any(_is_failure(m) for m in metrics):
+                continue
+            shown_any = True
+            _render_question_block(
+                qid,
+                metrics[0].get("question", ""),
+                metrics,
+                responses.get((llm, mode, qid), []),
+                chat_key=f"chat::{llm}::{mode}::{qid}",
+                failures_only=failures_only,
+            )
+        if not shown_any:
+            st.success("No failures. Every scored metric passed for this model.")
 
 
 if __name__ == "__main__":
