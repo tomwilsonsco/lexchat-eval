@@ -141,6 +141,30 @@ statement of law is worse than an omitted one.
 letting the judge pick its own points was measured to disagree with itself 48% of the time run to run;
 labelling a fixed list cut that to 7%.
 
+## Plan Coverage
+
+**Aim.** Deep research only. Checks whether the plan a lawyer approves before research starts actually
+sets out to answer the question, not whether the finished report does. Catches a plan that leaves out a
+whole area of the question, so the gap is visible before any research time is spent, rather than only
+once the final answer turns out to be missing something.
+
+**How.** Judge-based. Uses the same fixed list of key statements written for Reference Answer Agreement,
+rather than a second, separately written "ideal plan". For each statement, the judge checks whether any
+step in the plan, if carried out, would find what that statement needs, and says which step. If the
+judge names a step number that isn't actually in the plan, that counts as not covered rather than
+covered, so a made-up answer can't pass. The score is simply the fraction of statements covered. Unlike
+Reference Answer Agreement, there's no "contradicted" outcome, since a plan doesn't assert anything the
+way a finished answer does, so only the score decides pass or fail.
+
+**Why.** Reusing the existing statement list means this check adds no new lawyer work: the same
+statements already used to judge the final answer are used to judge the plan for it. This is a
+plan-quality check, not an execution check: it says nothing about whether the steps were actually
+carried out well, or whether the final answer used what was found. It's also least informative on narrow
+questions: any plan containing a step like "retrieve the text of section X" will score close to 1.0
+against statements that are all facts inside that section, however many other steps the plan has and
+regardless of how good the plan actually is. That's a known, accepted limitation rather than something
+the design tries to fix, since it produces an uninformative score there rather than a wrong one.
+
 ## Claim Support
 
 **Aim.** Scores what share of the legal claims in the Worker's report can be traced to the legal text

@@ -1,13 +1,16 @@
 """
 Compare LexChat responses against the hand written reference ("gold") answers.
 
-Two metrics, both anchored to the reference answer for the same question:
+Three metrics, all anchored to the reference answer for the same question:
 
   - CitationAgreementMetric      : does the response cite the legislation the
                                    reference answer cites? (no AI judge)
   - ReferenceAnswerAgreementMetric : does the response make the statements
                                      written alongside the reference answer,
                                      and contradict none of them?
+  - PlanCoverageMetric            : deep_research only. Does the approved
+                                     research plan set out to cover those same
+                                     statements, before any research happens?
 
 Reference answers are drafts until a lawyer signs one off, so an unverified
 answer's scores carry a "[DRAFT REFERENCE - unverified]" note. Such a score
@@ -19,6 +22,7 @@ from deepeval.test_case import LLMTestCase
 
 from lex_eval.metrics import (
     CitationAgreementMetric,
+    PlanCoverageMetric,
     ReferenceAnswerAgreementMetric,
 )
 from lex_eval.reference.store import load_reference_answers
@@ -36,6 +40,10 @@ from lex_eval.utils.test_helpers import (
 
 _COVERAGE_THRESHOLD: float = 0.3
 _AGREEMENT_THRESHOLD: float = 0.6
+# Same value as _AGREEMENT_THRESHOLD by convention ("at least 3 of 5"), kept as
+# its own constant since it's a different question (does the plan set out to
+# cover the points, not does the response make them) and may need to diverge.
+_PLAN_COVERAGE_THRESHOLD: float = 0.6
 
 # Same threshold as test_groundedness.py's gate, so a non-answer like "Could
 # you narrow this down?" is recorded as a capture event here too, not scored
@@ -48,6 +56,7 @@ _DRAFT_NOTE = "[DRAFT REFERENCE - unverified]"
 # so reports/streamlit_report.py keeps the row out of the mean.
 _NO_REFERENCE = "No reference answer for this question;"
 _NO_STATEMENTS = "No reference statements for this question;"
+_NO_PLAN = "No research plan for this record;"
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +135,18 @@ def _gate_statements(request, record, reference, test_name, metric_name, thresho
         f"{_NO_STATEMENTS} {metric_name} not measured. Write them in "
         f"reference_answers/.authored/q{qid}/statements.json."
     )
+    _attach_not_measured(request, record, test_name, metric_name, threshold, reason)
+    return None, reason
+
+
+def _gate_research_plan(request, record, test_name, metric_name, threshold):
+    """Fail fast if this isn't a deep-research response with an approved plan."""
+    plan = record.get("research_plan") or {}
+    steps = plan.get("steps") or []
+    if record.get("chat_mode") == "deep_research" and steps:
+        return steps, ""
+
+    reason = f"{_NO_PLAN} {metric_name} not measured"
     _attach_not_measured(request, record, test_name, metric_name, threshold, reason)
     return None, reason
 
@@ -265,4 +286,74 @@ def test_reference_answer_agreement(request, record):
     assert metric.is_successful(), (
         f"Reference Answer Agreement score {metric.score:.2f} < {metric.threshold}: "
         f"{metric.reason}"
+    )
+
+
+@pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
+@_skip_no_api_key
+def test_plan_coverage(request, record):
+    """
+    The approved deep-research plan must set out to cover the reference
+    answer's main points, before any research happens.
+
+    Pre-flight gates: this must be a deep_research response with an approved
+    plan, and the question must have a reference answer with statements. No
+    output-length gate, this metric scores the plan, not the response.
+    """
+    plan_steps, reason = _gate_research_plan(
+        request,
+        record,
+        "plan_coverage",
+        "Plan Coverage",
+        _PLAN_COVERAGE_THRESHOLD,
+    )
+    if plan_steps is None:
+        pytest.skip(reason)
+
+    reference, reason = _gate_reference(
+        request,
+        record,
+        "plan_coverage",
+        "Plan Coverage",
+        _PLAN_COVERAGE_THRESHOLD,
+    )
+    if reference is None:
+        pytest.skip(reason)
+
+    statements, reason = _gate_statements(
+        request,
+        record,
+        reference,
+        "plan_coverage",
+        "Plan Coverage",
+        _PLAN_COVERAGE_THRESHOLD,
+    )
+    if statements is None:
+        pytest.skip(reason)
+
+    test_case: LLMTestCase = record_to_test_case(record)
+    metric = PlanCoverageMetric(
+        plan_steps=plan_steps,
+        statements=statements,
+        model=_judge,
+        threshold=_PLAN_COVERAGE_THRESHOLD,
+    )
+    _judge.last_model, _judge.total_usage_tokens = None, None
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="plan_coverage",
+        metric_name="Plan Coverage",
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=_stamp(reference, metric.reason or ""),
+        judge_llm=_judge.last_model,
+        judge_tokens=_judge.total_usage_tokens,
+    )
+
+    assert metric.is_successful(), (
+        f"Plan Coverage score {metric.score:.2f} < {metric.threshold}: {metric.reason}"
     )

@@ -74,6 +74,7 @@ METRIC_FILES = {
     "genuine_gap": "test_structure.py",
     "citation_agreement": "test_reference.py",
     "reference_answer_agreement": "test_reference.py",
+    "plan_coverage": "test_reference.py",
 }
 
 _DEFAULT_WORKERS = 4

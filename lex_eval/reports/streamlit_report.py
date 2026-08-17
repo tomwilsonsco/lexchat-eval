@@ -100,6 +100,11 @@ METRICS: list[tuple[str, str, str]] = [
         "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
     ),
     (
+        "plan_coverage",
+        "Plan Coverage",
+        "Deep research only, AI as a judge metric: Does the approved research plan set out to cover the question's key statements, before any research happens. Reuses the same fixed statement list as Reference Answer Agreement rather than a separately authored golden plan.",
+    ),
+    (
         "response_groundedness",
         "Response Groundedness",
         "AI as a judge metric: Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which fails it on any unsupported claim or meaningful misrepresentation and passes only trivial wording differences. There is no partial credit, so the average is a pass rate.",
@@ -136,6 +141,7 @@ _NON_SCORED_PREFIXES = (
     "No reference answer for this question;",
     "No reference statements for this question;",
     "No reference answer citations to compare against;",
+    "No research plan for this record;",
 )
 
 
