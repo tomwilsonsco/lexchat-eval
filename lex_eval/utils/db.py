@@ -25,6 +25,9 @@ responses
     summarisation_llm TEXT        (model used for summarisation; equals llm_name when no separate model is configured)
     chat_mode         TEXT        (research | conversational | deep_research)
     research_plan     JSON        (deep_research only: the plan from POST /api/research/plan, NULL otherwise)
+    needs_clarification    BOOLEAN (True when POST /api/research/plan asked a clarifying question instead
+                                    of proposing a plan; a valid outcome, distinct from is_error)
+    clarification_question TEXT   (the clarifying question asked, NULL unless needs_clarification)
 
 eval_<metric>
     One table per metric (e.g. eval_tool_usage, eval_response_groundedness),
@@ -94,7 +97,9 @@ CREATE TABLE IF NOT EXISTS responses (
     memo_hits         INTEGER  NOT NULL DEFAULT 0,
     audit_schema_version INTEGER,
     audit_json        JSON,
-    research_plan     JSON
+    research_plan     JSON,
+    needs_clarification BOOLEAN NOT NULL DEFAULT FALSE,
+    clarification_question TEXT
 );
 """
 
@@ -130,6 +135,9 @@ _MIGRATE_RESPONSES = [
     "ALTER TABLE responses ADD COLUMN audit_json JSON",
     # --- deep_research plan capture (POST /api/research/plan) ---
     "ALTER TABLE responses ADD COLUMN research_plan JSON",
+    # --- deep_research clarification path (distinct outcome, not an error) ---
+    "ALTER TABLE responses ADD COLUMN needs_clarification BOOLEAN",
+    "ALTER TABLE responses ADD COLUMN clarification_question TEXT",
 ]
 
 _INSERT_RESPONSE = """
@@ -139,8 +147,9 @@ INSERT INTO responses (
     research_mode, case_law_context, tool_sequence, fallback_used,
     summarisation_output, summarisation_used, summarisation_llm,
     chat_mode, provider, total_cost_usd, total_ms, reformatted,
-    local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
+    needs_clarification, clarification_question
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -247,6 +256,8 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
                 if record.get("research_plan") is not None
                 else None
             ),
+            bool(record.get("needs_clarification", False)),
+            record.get("clarification_question") or None,
         ],
     )
 
@@ -287,7 +298,7 @@ def load_records(
                    summarisation_output, summarisation_used, summarisation_llm,
                    chat_mode, provider, total_cost_usd, total_ms, reformatted,
                    local_cache_hits, memo_hits, audit_schema_version, audit_json,
-                   research_plan
+                   research_plan, needs_clarification, clarification_question
             FROM responses
             {where}
             ORDER BY id
@@ -323,6 +334,8 @@ def load_records(
         audit_schema_version,
         audit_json,
         research_plan_json,
+        needs_clarification,
+        clarification_question,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -364,6 +377,8 @@ def load_records(
                 "audit_schema_version": audit_schema_version,
                 "audit_json": audit_json,
                 "research_plan": research_plan,
+                "needs_clarification": bool(needs_clarification),
+                "clarification_question": clarification_question,
             }
         )
     return records
@@ -712,7 +727,8 @@ def make_deploy_db(
             "research_mode, case_law_context, tool_sequence, fallback_used, "
             "summarisation_output, summarisation_used, summarisation_llm, "
             "chat_mode, provider, total_cost_usd, total_ms, reformatted, "
-            "local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan "
+            "local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan, "
+            "needs_clarification, clarification_question "
             "FROM responses ORDER BY id"
         ).fetchall()
 
@@ -746,6 +762,8 @@ def make_deploy_db(
                 audit_schema_version,
                 audit_json,
                 research_plan_json,
+                needs_clarification,
+                clarification_question,
             ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
@@ -787,6 +805,8 @@ def make_deploy_db(
                     audit_schema_version,
                     audit_json,
                     research_plan_json,
+                    bool(needs_clarification),
+                    clarification_question,
                 ],
             )
 

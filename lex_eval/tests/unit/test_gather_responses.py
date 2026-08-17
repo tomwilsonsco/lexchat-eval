@@ -347,7 +347,11 @@ class TestDeepResearchPlanCapture:
 
     def test_plan_none_when_clarification_needed(self):
         """When the plan endpoint asks for clarification, no usable plan
-        exists yet, so the early-return record should carry research_plan=None."""
+        exists yet, so the early-return record should carry research_plan=None,
+        and the outcome must be a distinct needs_clarification record, not an
+        "error" (a model correctly asking a clarifying question is not a
+        capture failure, and must not be silently excluded from scoring by
+        load_records()'s default WHERE NOT is_error filter)."""
         lines = _sse_lines(AUDIT_SUCCESS)
         mock_client = _MockClient(
             lines,
@@ -372,4 +376,6 @@ class TestDeepResearchPlanCapture:
             )
 
         assert result["research_plan"] is None
-        assert "clarification" in result["error"].lower()
+        assert result["needs_clarification"] is True
+        assert result["clarification_question"] == "Which jurisdiction?"
+        assert "error" not in result

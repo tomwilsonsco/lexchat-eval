@@ -11,7 +11,21 @@ from lex_eval.metrics.structure import MandatoryStructureMetric
 pytestmark = pytest.mark.unit
 
 
-def _test_case(delegate_output: str) -> LLMTestCase:
+_VALID_REPORT = """### **Summary Answer (BLUF)**
+Some answer text.
+
+### **Detailed Analysis**
+Analysis text.
+
+### **Jurisdiction & Status**
+Applies to Scotland.
+
+### **References**
+- [Act](http://legislation.gov.uk/example)
+"""
+
+
+def _test_case(*delegate_outputs: str) -> LLMTestCase:
     return LLMTestCase(
         input="q",
         actual_output="final answer",
@@ -19,6 +33,7 @@ def _test_case(delegate_output: str) -> LLMTestCase:
             ToolCall(
                 name="delegate_research", input_parameters={}, output=delegate_output
             )
+            for delegate_output in delegate_outputs
         ],
     )
 
@@ -80,3 +95,28 @@ Applies to Scotland.
     metric = MandatoryStructureMetric(research_mode="legislation_only")
     metric.measure(_test_case(output))
     assert metric.is_successful(), metric.reason
+
+
+def test_deep_research_all_steps_present_passes():
+    """A deep-research run has one delegate_research entry per plan step;
+    every step's report has the mandatory headings here, so it should pass
+    exactly like a single-shot run would."""
+    metric = MandatoryStructureMetric(research_mode="legislation_only")
+    metric.measure(_test_case(_VALID_REPORT, _VALID_REPORT, _VALID_REPORT))
+    assert metric.is_successful(), metric.reason
+
+
+def test_deep_research_bad_second_step_fails():
+    """A bad step 2 must not hide behind a good step 1 (the bug this fix
+    addresses: the metric used to only look at the first delegate_research
+    output, so a deep-research run's later steps were invisible to it)."""
+    broken_step = """### **Summary Answer (BLUF)**
+Some answer text.
+
+### **Detailed Analysis**
+Analysis text.
+"""
+    metric = MandatoryStructureMetric(research_mode="legislation_only")
+    metric.measure(_test_case(_VALID_REPORT, broken_step))
+    assert not metric.is_successful()
+    assert "step 2" in metric.reason

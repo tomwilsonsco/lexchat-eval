@@ -7,8 +7,10 @@ CitationGroundingMetric:   checks that Worker citations were actually retrieved.
 CitationDomainMetric:      checks that Worker citation URLs are on legislation.gov.uk.
 GenuineGapMetric:          checks that an empty retrieval is disclosed, not papered over.
 
-All five metrics inspect the ``delegate_research`` tool-call output, which is where
-the Worker Agent's response is surfaced.
+All five metrics inspect every ``delegate_research`` tool-call output, which is where
+the Worker Agent's response is surfaced, one per delegation, so a deep-research run
+with several approved plan steps produces several outputs, and each must independently
+satisfy the check, not just the first.
 """
 
 import json
@@ -69,14 +71,22 @@ REQUIRED_HEADINGS = {
 _HEADING_LINE_PREFIX = r"[\s#*\d.\-:]*"
 
 
-def _get_delegate_output(test_case: LLMTestCase) -> str | None:
-    """Return the ``delegate_research`` tool-call output, or None if absent."""
-    if test_case.tools_called:
-        for tool in test_case.tools_called:
-            if tool.name == _DELEGATE_TOOL_NAME:
-                raw = tool.output
-                return raw if isinstance(raw, str) else str(raw)
-    return None
+def _get_delegate_outputs(test_case: LLMTestCase) -> list[str]:
+    """Return every ``delegate_research`` tool-call output, in order.
+
+    A single-shot run has exactly one. A deep-research run has one per
+    approved plan step (``audit_capture.py`` synthesises one ``delegate_research``
+    tools_called entry per delegation), and every step's report must be
+    checked, not just the first, so a bad step can't hide behind a good one.
+    """
+    if not test_case.tools_called:
+        return []
+    outputs = []
+    for tool in test_case.tools_called:
+        if tool.name == _DELEGATE_TOOL_NAME:
+            raw = tool.output
+            outputs.append(raw if isinstance(raw, str) else str(raw))
+    return outputs
 
 
 class MandatoryStructureMetric(BaseMetric):
@@ -106,9 +116,9 @@ class MandatoryStructureMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -117,12 +127,11 @@ class MandatoryStructureMetric(BaseMetric):
             )
             return self.score
 
-        lowered = dr_output.lower()
         headings = REQUIRED_HEADINGS.get(
             self.research_mode, REQUIRED_HEADINGS["legislation_only"]
         )
 
-        def _heading_present(heading) -> bool:
+        def _heading_present(heading, lowered: str) -> bool:
             variants = heading if isinstance(heading, list) else [heading]
             return any(
                 re.search(
@@ -131,17 +140,28 @@ class MandatoryStructureMetric(BaseMetric):
                 for v in variants
             )
 
-        missing = [h for h in headings if not _heading_present(h)]
+        step_failures = []
+        for i, dr_output in enumerate(dr_outputs, 1):
+            lowered = dr_output.lower()
+            missing = [h for h in headings if not _heading_present(h, lowered)]
+            if missing:
+                display = [h[0] if isinstance(h, list) else h for h in missing]
+                label = f"step {i}: " if len(dr_outputs) > 1 else ""
+                step_failures.append(f"{label}{', '.join(display)}")
 
-        if missing:
+        if step_failures:
             self.score = 0.0
             self.success = False
-            display = [h[0] if isinstance(h, list) else h for h in missing]
-            self.reason = f"Missing mandatory headings: {', '.join(display)}"
+            self.reason = f"Missing mandatory headings: {'; '.join(step_failures)}"
         else:
             self.score = 1.0
             self.success = True
-            self.reason = "All mandatory Markdown headings present in Worker output."
+            self.reason = (
+                "All mandatory Markdown headings present in Worker output."
+                if len(dr_outputs) == 1
+                else f"All mandatory Markdown headings present in all "
+                f"{len(dr_outputs)} Worker report(s)."
+            )
 
         return self.score
 
@@ -177,9 +197,9 @@ class CitationPassthroughMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -188,7 +208,9 @@ class CitationPassthroughMetric(BaseMetric):
             )
             return self.score
 
-        worker_links = set(_URL_RE.findall(dr_output))
+        worker_links: set[str] = set()
+        for dr_output in dr_outputs:
+            worker_links.update(_URL_RE.findall(dr_output))
 
         if not worker_links:
             self.score = 0.0
@@ -332,9 +354,9 @@ class CitationGroundingMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -343,7 +365,9 @@ class CitationGroundingMetric(BaseMetric):
             )
             return self.score
 
-        cited_urls = set(_URL_RE.findall(dr_output))
+        cited_urls: set[str] = set()
+        for dr_output in dr_outputs:
+            cited_urls.update(_URL_RE.findall(dr_output))
         cited_ids = {
             lid for lid in (_legislation_id_from_url(u) for u in cited_urls) if lid
         }
@@ -415,9 +439,9 @@ class CitationDomainMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -426,7 +450,9 @@ class CitationDomainMetric(BaseMetric):
             )
             return self.score
 
-        cited_urls = set(_URL_RE.findall(dr_output))
+        cited_urls: set[str] = set()
+        for dr_output in dr_outputs:
+            cited_urls.update(_URL_RE.findall(dr_output))
 
         if not cited_urls:
             self.score = 1.0
@@ -536,9 +562,9 @@ class GenuineGapMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -565,28 +591,48 @@ class GenuineGapMetric(BaseMetric):
             )
             return self.score
 
-        lowered = dr_output.lower()
+        # Retrieval was empty for the whole run, so every step's report must
+        # disclose it, not just one, a bad step can't hide behind a good one.
+        step_scores = []
+        for dr_output in dr_outputs:
+            lowered = dr_output.lower()
+            if _GENUINE_GAP_PHRASE.lower() in lowered:
+                step_scores.append(1.0)
+            elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
+                step_scores.append(0.5)
+            else:
+                step_scores.append(0.0)
 
-        if _GENUINE_GAP_PHRASE.lower() in lowered:
-            self.score = 1.0
-            self.success = True
+        self.score = min(step_scores)
+        self.success = self.score >= self.threshold
+
+        if len(dr_outputs) == 1:
+            if self.score == 1.0:
+                self.reason = (
+                    "Retrieval was empty and the Worker used the mandated "
+                    "disclosure sentence."
+                )
+            elif self.score == 0.5:
+                self.reason = (
+                    "Retrieval was empty; the Worker disclosed the gap but not "
+                    "in the mandated wording."
+                )
+            else:
+                self.reason = (
+                    "Retrieval was empty and the Worker's report does not "
+                    "disclose this; answered without an honest gap statement."
+                )
+        elif self.score == 1.0:
             self.reason = (
-                "Retrieval was empty and the Worker used the mandated "
-                "disclosure sentence."
-            )
-        elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
-            self.score = 0.5
-            self.success = False
-            self.reason = (
-                "Retrieval was empty; the Worker disclosed the gap but not in "
-                "the mandated wording."
+                f"Retrieval was empty and every one of {len(dr_outputs)} Worker "
+                "reports disclosed this."
             )
         else:
-            self.score = 0.0
-            self.success = False
+            worst = step_scores.index(min(step_scores)) + 1
             self.reason = (
-                "Retrieval was empty and the Worker's report does not disclose "
-                "this; answered without an honest gap statement."
+                f"Retrieval was empty across the run; step {worst} of "
+                f"{len(dr_outputs)} did not disclose this (worst step score "
+                f"{self.score})."
             )
 
         return self.score
