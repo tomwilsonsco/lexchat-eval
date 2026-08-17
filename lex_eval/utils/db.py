@@ -510,6 +510,21 @@ def _eval_table_name(metric: str) -> str:
     return f"eval_{metric}"
 
 
+def _eval_table_exists(conn: duckdb.DuckDBPyConnection, metric: str) -> bool:
+    """Whether eval_<metric> already exists on *conn*, without creating it.
+
+    Used by make_deploy_db to read from the source database, which must
+    never be modified, so it cannot call init_eval_table (CREATE ... IF NOT
+    EXISTS still counts as a write) just to check.
+    """
+    table = _eval_table_name(metric)
+    row = conn.execute(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+        [table],
+    ).fetchone()
+    return bool(row and row[0])
+
+
 def init_eval_table(conn: duckdb.DuckDBPyConnection, metric: str) -> None:
     """Create the eval_<metric> table and sequence if they don't already exist."""
     table = _eval_table_name(metric)
@@ -775,13 +790,17 @@ def make_deploy_db(
                 ],
             )
 
-        # Copy each per-metric eval table verbatim
+        # Copy each per-metric eval table verbatim. Tables are only ever
+        # created on dst, never src: src must never be modified (see this
+        # function's docstring), and a metric that was never run on src
+        # simply has nothing to copy, not an error.
         from lex_eval.run_evals import METRIC_FILES
 
         eval_row_count = 0
         for metric in METRIC_FILES:
-            init_eval_table(src, metric)
             init_eval_table(dst, metric)
+            if not _eval_table_exists(src, metric):
+                continue
             table = _eval_table_name(metric)
             eval_rows = src.execute(
                 f"SELECT {_EVAL_COLUMNS} FROM {table} ORDER BY id"

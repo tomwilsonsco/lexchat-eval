@@ -127,12 +127,18 @@ class OpenRouterJudge:
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
         )
-        # Set by _call() on the successful call that produced the most recent
-        # generate() result, so callers can attribute a measurement to the
-        # judge model/token cost that actually answered it, even after a
-        # retry-on-empty or fallback-model swap.
+        # last_model / total_usage_tokens accumulate across every _call() made
+        # since the caller last reset them (generate() itself does NOT reset,
+        # since one metric measurement can span multiple generate() calls,
+        # e.g. ReferenceAnswerAgreementMetric's retry-on-wrong-label-count
+        # loop). Callers that want a per-measurement total must reset both to
+        # None immediately before starting that measurement. last_model ends
+        # up holding the model that produced the final, successful result;
+        # total_usage_tokens sums every attempt's tokens, including
+        # empty-content retries that get discarded, since those still cost
+        # real tokens.
         self.last_model: str | None = None
-        self.last_usage_tokens: int | None = None
+        self.total_usage_tokens: int | None = None
 
     @staticmethod
     def _strict_schema(schema: type[BaseModel]) -> dict[str, Any]:
@@ -195,6 +201,16 @@ class OpenRouterJudge:
         for attempt in range(_MAX_RETRIES + 1):
             try:
                 response = self._client.chat.completions.create(**kwargs)
+
+                # Accumulate before the empty-content check below: a call that
+                # gets discarded for returning no content still spent tokens.
+                usage = getattr(response, "usage", None)
+                call_tokens = getattr(usage, "total_tokens", None) if usage else None
+                if call_tokens is not None:
+                    self.total_usage_tokens = (
+                        self.total_usage_tokens or 0
+                    ) + call_tokens
+
                 content = response.choices[0].message.content or ""
 
                 if not content.strip():
@@ -203,10 +219,6 @@ class OpenRouterJudge:
                     )
 
                 self.last_model = getattr(response, "model", None) or model
-                usage = getattr(response, "usage", None)
-                self.last_usage_tokens = (
-                    getattr(usage, "total_tokens", None) if usage else None
-                )
 
                 if schema is not None:
                     data = json.loads(content)
@@ -251,9 +263,11 @@ class OpenRouterJudge:
         Returns:
             A parsed Pydantic model instance if *schema* is provided,
             otherwise the plain response text.
+
+        Does not reset last_model/total_usage_tokens itself, see the
+        attributes' docstring in __init__ for why; callers that want a clean
+        per-measurement total must reset them first.
         """
-        self.last_model = None
-        self.last_usage_tokens = None
         try:
             return self._call(self._model, prompt, self._max_tokens, schema)
         except ValueError:

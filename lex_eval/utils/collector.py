@@ -39,7 +39,7 @@ def attach_metric(
         ``eval_<test_name>`` table the result is written to.
     judge_llm, judge_tokens
         Only set by AI-judge metrics, e.g. from ``_judge.last_model`` /
-        ``_judge.last_usage_tokens`` after calling ``.generate()``. Left
+        ``_judge.total_usage_tokens`` after calling ``.generate()``. Left
         ``None`` for deterministic metrics.
     """
     request.node._metric_data = {

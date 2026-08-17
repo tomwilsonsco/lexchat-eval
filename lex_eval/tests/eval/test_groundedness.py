@@ -178,7 +178,7 @@ def test_response_groundedness(request, record):
     # Reset here, not just inside generate(): a near-verbatim response passes
     # without calling the judge at all, so without this the row would wrongly
     # inherit judge_llm/judge_tokens left over from a previous test's call.
-    _judge.last_model, _judge.last_usage_tokens = None, None
+    _judge.last_model, _judge.total_usage_tokens = None, None
     metric.measure(test_case)
 
     attach_metric(
@@ -192,7 +192,7 @@ def test_response_groundedness(request, record):
         reason=metric.reason or "",
         error=str(metric.error) if getattr(metric, "error", None) else "",
         judge_llm=_judge.last_model,
-        judge_tokens=_judge.last_usage_tokens,
+        judge_tokens=_judge.total_usage_tokens,
     )
 
     assert metric.is_successful(), (
@@ -244,7 +244,7 @@ def test_claim_support(request, record):
         model=_judge,
         threshold=_CLAIM_SUPPORT_THRESHOLD,
     )
-    _judge.last_model, _judge.last_usage_tokens = None, None
+    _judge.last_model, _judge.total_usage_tokens = None, None
     metric.measure(test_case)
 
     attach_metric(
@@ -258,7 +258,7 @@ def test_claim_support(request, record):
         reason=metric.reason or "",
         error=str(metric.error) if getattr(metric, "error", None) else "",
         judge_llm=_judge.last_model,
-        judge_tokens=_judge.last_usage_tokens,
+        judge_tokens=_judge.total_usage_tokens,
     )
 
     assert metric.is_successful(), (

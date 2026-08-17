@@ -246,7 +246,7 @@ def test_reference_answer_agreement(request, record):
         model=_judge,
         threshold=_AGREEMENT_THRESHOLD,
     )
-    _judge.last_model, _judge.last_usage_tokens = None, None
+    _judge.last_model, _judge.total_usage_tokens = None, None
     metric.measure(test_case)
 
     attach_metric(
@@ -259,7 +259,7 @@ def test_reference_answer_agreement(request, record):
         passed=metric.is_successful(),
         reason=_stamp(reference, metric.reason or ""),
         judge_llm=_judge.last_model,
-        judge_tokens=_judge.last_usage_tokens,
+        judge_tokens=_judge.total_usage_tokens,
     )
 
     assert metric.is_successful(), (

@@ -115,27 +115,33 @@ def _deselect_args(covered: dict[str, set], test_file: str) -> list[str]:
         return []
 
     # Pytest appends a numeric suffix (0, 1, …) when multiple records share
-    # the same base ID, so we must replicate that here.
+    # the same base ID, so we must replicate that here for most metrics.
+    # test_consistency.py is the one exception: _same_model_cases() assigns
+    # its own explicit ids of the form "{base_id}_run{n+1}" rather than
+    # letting pytest auto-number them, so its deselect ids must match that
+    # instead, or they silently fail to match anything and consistency rows
+    # never get deselected.
     from lex_eval.utils.test_helpers import load_records, record_id
 
     records = load_records()
     base_ids = [record_id(r) for r in records]
     id_counts: dict[str, int] = {}
-    pytest_ids: list[str] = []
+    occurrences: list[int] = []
     for bid in base_ids:
         n = id_counts.get(bid, 0)
-        pytest_ids.append(f"{bid}{n}")
+        occurrences.append(n)
         id_counts[bid] = n + 1
 
     deselect_args: list[str] = []
-    for record, pid in zip(records, pytest_ids):
+    for record, bid, n in zip(records, base_ids, occurrences):
         response_id = record.get("response_id")
         for metric, response_ids in covered.items():
             if response_id in response_ids:
+                suffix = f"_run{n + 1}" if metric == "consistency" else str(n)
                 deselect_args.extend(
                     [
                         "--deselect",
-                        f"lex_eval/tests/eval/{test_file}::test_{metric}[{pid}]",
+                        f"lex_eval/tests/eval/{test_file}::test_{metric}[{bid}{suffix}]",
                     ]
                 )
     return deselect_args
@@ -209,6 +215,7 @@ def run_evals(
             cmd.extend(["-k", " and ".join(keyword_parts)])
 
         # skip logic: deselect tests that already have results
+        deselect: list[str] = []
         if not overwrite and not append:
             deselect = _deselect_args(covered, test_file)
             if deselect:
@@ -240,9 +247,21 @@ def run_evals(
         print(f"Command: {' '.join(cmd)}\n")
 
         result = subprocess.run(cmd)
+        rc = result.returncode
 
-        if result.returncode > overall_rc:
-            overall_rc = result.returncode
+        # pytest exits 5 (NO_TESTS_COLLECTED) when every test was deselected,
+        # which happens whenever a metric is already fully covered, the
+        # documented default behaviour, not a failure. Only normalize it when
+        # we know that's why: --deselect args were present in this exact
+        # invocation. A rc 5 with no deselect args (e.g. a typo'd --llm
+        # matching nothing) is a genuine collection problem and still
+        # surfaces.
+        if rc == 5 and deselect:
+            print(f"ℹ️  {test_file}: nothing new to run, all requested responses already covered")
+            rc = 0
+
+        if rc > overall_rc:
+            overall_rc = rc
 
     if overall_rc in (0, 1):
         print(
