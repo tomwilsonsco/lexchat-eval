@@ -12,7 +12,16 @@ import logging
 import duckdb
 import pytest
 
-from lex_eval.utils.db import init_db, _CREATE_TABLE
+from lex_eval.utils.db import (
+    clear_eval_results,
+    covered_response_ids,
+    init_db,
+    init_eval_table,
+    insert_eval_result,
+    load_eval_results,
+    _CREATE_TABLE,
+    _eval_table_name,
+)
 
 # Mark every test in this module as a unit test (fast, offline, no LLM).
 pytestmark = pytest.mark.unit
@@ -154,3 +163,114 @@ class TestInitDbMigrationHandling:
         ), "Subsequent migrations should have continued after the first failure"
 
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Tests, per-metric eval tables
+# ---------------------------------------------------------------------------
+
+
+def _sample_record(**overrides):
+    record = {
+        "response_id": 1,
+        "llm_name": "test-llm",
+        "question_id": 1,
+        "question": "What does section 6 say?",
+        "score": 0.8,
+        "threshold": 0.6,
+        "passed": True,
+        "reason": "States 4 of 5 reference points.",
+        "error": "",
+        "tools_used": ["search_legislation"],
+        "judge_llm": None,
+        "judge_tokens": None,
+    }
+    record.update(overrides)
+    return record
+
+
+class TestEvalTableName:
+    def test_rejects_invalid_metric_name(self):
+        with pytest.raises(ValueError):
+            _eval_table_name("tool_usage; DROP TABLE responses")
+
+    def test_accepts_snake_case_metric_name(self):
+        assert _eval_table_name("response_groundedness") == "eval_response_groundedness"
+
+
+class TestEvalTableRoundTrip:
+    """init_eval_table / insert_eval_result / clear_eval_results / covered_response_ids
+    against an in-memory connection (these take a connection directly, unlike
+    load_eval_results which opens its own file-based connection)."""
+
+    def test_insert_and_covered_response_ids(self):
+        conn = duckdb.connect(":memory:")
+        init_eval_table(conn, "tool_usage")
+
+        insert_eval_result(conn, "tool_usage", _sample_record(response_id=1))
+        insert_eval_result(conn, "tool_usage", _sample_record(response_id=2))
+
+        assert covered_response_ids(conn, "tool_usage") == {1, 2}
+        conn.close()
+
+    def test_judge_metadata_stored_for_judge_metrics(self):
+        conn = duckdb.connect(":memory:")
+        init_eval_table(conn, "response_groundedness")
+        insert_eval_result(
+            conn,
+            "response_groundedness",
+            _sample_record(judge_llm="openai/gpt-4o", judge_tokens=1234),
+        )
+        row = conn.execute(
+            "SELECT judge_llm, judge_tokens, run_at FROM eval_response_groundedness"
+        ).fetchone()
+        assert row[0] == "openai/gpt-4o"
+        assert row[1] == 1234
+        assert row[2]  # run_at is populated
+        conn.close()
+
+    def test_clear_eval_results_only_affects_its_own_table(self):
+        conn = duckdb.connect(":memory:")
+        init_eval_table(conn, "tool_usage")
+        init_eval_table(conn, "consistency")
+        insert_eval_result(conn, "tool_usage", _sample_record())
+        insert_eval_result(conn, "consistency", _sample_record())
+
+        clear_eval_results(conn, "tool_usage")
+
+        assert covered_response_ids(conn, "tool_usage") == set()
+        assert covered_response_ids(conn, "consistency") == {1}
+        conn.close()
+
+
+class TestLoadEvalResults:
+    def test_round_trip_via_file(self, tmp_path):
+        from lex_eval.utils.db import get_connection
+
+        db_path = tmp_path / "scratch.db"
+        conn = get_connection(db_path)
+        init_eval_table(conn, "citation_agreement")
+        insert_eval_result(
+            conn, "citation_agreement", _sample_record(response_id=1, score=0.5)
+        )
+        conn.commit()
+        conn.close()
+
+        results = load_eval_results(db_path, metric="citation_agreement")
+        assert len(results) == 1
+        assert results[0]["response_id"] == 1
+        assert results[0]["score"] == 0.5
+        assert results[0]["judge_llm"] is None
+
+    def test_missing_table_returns_empty_list_read_only(self, tmp_path):
+        from lex_eval.utils.db import get_connection
+
+        db_path = tmp_path / "scratch.db"
+        # Ensure the file exists but the metric's table doesn't.
+        get_connection(db_path).close()
+
+        assert load_eval_results(db_path, metric="genuine_gap", read_only=True) == []
+
+    def test_requires_metric(self):
+        with pytest.raises(ValueError):
+            load_eval_results(metric=None)

@@ -2,7 +2,7 @@
 Shared pytest configuration for the LexChat evaluation suite.
 
 Handles custom markers, sys.path setup, and metric data collection.
-Results are written to the `eval_results` DuckDB table
+Results are written to per-metric `eval_<test_name>` DuckDB tables
 (data/responses.db) at the end of each pytest session.
 """
 
@@ -12,7 +12,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-# Accumulated during the session, keyed by suite name.
+# Accumulated during the session, keyed by metric (test_name).
 _metric_records: dict[str, list[dict]] = defaultdict(list)
 
 
@@ -31,43 +31,21 @@ def pytest_configure(config):
         "markers",
         "unit: unit tests for the lex_eval harness itself (capture, DB, gather), fast, offline, no LLM",
     )
-    config.addinivalue_line(
-        "markers",
-        "tool_usage: tests that check correct tool invocation (fast, offline)",
-    )
-    config.addinivalue_line(
-        "markers",
-        "groundedness: custom legal AI-judge metrics, response groundedness and "
-        "research groundedness (require OPENROUTER_API_KEY)",
-    )
-    config.addinivalue_line(
-        "markers", "consistency: same-model repeatability tests (cosine similarity)"
-    )
-    config.addinivalue_line(
-        "markers", "structure: tests that check mandatory Worker output structure"
-    )
-    config.addinivalue_line(
-        "markers",
-        "reference: tests that compare a response against the hand written "
-        "reference answer for the same question (Reference Answer Agreement "
-        "requires OPENROUTER_API_KEY)",
-    )
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Capture test reports and collect metric data for per-suite JSON files."""
+    """Capture test reports and collect metric data, keyed by metric (test_name)."""
     outcome = yield
     report = outcome.get_result()
 
     if call.when == "call" and hasattr(item, "_metric_data"):
         data = item._metric_data
-        suite = data.pop("suite", "unknown")
-        _metric_records[suite].append(data)
+        _metric_records[data["test_name"]].append(data)
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """Write collected metric data to the eval_results DuckDB table.
+    """Write collected metric data to each metric's eval_<test_name> DuckDB table.
 
     Under pytest-xdist, this session is either a worker (one of several
     subprocesses collecting/running a slice of the tests) or the controller
@@ -90,17 +68,17 @@ def pytest_sessionfinish(session, exitstatus):
     from lex_eval.utils.db import (
         DEFAULT_DB,
         get_connection,
-        init_eval_results,
+        init_eval_table,
         insert_eval_result,
     )
 
     conn = get_connection(DEFAULT_DB)
-    init_eval_results(conn)
 
     total = 0
-    for suite, records in _metric_records.items():
+    for metric, records in _metric_records.items():
+        init_eval_table(conn, metric)
         for record in records:
-            insert_eval_result(conn, record, suite=suite)
+            insert_eval_result(conn, metric, record)
             total += 1
 
     conn.commit()
@@ -116,5 +94,5 @@ def pytest_testnodedown(node, error):
     worker's results have already been folded into ``_metric_records``.
     """
     worker_records = (node.workeroutput or {}).get("metric_records", {})
-    for suite, records in worker_records.items():
-        _metric_records[suite].extend(records)
+    for metric, records in worker_records.items():
+        _metric_records[metric].extend(records)

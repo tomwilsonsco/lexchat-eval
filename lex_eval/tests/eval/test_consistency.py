@@ -73,12 +73,10 @@ def _gate_output_length(request, record) -> tuple[bool, str]:
         threshold=_THRESHOLD,
         passed=False,
         reason=reason,
-        suite="consistency",
     )
     return False, reason
 
 
-@pytest.mark.consistency
 @pytest.mark.skipif(
     not _same_model,
     reason="No repeated runs found, re-run gather_responses.py with --append to generate repeatability data",
@@ -112,7 +110,6 @@ def test_consistency(request, record, other_outputs):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason,
-        suite="consistency",
     )
 
     assert metric.is_successful(), metric.reason
