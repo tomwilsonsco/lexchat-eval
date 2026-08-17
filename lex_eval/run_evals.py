@@ -2,44 +2,42 @@
 """
 Run LexChat evaluations using pytest + DeepEval.
 
-This script wraps pytest so the full evaluation suite can be launched
-from the command line with sensible defaults and optional filters.
+This script wraps pytest so individual metrics (or all of them) can be
+launched from the command line with sensible defaults and optional filters.
+Each metric writes results to its own table (``eval_<metric>``) in the shared
+DuckDB database (data/responses.db).
 
-Each suite writes results to the shared DuckDB database (data/responses.db)
-in the eval_results table.
-
-By default, existing results are preserved: if a (question, LLM) pair
-already has 1+ results in the suite's records, the test is skipped.
-Use ``--overwrite`` to force re-running all tests and replacing existing
-results.
+By default, existing results are preserved: a response that already has a
+result in a metric's table is skipped for that metric. Use ``--overwrite`` to
+clear a metric's table and re-run everything, or ``--append`` to re-run
+everything without clearing, so new rows accumulate alongside old ones
+(useful for checking a metric's determinism).
 
 Tests run in parallel via pytest-xdist (``EVAL_WORKERS`` in lex_eval/.env,
-default 4). This mainly speeds up the AI-judge suites (groundedness,
-reference), which are otherwise a long serial chain of blocking
-OpenRouter calls. Use ``--workers 1`` to disable and run single-process.
+default 4). This mainly speeds up the AI-judge metrics (response_groundedness,
+claim_support, reference_answer_agreement), which are otherwise a long serial
+chain of blocking OpenRouter calls. Use ``--workers 1`` to disable and run
+single-process.
 
 Examples
 --------
-Run everything (skipping already-completed tests):
+Run everything (skipping already-completed metrics):
     python lex_eval/run_evals.py
 
-Run only groundedness (requires OPENROUTER_API_KEY):
-    python lex_eval/run_evals.py --suite groundedness
+Run a single metric (requires OPENROUTER_API_KEY for judge metrics):
+    python lex_eval/run_evals.py --metrics response_groundedness
 
-Force re-run (overwrite existing results):
-    python lex_eval/run_evals.py --suite groundedness --overwrite
+Run several metrics at once:
+    python lex_eval/run_evals.py --metrics citation_grounding citation_domain
 
-Force re-run a single metric only (leaves the suite's other metrics alone):
-    python lex_eval/run_evals.py --suite groundedness --test-name response_groundedness --overwrite
+Force re-run (clear and replace existing results):
+    python lex_eval/run_evals.py --metrics response_groundedness --overwrite
+
+Re-run without clearing, to check a metric's determinism:
+    python lex_eval/run_evals.py --metrics claim_support --append
 
 Run only tool-usage checks (fast, no LLM judge needed):
-    python lex_eval/run_evals.py --suite tool_usage
-
-Run only consistency:
-    python lex_eval/run_evals.py --suite consistency
-
-Exclude slow LLM-judge tests:
-    python lex_eval/run_evals.py -m "not groundedness"
+    python lex_eval/run_evals.py --metrics tool_usage
 
 Verbose output:
     python lex_eval/run_evals.py -v
@@ -61,29 +59,21 @@ load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 TESTS_DIR = Path(__file__).parent / "tests" / "eval"
 
-SUITES = {
+# Every metric, keyed by its test_name (the same string used everywhere it
+# matters: attach_metric's test_name, the eval_<metric> table name, and the
+# pytest function name test_<metric>), mapped to the file it lives in.
+METRIC_FILES = {
     "tool_usage": "test_tool_usage.py",
-    "groundedness": "test_groundedness.py",
+    "response_groundedness": "test_groundedness.py",
+    "claim_support": "test_groundedness.py",
     "consistency": "test_consistency.py",
-    "structure": "test_structure.py",
-    "reference": "test_reference.py",
-}
-
-# The individual test_name values each suite can write to eval_results, used
-# to validate --test-name and to scope --overwrite to just that metric
-# instead of clearing the whole suite.
-SUITE_TEST_NAMES = {
-    "tool_usage": ["tool_usage"],
-    "groundedness": ["response_groundedness", "claim_support"],
-    "consistency": ["consistency"],
-    "structure": [
-        "mandatory_structure",
-        "citation_passthrough",
-        "citation_grounding",
-        "citation_domain",
-        "genuine_gap",
-    ],
-    "reference": ["citation_agreement", "reference_answer_agreement"],
+    "mandatory_structure": "test_structure.py",
+    "citation_passthrough": "test_structure.py",
+    "citation_grounding": "test_structure.py",
+    "citation_domain": "test_structure.py",
+    "genuine_gap": "test_structure.py",
+    "citation_agreement": "test_reference.py",
+    "reference_answer_agreement": "test_reference.py",
 }
 
 _DEFAULT_WORKERS = 4
@@ -104,44 +94,31 @@ def _default_workers() -> int:
         return _DEFAULT_WORKERS
 
 
-def _load_existing_results(suite: str) -> list[dict]:
-    """Load existing results for a suite from DuckDB, or return [] if not found."""
-    from lex_eval.utils.db import DEFAULT_DB, load_eval_results
-
-    return load_eval_results(DEFAULT_DB, suite=suite)
-
-
-def _covered_triples(results: list[dict]) -> set[tuple[int, str]]:
-    """Return the set of (response_id, test_name) pairs already covered."""
-    return {(int(r["response_id"]), r["test_name"]) for r in results}
+def _group_by_file(metrics: list[str]) -> dict[str, list[str]]:
+    """Group *metrics* by their test file, preserving METRIC_FILES order."""
+    grouped: dict[str, list[str]] = {}
+    for metric in metrics:
+        grouped.setdefault(METRIC_FILES[metric], []).append(metric)
+    return grouped
 
 
-def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
+def _deselect_args(covered: dict[str, set], test_file: str) -> list[str]:
     """
     Build pytest ``--deselect`` arguments for test IDs that already have a
-    result for that *specific* response (via ``response_id``).
+    result for that *specific* response, one metric's covered response_ids
+    at a time.
 
-    If *llm* is given, only records matching that LLM name are considered.
-
-    Returns an empty list if there are no existing results or if the suite file
-    doesn't exist.
+    *covered* maps metric -> set of response_ids already scored for it.
+    Returns an empty list if nothing is covered.
     """
-    existing = _load_existing_results(suite)
-    if llm:
-        existing = [r for r in existing if r["llm_name"] == llm]
-    if not existing:
+    if not any(covered.values()):
         return []
-
-    covered = _covered_triples(existing)
 
     # Pytest appends a numeric suffix (0, 1, …) when multiple records share
     # the same base ID, so we must replicate that here.
     from lex_eval.utils.test_helpers import load_records, record_id
 
     records = load_records()
-    test_file = SUITES[suite]
-
-    # build the same IDs pytest uses: base_id + counter suffix
     base_ids = [record_id(r) for r in records]
     id_counts: dict[str, int] = {}
     pytest_ids: list[str] = []
@@ -150,137 +127,101 @@ def _build_deselect_args(suite: str, llm: str | None = None) -> list[str]:
         pytest_ids.append(f"{bid}{n}")
         id_counts[bid] = n + 1
 
-    def _covered(record: dict, test_name: str) -> bool:
-        return (int(record["response_id"]), test_name) in covered
-
     deselect_args: list[str] = []
     for record, pid in zip(records, pytest_ids):
-        if suite == "groundedness":
-            for test_name, fn_name in (
-                ("response_groundedness", "test_response_groundedness"),
-                ("claim_support", "test_claim_support"),
-            ):
-                if _covered(record, test_name):
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::{fn_name}[{pid}]",
-                        ]
-                    )
-        elif suite == "tool_usage":
-            if _covered(record, "tool_usage"):
+        response_id = record.get("response_id")
+        for metric, response_ids in covered.items():
+            if response_id in response_ids:
                 deselect_args.extend(
                     [
                         "--deselect",
-                        f"lex_eval/tests/eval/{test_file}::test_tool_usage[{pid}]",
+                        f"lex_eval/tests/eval/{test_file}::test_{metric}[{pid}]",
                     ]
                 )
-        elif suite == "consistency":
-            if _covered(record, "consistency"):
-                deselect_args.extend(
-                    [
-                        "--deselect",
-                        f"lex_eval/tests/eval/{test_file}::test_consistency[{pid}]",
-                    ]
-                )
-        elif suite in ("structure", "reference"):
-            fn_names = {
-                "structure": (
-                    ("mandatory_structure", "test_mandatory_structure"),
-                    ("citation_passthrough", "test_citation_passthrough"),
-                    ("citation_grounding", "test_citation_grounding"),
-                    ("citation_domain", "test_citation_domain"),
-                    ("genuine_gap", "test_genuine_gap"),
-                ),
-                "reference": (
-                    ("citation_agreement", "test_citation_agreement"),
-                    ("reference_answer_agreement", "test_reference_answer_agreement"),
-                ),
-            }[suite]
-            for test_name, fn_name in fn_names:
-                if _covered(record, test_name):
-                    deselect_args.extend(
-                        [
-                            "--deselect",
-                            f"lex_eval/tests/eval/{test_file}::{fn_name}[{pid}]",
-                        ]
-                    )
-
     return deselect_args
 
 
 def run_evals(
-    suite: str | None = None,
+    metrics: list[str] | None = None,
     markers: str | None = None,
     verbose: bool = False,
     overwrite: bool = False,
+    append: bool = False,
     extra_args: list[str] | None = None,
     llm: str | None = None,
     workers: int | None = None,
-    test_name: str | None = None,
 ) -> int:
     """
-    Launch pytest against the evaluation test suite.
+    Launch pytest against the requested metrics (all of them if *metrics* is
+    None).
 
     Returns the pytest exit code (0 = all passed).
     """
-    suites_to_run = [suite] if suite and suite in SUITES else list(SUITES.keys())
+    requested = metrics or list(METRIC_FILES.keys())
+    grouped = _group_by_file(requested)
     overall_rc = 0
 
-    for s in suites_to_run:
-        from lex_eval.utils.db import (
-            DEFAULT_DB,
-            clear_eval_results,
-            get_connection,
-            init_db,
-            init_eval_results,
-        )
+    from lex_eval.utils.db import (
+        DEFAULT_DB,
+        clear_eval_results,
+        covered_response_ids,
+        get_connection,
+        init_db,
+        init_eval_table,
+    )
 
+    for test_file, file_metrics in grouped.items():
         conn = get_connection(DEFAULT_DB)
+        covered: dict[str, set] = {}
         try:
-            # Migrate both tables' schemas here, up front, in this single
-            # read-write connection. Eval test modules load records/results
-            # via read-only connections (safe under parallel pytest-xdist
-            # workers) and skip migration themselves, so it must happen once
-            # before pytest starts.
+            # Migrate the responses schema and each requested metric's table
+            # here, up front, in this single read-write connection. Eval test
+            # modules load records/results via read-only connections (safe
+            # under parallel pytest-xdist workers) and skip migration
+            # themselves, so it must happen once before pytest starts.
             init_db(conn)
-            init_eval_results(conn)  # Ensure table exists first
-            if overwrite:
-                # Scoped to test_name when given, so re-running one metric
-                # with --overwrite never wipes its sibling metrics' results.
-                clear_eval_results(conn, suite=s, test_name=test_name)
-            conn.commit()  # Commit after init and potential clear
+            for metric in file_metrics:
+                init_eval_table(conn, metric)
+                if overwrite:
+                    clear_eval_results(conn, metric)
+                elif not append:
+                    covered[metric] = covered_response_ids(conn, metric)
+            conn.commit()
         finally:
             conn.close()
 
-        cmd: list[str] = [sys.executable, "-m", "pytest"]
-        cmd.append(str(TESTS_DIR / SUITES[s]))
+        cmd: list[str] = [sys.executable, "-m", "pytest", str(TESTS_DIR / test_file)]
 
         if markers:
             cmd.extend(["-m", markers])
 
-        # filter to a single LLM and/or a single test_name via a combined
-        # pytest keyword expression (both are plain substrings, so "and"
-        # narrows to their intersection; LLM names containing ":" are fine
-        # unquoted here, same as the single-filter case below)
-        keyword_filters = [f for f in (llm, test_name) if f]
-        if keyword_filters:
-            cmd.extend(["-k", " and ".join(keyword_filters)])
+        # Filter to just the requested metrics' functions (only needed when
+        # not every metric in this file was requested), anded with an LLM
+        # filter if given.
+        all_file_metrics = [m for m, f in METRIC_FILES.items() if f == test_file]
+        keyword_parts = []
+        if set(file_metrics) != set(all_file_metrics):
+            fn_expr = " or ".join(f"test_{m}" for m in file_metrics)
+            keyword_parts.append(f"({fn_expr})" if len(file_metrics) > 1 else fn_expr)
+        if llm:
+            keyword_parts.append(llm)
+        if keyword_parts:
+            cmd.extend(["-k", " and ".join(keyword_parts)])
 
         # skip logic: deselect tests that already have results
-        if not overwrite:
-            deselect = _build_deselect_args(s, llm=llm)
+        if not overwrite and not append:
+            deselect = _deselect_args(covered, test_file)
             if deselect:
                 cmd.extend(deselect)
                 n_skipped = deselect.count("--deselect")
                 print(
-                    f"ℹ️  {s}: skipping {n_skipped} test(s) with existing results "
-                    f"(use --overwrite to force)"
+                    f"ℹ️  {test_file}: skipping {n_skipped} test(s) with existing "
+                    f"results (use --overwrite or --append to force)"
                 )
 
         # parallelise via pytest-xdist unless disabled (--workers 1); applied
-        # uniformly across suites so any future AI-judge suite benefits with
-        # no extra wiring, and fast/offline suites just pay a small
+        # uniformly across metrics so any future AI-judge metric benefits with
+        # no extra wiring, and fast/offline metrics just pay a small
         # worker-startup cost
         n_workers = workers if workers is not None else _default_workers()
         if n_workers != 1:
@@ -294,7 +235,7 @@ def run_evals(
             cmd.extend(extra_args)
 
         print(f"\n{'='*60}")
-        print(f"Running suite: {s}")
+        print(f"Running: {', '.join(file_metrics)}")
         print(f"{'='*60}")
         print(f"Command: {' '.join(cmd)}\n")
 
@@ -305,7 +246,7 @@ def run_evals(
 
     if overall_rc in (0, 1):
         print(
-            "\n📊 Results written to data/responses.db (eval_results table)"
+            "\n📊 Results written to data/responses.db (one eval_<metric> table per metric)"
             "\n   View dashboard: streamlit run lex_eval/reports/streamlit_report.py"
         )
 
@@ -317,19 +258,25 @@ def main() -> int:
         description="Run LexChat evaluations (pytest + DeepEval)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Suites:
-  tool_usage        Check tools were invoked correctly (fast, offline)
-  groundedness      LLM-as-judge faithfulness checks (needs OPENROUTER_API_KEY)
-  consistency       Same-model repeatability checks (fast, cosine similarity)
-  structure         Worker output structure + citation checks (fast, offline)
-  reference         Compare against the hand written reference answers
-                    (Reference Answer Agreement needs OPENROUTER_API_KEY)
+Metrics:
+  tool_usage                   Tools were invoked correctly (fast, offline)
+  response_groundedness        Final response grounded in research output (needs OPENROUTER_API_KEY)
+  claim_support                Research claims traceable to retrieved text (needs OPENROUTER_API_KEY)
+  consistency                  Same-model repeatability (fast, cosine similarity)
+  mandatory_structure          Worker output has required headings (fast, offline)
+  citation_passthrough         Worker citations reach the final response (fast, offline)
+  citation_grounding           Cited Acts were actually retrieved (fast, offline)
+  citation_domain               Citations point to legislation.gov.uk (fast, offline)
+  genuine_gap                  Failed retrieval is disclosed, not glossed over (fast, offline)
+  citation_agreement           Cites what the reference answer cites (fast, offline)
+  reference_answer_agreement   States the reference answer's key points (needs OPENROUTER_API_KEY)
 
 Results:
-  All suites write to the eval_results table in data/responses.db.
+  Each metric writes to its own eval_<metric> table in data/responses.db.
 
-  By default, tests are skipped if results already exist for that
-  (question, LLM) pair.  Use --overwrite to force re-running.
+  By default, a response already scored for a metric is skipped for it.
+  Use --overwrite to clear and re-run, or --append to re-run without
+  clearing (accumulates extra rows; useful for determinism checks).
   Use --llm to restrict evaluation to a single model.
 
 Dashboard:
@@ -338,14 +285,16 @@ Dashboard:
 """,
     )
     parser.add_argument(
-        "--suite",
-        choices=list(SUITES.keys()),
-        help="Run a specific test suite instead of all",
+        "--metrics",
+        nargs="+",
+        choices=sorted(METRIC_FILES.keys()),
+        metavar="METRIC",
+        help="Run only these metrics instead of all of them",
     )
     parser.add_argument(
         "-m",
         "--markers",
-        help="Pytest marker expression (e.g. 'not groundedness')",
+        help="Pytest marker expression (e.g. 'not slow')",
     )
     parser.add_argument(
         "--llm",
@@ -356,15 +305,16 @@ Dashboard:
         "--overwrite",
         action="store_true",
         default=False,
-        help="Overwrite existing results instead of skipping completed tests",
+        help="Clear existing results for the selected metrics and re-run everything",
     )
     parser.add_argument(
-        "--test-name",
-        metavar="TEST_NAME",
+        "--append",
+        action="store_true",
+        default=False,
         help=(
-            "Only run/overwrite this one metric within --suite (e.g. "
-            "response_groundedness). With --overwrite, scopes the DB clear "
-            "to this test_name instead of the whole suite. Requires --suite."
+            "Re-run the selected metrics against every response without "
+            "clearing or skipping, so new rows accumulate alongside existing "
+            "ones. For troubleshooting/testing a metric's determinism."
         ),
     )
     parser.add_argument(
@@ -392,25 +342,18 @@ Dashboard:
 
     args = parser.parse_args()
 
-    if args.test_name:
-        if not args.suite:
-            parser.error("--test-name requires --suite")
-        valid = SUITE_TEST_NAMES[args.suite]
-        if args.test_name not in valid:
-            parser.error(
-                f"--test-name {args.test_name!r} is not valid for --suite "
-                f"{args.suite!r}; choose from {valid}"
-            )
+    if args.overwrite and args.append:
+        parser.error("--overwrite and --append are mutually exclusive")
 
     return run_evals(
-        suite=args.suite,
+        metrics=args.metrics,
         markers=args.markers,
         verbose=args.verbose,
         overwrite=args.overwrite,
+        append=args.append,
         extra_args=args.extra,
         llm=args.llm,
         workers=args.workers,
-        test_name=args.test_name,
     )
 
 

@@ -26,26 +26,33 @@ responses
     chat_mode         TEXT        (research | conversational | deep_research)
     research_plan     JSON        (deep_research only: the plan from POST /api/research/plan, NULL otherwise)
 
-eval_results
-    id          SEQUENCE primary key
-    suite       TEXT    (grouping key: groundedness, tool_usage, etc.)
-    llm_name    TEXT
-    question_id INTEGER
-    question    TEXT
-    test_name   TEXT    (individual test function name)
-    metric_name TEXT
-    score       DOUBLE
-    threshold   DOUBLE
-    passed      BOOLEAN
-    reason      TEXT
-    error       TEXT
-    tools_used  JSON    (list of tool name strings, or null)
+eval_<metric>
+    One table per metric (e.g. eval_tool_usage, eval_response_groundedness),
+    table name derived from the metric's test_name. Uniform schema across all
+    of them; judge_llm/judge_tokens are NULL for non-judge metrics.
+
+    id           SEQUENCE primary key
+    response_id  INTEGER (FK to responses.id)
+    llm_name     TEXT
+    question_id  INTEGER
+    question     TEXT
+    score        DOUBLE
+    threshold    DOUBLE
+    passed       BOOLEAN
+    reason       TEXT
+    error        TEXT
+    tools_used   JSON    (list of tool name strings, or null)
+    run_at       TEXT    (ISO timestamp this metric was evaluated)
+    judge_llm    TEXT    (model that actually answered; AI-judge metrics only)
+    judge_tokens INTEGER (total tokens for the judge call(s); AI-judge metrics only)
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -481,181 +488,147 @@ def completeness_report(path: Optional[Path] = None) -> None:
 
 
 # ----------------------------
-# EVAL
+# EVAL — one table per metric
 
-_CREATE_EVAL_RESULTS_TABLE = """
-CREATE SEQUENCE IF NOT EXISTS eval_results_id_seq START 1;
+_METRIC_NAME_RE = re.compile(r"^[a-z_]+$")
 
-CREATE TABLE IF NOT EXISTS eval_results (
-    id          INTEGER DEFAULT nextval('eval_results_id_seq') PRIMARY KEY,
-    suite       TEXT    NOT NULL,
-    llm_name    TEXT    NOT NULL,
-    question_id INTEGER NOT NULL,
-    question    TEXT    NOT NULL,
-    test_name   TEXT    NOT NULL,
-    metric_name TEXT    NOT NULL,
-    score       DOUBLE  NOT NULL,
-    threshold   DOUBLE  NOT NULL,
-    passed      BOOLEAN NOT NULL,
-    reason      TEXT,
-    error       TEXT,
-    tools_used  JSON,
-    response_id INTEGER
-);
-"""
-
-# Columns added after the initial schema; applied to existing databases via
-# init_eval_results, mirroring the _MIGRATE_RESPONSES pattern above.
-_MIGRATE_EVAL_RESULTS = [
-    # Foreign key to responses.id. NULL on rows written before this migration,
-    # there is no reliable way to backfill which response they scored.
-    "ALTER TABLE eval_results ADD COLUMN response_id INTEGER",
-]
-
-_INSERT_EVAL_RESULT = """
-INSERT INTO eval_results (
-    suite, llm_name, question_id, question, test_name, metric_name,
-    score, threshold, passed, reason, error, tools_used, response_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-"""
+_EVAL_COLUMNS = (
+    "response_id, llm_name, question_id, question, score, threshold, "
+    "passed, reason, error, tools_used, run_at, judge_llm, judge_tokens"
+)
 
 
-def init_eval_results(conn: duckdb.DuckDBPyConnection) -> None:
-    """Create the eval_results table and sequence if they don't already exist.
+def _eval_table_name(metric: str) -> str:
+    """Return the ``eval_<metric>`` table name for *metric*.
 
-    Also applies column migrations so existing databases gain new fields.
+    *metric* is always drawn from an internal registry
+    (``run_evals.py::METRIC_FILES``), never from user input, but this is
+    validated anyway since it is interpolated directly into SQL identifiers.
     """
-    conn.execute(_CREATE_EVAL_RESULTS_TABLE)
-    for stmt in _MIGRATE_EVAL_RESULTS:
-        try:
-            conn.execute(stmt)
-        except duckdb.CatalogException:
-            try:
-                conn.execute("ROLLBACK")
-            except Exception:
-                pass
-            col_hint = (
-                stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
-            )
-            logger.debug("Migration skipped (column may already exist): %s", col_hint)
-        except Exception:
-            try:
-                conn.execute("ROLLBACK")
-            except Exception:
-                pass
-            col_hint = (
-                stmt.split("ADD COLUMN")[-1].strip() if "ADD COLUMN" in stmt else stmt
-            )
-            logger.warning("Migration failed for column: %s", col_hint, exc_info=True)
+    if not _METRIC_NAME_RE.match(metric):
+        raise ValueError(f"invalid metric name: {metric!r}")
+    return f"eval_{metric}"
+
+
+def init_eval_table(conn: duckdb.DuckDBPyConnection, metric: str) -> None:
+    """Create the eval_<metric> table and sequence if they don't already exist."""
+    table = _eval_table_name(metric)
+    conn.execute(f"""
+        CREATE SEQUENCE IF NOT EXISTS {table}_id_seq START 1;
+
+        CREATE TABLE IF NOT EXISTS {table} (
+            id           INTEGER DEFAULT nextval('{table}_id_seq') PRIMARY KEY,
+            response_id  INTEGER NOT NULL,
+            llm_name     TEXT    NOT NULL,
+            question_id  INTEGER NOT NULL,
+            question     TEXT    NOT NULL,
+            score        DOUBLE  NOT NULL,
+            threshold    DOUBLE  NOT NULL,
+            passed       BOOLEAN NOT NULL,
+            reason       TEXT,
+            error        TEXT,
+            tools_used   JSON,
+            run_at       TEXT    NOT NULL,
+            judge_llm    TEXT,
+            judge_tokens INTEGER
+        );
+    """)
 
 
 def insert_eval_result(
-    conn: duckdb.DuckDBPyConnection, record: Dict[str, Any], suite: str
+    conn: duckdb.DuckDBPyConnection, metric: str, record: Dict[str, Any]
 ) -> None:
-    """Insert one eval result record into the eval_results table."""
+    """Insert one eval result record into the eval_<metric> table."""
+    table = _eval_table_name(metric)
     conn.execute(
-        _INSERT_EVAL_RESULT,
+        f"INSERT INTO {table} ({_EVAL_COLUMNS}) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
-            suite,
+            record["response_id"],
             record["llm_name"],
             int(record["question_id"]),
             record["question"],
-            record["test_name"],
-            record["metric_name"],
             float(record["score"]),
             float(record["threshold"]),
             bool(record["passed"]),
             record.get("reason") or None,
             record.get("error") or None,
             json.dumps(record.get("tools_used")),
-            record.get("response_id"),
+            datetime.now(timezone.utc).isoformat(),
+            record.get("judge_llm") or None,
+            record.get("judge_tokens"),
         ],
     )
 
 
-def clear_eval_results(
-    conn: duckdb.DuckDBPyConnection,
-    suite: Optional[str] = None,
-    test_name: Optional[str] = None,
-) -> None:
-    """Delete eval results, optionally filtered to a specific suite and/or test_name."""
-    conditions = []
-    params: List[Any] = []
-    if suite:
-        conditions.append("suite = ?")
-        params.append(suite)
-    if test_name:
-        conditions.append("test_name = ?")
-        params.append(test_name)
-    if conditions:
-        conn.execute(
-            f"DELETE FROM eval_results WHERE {' AND '.join(conditions)}", params
-        )
-    else:
-        conn.execute("DELETE FROM eval_results")
+def clear_eval_results(conn: duckdb.DuckDBPyConnection, metric: str) -> None:
+    """Delete all rows from the eval_<metric> table."""
+    table = _eval_table_name(metric)
+    conn.execute(f"DELETE FROM {table}")
+
+
+def covered_response_ids(conn: duckdb.DuckDBPyConnection, metric: str) -> set:
+    """Return the set of response_ids already scored for *metric*."""
+    init_eval_table(conn, metric)
+    table = _eval_table_name(metric)
+    rows = conn.execute(f"SELECT DISTINCT response_id FROM {table}").fetchall()
+    return {r[0] for r in rows}
 
 
 def load_eval_results(
     path: Optional[Path] = None,
-    suite: Optional[str] = None,
+    metric: Optional[str] = None,
     read_only: bool = False,
 ) -> List[Dict[str, Any]]:
     """
-    Load eval results from the database.  Returns a list of dicts loaded from
-    the `eval_results` DuckDB table.
-
-    Optionally filter to a single suite (e.g. ``"groundedness"``).
+    Load all rows from the eval_<metric> table as a list of dicts.
 
     Pass ``read_only=True`` when this may run concurrently with other readers
     of the same file (see ``load_records`` for why).
     """
+    if not metric:
+        raise ValueError("metric is required")
     path = path or DEFAULT_DB
     if not path.exists():
         return []
 
+    table = _eval_table_name(metric)
     conn = get_connection(path, read_only=read_only)
     try:
         if not read_only:
-            # Ensure the schema is migrated (adds new columns to existing DBs)
-            init_eval_results(conn)
-        if suite:
+            init_eval_table(conn, metric)
+        try:
             rows = conn.execute(
-                "SELECT llm_name, question_id, question, test_name, metric_name, "
-                "score, threshold, passed, reason, error, tools_used, response_id "
-                "FROM eval_results WHERE suite = ? ORDER BY id",
-                [suite],
+                f"SELECT {_EVAL_COLUMNS} FROM {table} ORDER BY id"
             ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT llm_name, question_id, question, test_name, metric_name, "
-                "score, threshold, passed, reason, error, tools_used, response_id "
-                "FROM eval_results ORDER BY id"
-            ).fetchall()
+        except duckdb.CatalogException:
+            # Read-only connection against a metric that has never been run.
+            rows = []
     finally:
         conn.close()
 
     results = []
     for (
+        response_id,
         llm_name,
         question_id,
         question,
-        test_name,
-        metric_name,
         score,
         threshold,
         passed,
         reason,
         error,
         tools_used_json,
-        response_id,
+        run_at,
+        judge_llm,
+        judge_tokens,
     ) in rows:
         results.append(
             {
+                "response_id": response_id,
                 "llm_name": llm_name,
                 "question_id": question_id,
                 "question": question,
-                "test_name": test_name,
-                "metric_name": metric_name,
                 "score": score,
                 "threshold": threshold,
                 "passed": passed,
@@ -666,7 +639,9 @@ def load_eval_results(
                     if tools_used_json and tools_used_json != "null"
                     else None
                 ),
-                "response_id": response_id,
+                "run_at": run_at,
+                "judge_llm": judge_llm,
+                "judge_tokens": judge_tokens,
             }
         )
     return results
@@ -712,10 +687,8 @@ def make_deploy_db(
     try:
         # Ensure source schema is migrated (adds new columns to existing DBs)
         init_db(src)
-        init_eval_results(src)
         # Recreate schema in the destination
         init_db(dst)
-        init_eval_results(dst)
 
         # Copy responses with trimmed retrieval_context
         rows = src.execute(
@@ -802,14 +775,24 @@ def make_deploy_db(
                 ],
             )
 
-        # Copy eval_results verbatim
-        eval_rows = src.execute(
-            "SELECT suite, llm_name, question_id, question, test_name, metric_name, "
-            "score, threshold, passed, reason, error, tools_used, response_id "
-            "FROM eval_results ORDER BY id"
-        ).fetchall()
-        for er in eval_rows:
-            dst.execute(_INSERT_EVAL_RESULT, list(er))
+        # Copy each per-metric eval table verbatim
+        from lex_eval.run_evals import METRIC_FILES
+
+        eval_row_count = 0
+        for metric in METRIC_FILES:
+            init_eval_table(src, metric)
+            init_eval_table(dst, metric)
+            table = _eval_table_name(metric)
+            eval_rows = src.execute(
+                f"SELECT {_EVAL_COLUMNS} FROM {table} ORDER BY id"
+            ).fetchall()
+            for er in eval_rows:
+                dst.execute(
+                    f"INSERT INTO {table} ({_EVAL_COLUMNS}) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    list(er),
+                )
+            eval_row_count += len(eval_rows)
 
         dst.execute("CHECKPOINT")
     finally:
@@ -821,7 +804,8 @@ def make_deploy_db(
     print(
         f"Deploy DB written to {output_path}\n"
         f"  Source : {before:.1f} MB\n"
-        f"  Deploy : {after:.1f} MB ({trimmed_count} row(s) trimmed)"
+        f"  Deploy : {after:.1f} MB ({trimmed_count} response row(s) trimmed, "
+        f"{eval_row_count} eval result row(s) copied)"
     )
     return output_path
 

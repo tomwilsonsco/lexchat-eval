@@ -99,7 +99,6 @@ def _gate_output_length(request, record, test_name, metric_name, threshold):
             threshold=threshold,
             passed=False,
             reason=reason,
-            suite="reference",
         )
         return False, reason
     return True, ""
@@ -142,7 +141,6 @@ def _attach_not_measured(request, record, test_name, metric_name, threshold, rea
         threshold=threshold,
         passed=False,
         reason=reason,
-        suite="reference",
     )
 
 
@@ -152,7 +150,6 @@ def _attach_not_measured(request, record, test_name, metric_name, threshold, rea
 
 
 @pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
-@pytest.mark.reference
 def test_citation_agreement(request, record):
     """
     The response must cite the legislation the reference answer cites.
@@ -195,7 +192,6 @@ def test_citation_agreement(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=_stamp(reference, metric.reason or ""),
-        suite="reference",
     )
 
     assert metric.is_successful(), (
@@ -205,7 +201,6 @@ def test_citation_agreement(request, record):
 
 
 @pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
-@pytest.mark.reference
 @_skip_no_api_key
 def test_reference_answer_agreement(request, record):
     """
@@ -251,6 +246,7 @@ def test_reference_answer_agreement(request, record):
         model=_judge,
         threshold=_AGREEMENT_THRESHOLD,
     )
+    _judge.last_model, _judge.last_usage_tokens = None, None
     metric.measure(test_case)
 
     attach_metric(
@@ -262,7 +258,8 @@ def test_reference_answer_agreement(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=_stamp(reference, metric.reason or ""),
-        suite="reference",
+        judge_llm=_judge.last_model,
+        judge_tokens=_judge.last_usage_tokens,
     )
 
     assert metric.is_successful(), (

@@ -30,9 +30,4 @@ dev = [
 testpaths = ["lex_eval/tests"]
 markers = [
     "unit: unit tests for the lex_eval harness itself (capture, DB, gather) — fast, offline, no LLM",
-    "groundedness: Custom legal AI-judge metrics, response groundedness and research groundedness (require OPENROUTER_API_KEY)",
-    "consistency: same-model repeatability tests using cosine similarity",
-    "tool_usage: tests that check tool-calling behaviour",
-    "structure: tests that check mandatory Worker output structure",
-    "reference: tests that compare a response against the hand written reference answer for the same question (Reference Answer Agreement requires OPENROUTER_API_KEY)",
 ]

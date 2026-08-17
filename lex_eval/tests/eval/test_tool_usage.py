@@ -78,7 +78,6 @@ def test_tool_usage(request, record):
         passed=metric.is_successful(),
         reason=metric.reason,
         tools_used=_tools_list(test_case),
-        suite="tool_usage",
     )
 
     assert metric.is_successful(), metric.reason

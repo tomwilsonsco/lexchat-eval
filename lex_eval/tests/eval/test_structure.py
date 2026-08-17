@@ -39,7 +39,6 @@ records = load_records(read_only=True)
     records,
     ids=[record_id(r) for r in records],
 )
-@pytest.mark.structure
 def test_mandatory_structure(request, record):
     """
     The Worker Agent output (returned via ``delegate_research``) must contain
@@ -61,7 +60,6 @@ def test_mandatory_structure(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason,
-        suite="structure",
     )
 
     assert metric.is_successful(), metric.reason
@@ -72,7 +70,6 @@ def test_mandatory_structure(request, record):
     records,
     ids=[record_id(r) for r in records],
 )
-@pytest.mark.structure
 def test_citation_passthrough(request, record):
     """
     Every legislation URL from the Worker output must appear in the final
@@ -96,7 +93,6 @@ def test_citation_passthrough(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason,
-        suite="structure",
     )
 
     assert metric.is_successful(), metric.reason
@@ -107,7 +103,6 @@ def test_citation_passthrough(request, record):
     records,
     ids=[record_id(r) for r in records],
 )
-@pytest.mark.structure
 def test_citation_grounding(request, record):
     """
     Every Act cited in the Worker output must correspond to a legislation_id
@@ -130,7 +125,6 @@ def test_citation_grounding(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason,
-        suite="structure",
     )
 
     assert metric.is_successful(), metric.reason
@@ -141,7 +135,6 @@ def test_citation_grounding(request, record):
     records,
     ids=[record_id(r) for r in records],
 )
-@pytest.mark.structure
 def test_citation_domain(request, record):
     """
     Every citation URL in the Worker output must point to legislation.gov.uk,
@@ -163,7 +156,6 @@ def test_citation_domain(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason,
-        suite="structure",
     )
 
     assert metric.is_successful(), metric.reason
@@ -174,7 +166,6 @@ def test_citation_domain(request, record):
     records,
     ids=[record_id(r) for r in records],
 )
-@pytest.mark.structure
 def test_genuine_gap(request, record):
     """
     When retrieval returned no usable legislation section/full-text content,
@@ -198,7 +189,6 @@ def test_genuine_gap(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason,
-        suite="structure",
     )
 
     assert metric.is_successful(), metric.reason

@@ -104,23 +104,24 @@ python lex_eval/gather_responses.py
 ## Step 3 Run evaluations
 
 ```bash
-# All suites:
+# All metrics:
 python lex_eval/run_evals.py
 
-# Specific suite:
-python lex_eval/run_evals.py --suite tool_usage
-python lex_eval/run_evals.py --suite groundedness    # needs OPENROUTER_API_KEY
-# (Groundedness measures: response groundedness, research groundedness)
-python lex_eval/run_evals.py --suite consistency
-python lex_eval/run_evals.py --suite structure
-python lex_eval/run_evals.py --suite reference       # Reference Answer Agreement needs OPENROUTER_API_KEY
-# (Reference measures against the hand written answers: key authority coverage, reference agreement)
+# Specific metric(s), each writes to its own eval_<metric> table:
+python lex_eval/run_evals.py --metrics tool_usage
+python lex_eval/run_evals.py --metrics response_groundedness    # needs OPENROUTER_API_KEY
+python lex_eval/run_evals.py --metrics claim_support            # needs OPENROUTER_API_KEY
+python lex_eval/run_evals.py --metrics consistency
+python lex_eval/run_evals.py --metrics mandatory_structure citation_passthrough citation_grounding citation_domain genuine_gap
+python lex_eval/run_evals.py --metrics citation_agreement
+python lex_eval/run_evals.py --metrics reference_answer_agreement    # needs OPENROUTER_API_KEY
 
-# Force re-run (overwrite existing results):
-python lex_eval/run_evals.py --suite groundedness --overwrite
+# Force re-run (clear and replace existing results for the selected metric(s)):
+python lex_eval/run_evals.py --metrics response_groundedness --overwrite
 
-# Force re-run a single metric only (leaves the suite's other metrics alone):
-python lex_eval/run_evals.py --suite groundedness --test-name response_groundedness --overwrite
+# Re-run without clearing, so new rows accumulate alongside old ones
+# (troubleshooting/testing a metric's determinism):
+python lex_eval/run_evals.py --metrics claim_support --append
 
 # Single LLM only:
 python lex_eval/run_evals.py --llm "model-name"
@@ -129,19 +130,21 @@ python lex_eval/run_evals.py --llm "model-name"
 python lex_eval/run_evals.py -v
 ```
 
-Results are written to the `eval_results` table in `lex_eval/data/responses.db`.
-By default, tests are skipped if results already exist for a (question, LLM)
-pair, use `--overwrite` to force re-running.
+Each metric writes to its own `eval_<metric>` table in `lex_eval/data/responses.db`.
+By default, a response already scored for a metric is skipped for it, use
+`--overwrite` to clear and force re-running, or `--append` to re-run without
+clearing (useful for testing a metric's determinism).
 
 ### Evaluation requirements
 
-| Suite | Speed | Requires |
+| Metric | Speed | Requires |
 |---|---|---|
 | `tool_usage` | Fast | Nothing extra |
-| `structure` | Fast | Nothing extra |
+| `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_domain`, `genuine_gap` | Fast | Nothing extra |
+| `citation_agreement` | Fast | Hand written reference answers |
 | `consistency` | Fast | ≥2 responses per question/LLM pair |
-| `groundedness` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
-| `reference` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` + hand written reference answers |
+| `response_groundedness`, `claim_support` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
+| `reference_answer_agreement` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` + hand written reference answers |
 
 ## Step 4 Streamlit dashboard
 

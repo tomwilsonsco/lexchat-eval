@@ -27,8 +27,14 @@ RESPONSES_DB = DEFAULT_DB
 
 @st.cache_data
 def load_eval_results(_db_mtime: float = 0.0) -> list[dict]:
-    """Load all eval results from the DuckDB eval_results table."""
-    return db_load_eval_results(RESPONSES_DB)
+    """Load every metric's eval_<metric> table and tag each row with the
+    test_name/metric_name implied by which table it came from (the table
+    itself doesn't store them, since the table name already is the metric)."""
+    results: list[dict] = []
+    for key, display_name, _tooltip in METRICS:
+        for row in db_load_eval_results(RESPONSES_DB, metric=key):
+            results.append({**row, "test_name": key, "metric_name": display_name})
+    return results
 
 
 @st.cache_data
@@ -44,35 +50,72 @@ def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
     return dict(idx)
 
 
-# order shown in streamlit
-METRIC_DISPLAY_ORDER: list[str] = [
-    "Tool Usage",
-    "Research Output Structure",
-    "Reference Links",
-    "Citation Grounding",
-    "Citation Domain",
-    "Genuine Gap",
-    "Consistency (Cosine)",
-    "Citation Agreement",
-    "Reference Answer Agreement",
-    "Response Groundedness",
-    "Claim Support",
+# Single source of truth for every metric this dashboard displays: its
+# eval_<key> table, its display name, and its tooltip, in display order.
+# Keys here must match run_evals.py::METRIC_FILES.
+METRICS: list[tuple[str, str, str]] = [
+    (
+        "tool_usage",
+        "Tool Usage",
+        "Are all of delegate research, search legislation and search legislation sections used, in the correct order (search legislation - search legislation sections - get legislation text if needed), and does the Worker stick to that order rather than looping back to an earlier step later in the same run?",
+    ),
+    (
+        "mandatory_structure",
+        "Research Output Structure",
+        "Does the worker agent return the findings to the manager with the requested headers.",
+    ),
+    (
+        "citation_passthrough",
+        "Reference Links",
+        "Are all reference links found by the researcher included in the final answer given to the user.",
+    ),
+    (
+        "citation_grounding",
+        "Citation Grounding",
+        "Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model.",
+    ),
+    (
+        "citation_domain",
+        "Citation Domain",
+        "Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite.",
+    ),
+    (
+        "genuine_gap",
+        "Genuine Gap",
+        "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence.",
+    ),
+    (
+        "consistency",
+        "Consistency (Cosine)",
+        "Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
+    ),
+    (
+        "citation_agreement",
+        "Citation Agreement",
+        "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
+    ),
+    (
+        "reference_answer_agreement",
+        "Reference Answer Agreement",
+        "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
+    ),
+    (
+        "response_groundedness",
+        "Response Groundedness",
+        "AI as a judge metric: Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which fails it on any unsupported claim or meaningful misrepresentation and passes only trivial wording differences. There is no partial credit, so the average is a pass rate.",
+    ),
+    (
+        "claim_support",
+        "Claim Support",
+        "AI as a judge metric: What share of the report's verifiable legal claims are backed by text the researcher actually read? Claims whose truth depends on the absence of a provision are reported separately because absence generally cannot be established from retrieved excerpts or summaries.",
+    ),
 ]
 
+# order shown in streamlit
+METRIC_DISPLAY_ORDER: list[str] = [name for _key, name, _tooltip in METRICS]
+
 # hover over tips on app summary tables
-METRIC_TOOLTIPS: dict[str, str] = {
-    "Tool Usage": "Are all of delegate research, search legislation and search legislation sections used, in the correct order (search legislation - search legislation sections - get legislation text if needed), and does the Worker stick to that order rather than looping back to an earlier step later in the same run?",
-    "Research Output Structure": "Does the worker agent return the findings to the manager with the requested headers.",
-    "Reference Links": "Are all reference links found by the researcher included in the final answer given to the user.",
-    "Citation Grounding": "Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model.",
-    "Citation Domain": "Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite.",
-    "Genuine Gap": "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence.",
-    "Consistency (Cosine)": "Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
-    "Citation Agreement": "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
-    "Reference Answer Agreement": "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
-    "Claim Support": "AI as a judge metric: What share of the report's verifiable legal claims are backed by text the researcher actually read? Claims whose truth depends on the absence of a provision are reported separately because absence generally cannot be established from retrieved excerpts or summaries.",
-    "Response Groundedness": "AI as a judge metric: Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which fails it on any unsupported claim or meaningful misrepresentation and passes only trivial wording differences. There is no partial credit, so the average is a pass rate.",
-}
+METRIC_TOOLTIPS: dict[str, str] = {name: tip for _key, name, tip in METRICS}
 
 # do not keep the individual response results of these metrics as only make sense
 # comparing multiple
@@ -474,6 +517,16 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         unsafe_allow_html=True,
     )
 
+    meta_bits = []
+    if r.get("run_at"):
+        meta_bits.append(f"scored {r['run_at'][:19]}")
+    if r.get("judge_llm"):
+        meta_bits.append(f"judge: `{r['judge_llm']}`")
+        if r.get("judge_tokens"):
+            meta_bits.append(f"{r['judge_tokens']} tokens")
+    if meta_bits:
+        st.caption(" · ".join(meta_bits))
+
     tools = r.get("tools_used")
     if tools:
         st.caption(f"Tools used: {', '.join(tools)}")
@@ -851,7 +904,7 @@ def main() -> None:
 
     raw_results = load_eval_results(_db_mtime=_db_mtime)
     if not raw_results:
-        st.warning("eval_results table is empty - run evaluations first.")
+        st.warning("No eval_<metric> tables have results yet - run evaluations first.")
 
     hierarchy = _build_hierarchy(raw_results)
     responses = load_responses(_mtime=_db_mtime) if RESPONSES_DB.exists() else {}

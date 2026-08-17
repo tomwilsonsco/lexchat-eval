@@ -127,6 +127,12 @@ class OpenRouterJudge:
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
         )
+        # Set by _call() on the successful call that produced the most recent
+        # generate() result, so callers can attribute a measurement to the
+        # judge model/token cost that actually answered it, even after a
+        # retry-on-empty or fallback-model swap.
+        self.last_model: str | None = None
+        self.last_usage_tokens: int | None = None
 
     @staticmethod
     def _strict_schema(schema: type[BaseModel]) -> dict[str, Any]:
@@ -196,6 +202,12 @@ class OpenRouterJudge:
                         f"Judge returned empty content for prompt (model={model})"
                     )
 
+                self.last_model = getattr(response, "model", None) or model
+                usage = getattr(response, "usage", None)
+                self.last_usage_tokens = (
+                    getattr(usage, "total_tokens", None) if usage else None
+                )
+
                 if schema is not None:
                     data = json.loads(content)
                     return schema(**data)
@@ -240,6 +252,8 @@ class OpenRouterJudge:
             A parsed Pydantic model instance if *schema* is provided,
             otherwise the plain response text.
         """
+        self.last_model = None
+        self.last_usage_tokens = None
         try:
             return self._call(self._model, prompt, self._max_tokens, schema)
         except ValueError:

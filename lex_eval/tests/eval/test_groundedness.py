@@ -87,7 +87,6 @@ def _gate_output_length(
             threshold=threshold,
             passed=False,
             reason=reason,
-            suite="groundedness",
         )
         return False, reason
     return True, ""
@@ -113,7 +112,6 @@ def _gate_retrieval_context(
             threshold=threshold,
             passed=False,
             reason=reason,
-            suite="groundedness",
         )
         return False, reason
     return True, ""
@@ -138,7 +136,6 @@ def _gate_research_output(
             threshold=threshold,
             passed=False,
             reason=reason,
-            suite="groundedness",
         )
         return False, reason
     return True, ""
@@ -150,7 +147,6 @@ def _gate_research_output(
 
 
 @pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
-@pytest.mark.groundedness
 @_skip_no_api_key
 def test_response_groundedness(request, record):
     """
@@ -179,6 +175,10 @@ def test_response_groundedness(request, record):
         model=_judge,
         threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
     )
+    # Reset here, not just inside generate(): a near-verbatim response passes
+    # without calling the judge at all, so without this the row would wrongly
+    # inherit judge_llm/judge_tokens left over from a previous test's call.
+    _judge.last_model, _judge.last_usage_tokens = None, None
     metric.measure(test_case)
 
     attach_metric(
@@ -191,7 +191,8 @@ def test_response_groundedness(request, record):
         passed=metric.is_successful(),
         reason=metric.reason or "",
         error=str(metric.error) if getattr(metric, "error", None) else "",
-        suite="groundedness",
+        judge_llm=_judge.last_model,
+        judge_tokens=_judge.last_usage_tokens,
     )
 
     assert metric.is_successful(), (
@@ -201,7 +202,6 @@ def test_response_groundedness(request, record):
 
 
 @pytest.mark.parametrize("record", records, ids=[record_id(r) for r in records])
-@pytest.mark.groundedness
 @_skip_no_api_key
 def test_claim_support(request, record):
     """
@@ -244,6 +244,7 @@ def test_claim_support(request, record):
         model=_judge,
         threshold=_CLAIM_SUPPORT_THRESHOLD,
     )
+    _judge.last_model, _judge.last_usage_tokens = None, None
     metric.measure(test_case)
 
     attach_metric(
@@ -256,7 +257,8 @@ def test_claim_support(request, record):
         passed=metric.is_successful(),
         reason=metric.reason or "",
         error=str(metric.error) if getattr(metric, "error", None) else "",
-        suite="groundedness",
+        judge_llm=_judge.last_model,
+        judge_tokens=_judge.last_usage_tokens,
     )
 
     assert metric.is_successful(), (
