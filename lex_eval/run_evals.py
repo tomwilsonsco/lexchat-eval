@@ -290,6 +290,7 @@ Metrics:
   genuine_gap                  Failed retrieval is disclosed, not glossed over (fast, offline)
   citation_agreement           Cites what the reference answer cites (fast, offline)
   reference_answer_agreement   States the reference answer's key points (needs OPENROUTER_API_KEY)
+  plan_coverage                Deep research plan sets out to cover key points (needs OPENROUTER_API_KEY)
 
 Results:
   Each metric writes to its own eval_<metric> table in data/responses.db.

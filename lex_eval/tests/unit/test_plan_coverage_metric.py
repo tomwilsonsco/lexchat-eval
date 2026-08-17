@@ -72,6 +72,23 @@ def test_invalid_step_number_downgraded_to_not_addressed():
     assert "cited step number doesn't exist" in metric.reason
 
 
+def test_reason_lists_which_statements_were_and_werent_addressed():
+    """Dashboard reviewers need to see which reference points the plan
+    missed, not just a count, so the reason spells out both statement lists,
+    one point per line, with 'Not addressed' shown before 'Addressed'."""
+    judge = _StubJudge(
+        _points(("addressed", 1), ("not_addressed", 0), ("not_addressed", 0))
+    )
+    metric = PlanCoverageMetric(plan_steps=_PLAN, statements=_STATEMENTS, model=judge)
+    metric.measure(_TEST_CASE)
+    expected_tail = (
+        "\nNot addressed:\n(2) Statement two.\n(3) Statement three."
+        "\nAddressed:\n(1) Statement one."
+    )
+    assert metric.reason.endswith(expected_tail)
+    assert metric.reason.index("Not addressed:") < metric.reason.index("Addressed:")
+
+
 def test_retries_once_on_wrong_label_count_then_succeeds():
     too_few = _CoverageJudgement(points=[{"index": 1, "label": "addressed", "step": 1}])
     correct = _points(("addressed", 1), ("addressed", 1), ("addressed", 1))

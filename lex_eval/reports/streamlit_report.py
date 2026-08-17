@@ -510,6 +510,10 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         label = "N/A"
         score_text = "not scored"
 
+    # Escaped, then newlines turned into <br>, so a multi-line reason (e.g.
+    # Plan Coverage's per-statement breakdown) renders as line breaks rather
+    # than one run-on line, without trusting judge/reason text as raw HTML.
+    reason_html = html.escape(r.get("reason", "")).replace("\n", "<br>")
     st.markdown(
         f'<div style="background:#0d1117;border-left:3px solid {colour};'
         f'padding:10px 14px;border-radius:4px;margin:6px 0;">'
@@ -518,7 +522,7 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         f'<span style="color:{colour};font-size:0.85em;font-weight:600;">{label}</span>'
         f"&nbsp;&nbsp;score: <code>{score_text}</code>"
         f'<div style="color:#8b949e;font-size:0.85em;margin-top:6px;">'
-        f'{r.get("reason","")}</div>'
+        f'{reason_html}</div>'
         f"</div>",
         unsafe_allow_html=True,
     )

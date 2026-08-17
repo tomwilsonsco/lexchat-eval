@@ -91,6 +91,12 @@ class PlanCoverageMetric(BaseMetric):
     anything the way a finished answer can, so is_successful() is simply
     score >= threshold.
 
+    reason lists each statement's own text, one per line, under a "Not
+    addressed" heading (shown first, so a reviewer sees the gap before
+    everything the plan got right) and an "Addressed" heading, not just the
+    count. Newline-separated rather than HTML: the dashboard renders it as
+    line breaks, everything else (DB, pytest output) just sees plain text.
+
     Args:
         plan_steps: The approved plan's steps, in order, each a dict with at
                     least "title" and "detail" (LexChat's
@@ -172,6 +178,7 @@ class PlanCoverageMetric(BaseMetric):
         addressed = [
             p for p in ordered if p.label == "addressed" and 1 <= p.step <= n_steps
         ]
+        addressed_idx = {p.index for p in addressed}
         invalid_step = sum(
             1
             for p in ordered
@@ -187,6 +194,23 @@ class PlanCoverageMetric(BaseMetric):
                 f" {invalid_step} further 'addressed' label(s) counted as not "
                 "addressed because the cited step number doesn't exist in the plan."
             )
+
+        addressed_lines = [
+            f"({p.index}) {self.statements[p.index - 1]}"
+            for p in ordered
+            if p.index in addressed_idx
+        ]
+        not_addressed_lines = [
+            f"({p.index}) {self.statements[p.index - 1]}"
+            for p in ordered
+            if p.index not in addressed_idx
+        ]
+        # Not addressed first, so the gap is the first thing a reviewer sees
+        # rather than scrolling past everything the plan got right.
+        if not_addressed_lines:
+            self.reason += "\nNot addressed:\n" + "\n".join(not_addressed_lines)
+        if addressed_lines:
+            self.reason += "\nAddressed:\n" + "\n".join(addressed_lines)
 
         return self.score
 
