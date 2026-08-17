@@ -25,27 +25,63 @@ data_dir = script_dir.parent / "data"
 RESPONSES_DB = DEFAULT_DB
 
 
+DEFAULT_CHAT_MODE = "research"
+
+
 @st.cache_data
 def load_eval_results(_db_mtime: float = 0.0) -> list[dict]:
     """Load every metric's eval_<metric> table and tag each row with the
     test_name/metric_name implied by which table it came from (the table
-    itself doesn't store them, since the table name already is the metric)."""
+    itself doesn't store them, since the table name already is the metric).
+
+    Also tags each row with the chat_mode of the response it scored. The
+    eval_<metric> tables have no chat_mode column, so it is looked up through
+    response_id. Everything downstream groups on it, so a deep research run is
+    never averaged together with a single-shot one."""
+    modes = _response_chat_modes()
     results: list[dict] = []
     for key, display_name, _tooltip in METRICS:
         for row in db_load_eval_results(RESPONSES_DB, metric=key):
-            results.append({**row, "test_name": key, "metric_name": display_name})
+            results.append(
+                {
+                    **row,
+                    "test_name": key,
+                    "metric_name": display_name,
+                    # "unknown" rather than a silent default: an eval row whose
+                    # response_id matches no response is a broken FK, and it
+                    # should surface as its own group rather than quietly
+                    # inflating the single-shot numbers.
+                    "chat_mode": modes.get(row.get("response_id"), "unknown"),
+                }
+            )
     return results
 
 
+def _response_chat_modes() -> dict[int, str]:
+    """response_id -> chat_mode, for tagging eval rows."""
+    return {
+        int(rec["response_id"]): (rec.get("chat_mode") or DEFAULT_CHAT_MODE)
+        for rec in db_load_records(RESPONSES_DB)
+        if rec.get("response_id") is not None
+    }
+
+
 @st.cache_data
-def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
+def load_responses(_mtime: float = 0.0) -> dict[tuple[str, str, int], list[dict]]:
     """
-    Load responses from DuckDB and index by (llm_name, question_id).
+    Load responses from DuckDB and index by (llm_name, chat_mode, question_id).
     Each key maps to a list of response records (could be 2+ runs).
+
+    chat_mode is part of the key so the Chat Interaction tab shows the same runs
+    the metrics above it were scored on, rather than every run of the question.
     """
-    idx: dict[tuple[str, int], list[dict]] = defaultdict(list)
+    idx: dict[tuple[str, str, int], list[dict]] = defaultdict(list)
     for rec in db_load_records(RESPONSES_DB):
-        key = (rec["llm_name"], int(rec["question_id"]))
+        key = (
+            rec["llm_name"],
+            rec.get("chat_mode") or DEFAULT_CHAT_MODE,
+            int(rec["question_id"]),
+        )
         idx[key].append(rec)
     return dict(idx)
 
@@ -203,19 +239,26 @@ def _aggregate_metrics(results: list[dict]) -> list[dict]:
 
 def _build_hierarchy(
     raw: list[dict],
-) -> dict[str, dict[int, list[dict]]]:
+) -> dict[tuple[str, str], dict[int, list[dict]]]:
     """
     group raw results
-    llm_name + question_id + [aggregated metric results]
+    (llm_name, chat_mode) + question_id + [aggregated metric results]
+
+    chat_mode is part of the key because a deep research run and a single-shot
+    run of the same question are different products of the same model, and
+    averaging them into one score hides the difference between them.
     """
-    grouped: dict[str, dict[int, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    grouped: dict[tuple[str, str], dict[int, list[dict]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     for r in raw:
-        grouped[r["llm_name"]][int(r["question_id"])].append(r)
-    hierarchy: dict[str, dict[int, list[dict]]] = {}
-    for llm, questions in grouped.items():
-        hierarchy[llm] = {}
+        key = (r["llm_name"], r.get("chat_mode") or DEFAULT_CHAT_MODE)
+        grouped[key][int(r["question_id"])].append(r)
+    hierarchy: dict[tuple[str, str], dict[int, list[dict]]] = {}
+    for key, questions in grouped.items():
+        hierarchy[key] = {}
         for qid, results in questions.items():
-            hierarchy[llm][qid] = _aggregate_metrics(results)
+            hierarchy[key][qid] = _aggregate_metrics(results)
     return hierarchy
 
 
@@ -254,31 +297,37 @@ def _score_badge(score: float | str, level: str | None = None) -> str:
     )
 
 
-def _status_icon(passed: bool) -> str:
-    colour = "#3fb950" if passed else "#f85149"
-    text = "Passed" if passed else "Failed"
-    return f'<span style="color:{colour};font-weight:600;">{text}</span>'
-
-
-def _get_llm_pass_rate(llm: str, hierarchy: dict) -> float:
-    """Calculate the overall pass rate for an LLM.
+def _get_group_pass_rate(key: tuple[str, str], hierarchy: dict) -> float:
+    """Calculate the overall pass rate for one (llm, chat_mode) group.
 
     Metric groups with nothing scored (every run a judge error or capture
     gate) are excluded entirely, not counted as failed.
     """
-    q_data = hierarchy.get(llm, {})
+    q_data = hierarchy.get(key, {})
     all_m = [r for results in q_data.values() for r in results if r.get("scored", True)]
     total = len(all_m)
     return (sum(1 for r in all_m if r["passed"]) / total) if total else 0.0
 
 
-def _render_top_summary(hierarchy: dict) -> None:
-    """summary rows at the top of the page for each LLM. Expand to show
-    mean score per metric across all questions."""
-    for llm in sorted(
-        hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)
-    ):
-        q_data = hierarchy[llm]
+def _group_label(key: tuple[str, str], show_mode: bool) -> str:
+    """Display name for an (llm, chat_mode) group."""
+    llm, mode = key
+    return f"{llm}  ·  {_chat_mode_badge(mode)}" if show_mode else llm
+
+
+def _sorted_group_keys(hierarchy: dict) -> list[tuple[str, str]]:
+    """Groups worst pass rate first, so the ones needing attention lead."""
+    return sorted(
+        hierarchy.keys(), key=lambda k: (_get_group_pass_rate(k, hierarchy), k)
+    )
+
+
+def _render_top_summary(hierarchy: dict, show_mode: bool) -> None:
+    """summary rows at the top of the page for each (llm, chat_mode) group.
+    Expand to show mean score per metric across all questions."""
+    for key in _sorted_group_keys(hierarchy):
+        group_name = _group_label(key, show_mode)
+        q_data = hierarchy[key]
         all_results = [r for results in q_data.values() for r in results]
         all_m = [r for r in all_results if r.get("scored", True)]
         n_na = len(all_results) - len(all_m)
@@ -286,11 +335,10 @@ def _render_top_summary(hierarchy: dict) -> None:
         passed = sum(1 for r in all_m if r["passed"])
         failed = total - passed
         pct = passed / total * 100 if total else 0.0
-        pct_colour = "#3fb950" if pct >= 80 else "#f0ad4e" if pct >= 50 else "#f85149"
 
         na_part = f" &nbsp; N/A: **{n_na}**" if n_na else ""
         label = (
-            f"**{llm}** &nbsp;|&nbsp; "
+            f"**{group_name}** &nbsp;|&nbsp; "
             f"Passed: **{passed}** &nbsp; Failed: **{failed}** &nbsp; "
             f"Total: **{total}**{na_part} &nbsp; Pass Rate: **{pct:.1f}%**"
         )
@@ -353,8 +401,8 @@ def _render_top_summary(hierarchy: dict) -> None:
             )
 
 
-def _render_llm_summary_bar(llm: str, q_data: dict[int, list[dict]]) -> None:
-    """header stats for an LLM"""
+def _render_llm_summary_bar(q_data: dict[int, list[dict]]) -> None:
+    """header stats for one (llm, chat_mode) group"""
     all_m = [r for results in q_data.values() for r in results if r.get("scored", True)]
     total = len(all_m)
     passed = sum(1 for r in all_m if r["passed"])
@@ -367,133 +415,87 @@ def _render_llm_summary_bar(llm: str, q_data: dict[int, list[dict]]) -> None:
     )
 
 
-def _render_metric_summary_table(metrics: list[dict]) -> None:
+def _metric_row_label(m: dict) -> str:
+    """One-line summary of a metric, used as its expander label.
+
+    Carries everything the old summary table's row carried, so opening the row
+    is the only step between seeing a score and reading why it came out that
+    way. Expander labels take Markdown, including :red[] / :green[] colour.
     """
-    summary row per metric showing:
-    metric name, score badge, min/max, threshold, status
+    name = m["metric_name"].strip()
+
+    if not m.get("scored", True):
+        # Every run in this group was a judge error or capture gate, so there
+        # is no score or pass/fail status to show.
+        return f"**{name}** &nbsp; `N/A` &nbsp; :gray[Not scored]"
+
+    status = ":green[Passed]" if m["passed"] else ":red[Failed]"
+    label = (
+        f"**{name}** &nbsp; `{m['score']:.3f}` &nbsp; {status} "
+        f"&nbsp; :gray[threshold {m['threshold']:.2f}]"
+    )
+
+    # Only worth the space when the runs actually disagreed.
+    if "min_score" in m and m["min_score"] != m["max_score"]:
+        label += f" &nbsp; :gray[runs {m['min_score']:.3f} to {m['max_score']:.3f}]"
+
+    if m.get("not_scored_count"):
+        label += f" &nbsp; :orange[{m['not_scored_count']} not scored]"
+
+    return label
+
+
+def _render_metric_rows(metrics: list[dict]) -> None:
+    """One expander per metric: the label is the summary row, the body is that
+    metric's per-run detail.
+
+    Failed metrics open by default, passed ones stay shut, so the reasons you
+    need are on screen and the rest is one line each.
     """
-    rows_html = ""
     for m in metrics:
-        name = m["metric_name"].strip()
-        score = m["score"]
-        threshold = m["threshold"]
-        passed = m["passed"]
-        has_range = "min_score" in m and "max_score" in m
-        not_scored_count = m.get("not_scored_count", 0)
-
-        if not m.get("scored", True):
-            # Every run in this group was a judge error or capture gate,
-            # nothing to show a score or pass/fail status for.
-            score_cell = (
-                '<span style="background:#30363d;color:#8b949e;padding:2px 8px;'
-                "border-radius:4px;font-family:monospace;font-size:0.85em;"
-                'font-weight:600;" title="No run produced a quality verdict '
-                '(judge error or capture gate)">N/A</span>'
-            )
-            status = '<span style="color:#8b949e;font-weight:600;">Not scored</span>'
-        else:
-            badge = _score_badge(score)
-            status = _status_icon(passed)
-
-            if has_range:
-                min_s = m["min_score"]
-                max_s = m["max_score"]
-                score_cell = (
-                    f"{badge}"
-                    f'&nbsp;<span style="font-size:0.78em;color:#8b949e;">'
-                    f"min&nbsp;<code>{min_s:.3f}</code>&nbsp;"
-                    f"max&nbsp;<code>{max_s:.3f}</code></span>"
+        scored = m.get("scored", True)
+        with st.expander(
+            _metric_row_label(m),
+            expanded=scored and not m["passed"],
+        ):
+            tooltip = METRIC_TOOLTIPS.get(m["metric_name"].strip(), "")
+            if tooltip:
+                st.caption(tooltip)
+            if not scored:
+                st.markdown(
+                    ":gray[No run produced a quality verdict "
+                    "(judge error or capture gate).]"
                 )
-            else:
-                score_cell = badge
+            _render_metric_body(m)
 
-            if not_scored_count:
-                score_cell += (
-                    f'&nbsp;<span style="font-size:0.78em;color:#d29922;" '
-                    f'title="Excluded from the mean: judge errors or capture '
-                    f'gates, not quality verdicts">&#9888; {not_scored_count} '
-                    f"not scored</span>"
-                )
 
-        tooltip = METRIC_TOOLTIPS.get(name, "")
-        if tooltip:
-            name_cell = (
-                f'<span title="{tooltip}" style="cursor:help;color:#c9d1d9;">'
-                f"{name}</span>"
-            )
-        else:
-            name_cell = f'<span style="color:#c9d1d9;">{name}</span>'
+def _render_metric_body(m: dict) -> None:
+    """
+    show individual raw eval results for one metric.
+    aggregated metrics also show a per-run breakdown.
+    """
+    if "min_score" not in m:
+        # Consistency - single aggregated result, no per-run breakdown
+        _render_single_eval_result(m)
+        return
 
-        rows_html += (
-            f"<tr>"
-            f'<td style="padding:6px 12px;">{name_cell}</td>'
-            f'<td style="padding:6px 12px;">{score_cell}</td>'
-            f'<td style="padding:6px 12px;font-family:monospace;color:#8b949e;">{threshold:.3f}</td>'
-            f'<td style="padding:6px 12px;font-size:1.1em;">{status}</td>'
-            f"</tr>"
+    # Mean/threshold are already in the row label; only the run count adds
+    # anything here, and only once there is more than one run.
+    n = m.get("n_runs", len(m.get("raw_results", [])))
+    if n > 1:
+        st.caption(f"Mean of {n} runs")
+
+    not_scored_reasons = m.get("not_scored_reasons") or []
+    if not_scored_reasons:
+        reasons_list = "; ".join(html.escape(reason) for reason in not_scored_reasons)
+        st.markdown(
+            f":orange[**{len(not_scored_reasons)} run(s) not scored** "
+            f"(excluded from the mean above, not a quality verdict): "
+            f"{reasons_list}]"
         )
 
-    table_html = f"""
-    <table style="border-collapse:collapse;width:100%;
-                  background:#161b22;border-radius:6px;overflow:hidden;">
-      <thead>
-        <tr style="background:#21262d;color:#8b949e;font-size:0.8em;text-transform:uppercase;">
-          <th style="padding:8px 12px;text-align:left;">Metric</th>
-          <th style="padding:8px 12px;text-align:left;">Score</th>
-          <th style="padding:8px 12px;text-align:left;">Threshold</th>
-          <th style="padding:8px 12px;text-align:left;">Status</th>
-        </tr>
-      </thead>
-      <tbody>{rows_html}</tbody>
-    </table>
-    """
-    st.markdown(table_html, unsafe_allow_html=True)
-
-
-def _render_metric_detail(metrics: list[dict]) -> None:
-    """
-    show individual raw eval results for each metric.
-    aggregated metrics also shows per-run breakdown.
-    """
-    for m in metrics:
-        name = m["metric_name"]
-        has_range = "min_score" in m
-        if m.get("scored", True):
-            icon = _status_icon(m["passed"])
-            st.markdown(
-                f"**{name}** {icon} - score: `{m['score']:.3f}`",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f"**{name}** :grey[Not scored] - no run produced a quality verdict"
-            )
-        with st.container():
-            if has_range:
-                n = m.get("n_runs", len(m.get("raw_results", [])))
-                st.markdown(
-                    f"**Mean:** `{m['score']:.3f}` &nbsp;|&nbsp; "
-                    f"**Min:** `{m['min_score']:.3f}` &nbsp;|&nbsp; "
-                    f"**Max:** `{m['max_score']:.3f}` &nbsp;|&nbsp; "
-                    f"**Threshold:** `{m['threshold']:.3f}` &nbsp;|&nbsp; "
-                    f"**Runs:** `{n}`"
-                )
-                not_scored_reasons = m.get("not_scored_reasons") or []
-                if not_scored_reasons:
-                    reasons_list = "; ".join(
-                        html.escape(reason) for reason in not_scored_reasons
-                    )
-                    st.markdown(
-                        f":orange[**{len(not_scored_reasons)} run(s) not scored** "
-                        f"(excluded from the mean above, not a quality verdict): "
-                        f"{reasons_list}]"
-                    )
-                for idx, raw in enumerate(m.get("raw_results", []), 1):
-                    _render_single_eval_result(raw, run_label=f"Run {idx}")
-            else:
-                # Consistency - single aggregated result, no per-run breakdown
-                _render_single_eval_result(m)
-        st.divider()
+    for idx, raw in enumerate(m.get("raw_results", []), 1):
+        _render_single_eval_result(raw, run_label=f"Run {idx}" if n > 1 else None)
 
 
 def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
@@ -857,37 +859,49 @@ def _render_question_block(
 ) -> None:
     """Full block for one question within an LLM section."""
     scored_metrics = [m for m in metrics if m.get("scored", True)]
-    all_pass = all(m["passed"] for m in scored_metrics)
     n_pass = sum(1 for m in scored_metrics if m["passed"])
     n_total = len(scored_metrics)
+    n_na = len(metrics) - n_total
 
-    # Determine the colour for the metric count
-    count_colour = "#3fb950" if n_pass == n_total else "#f85149"
-    status_text = "All passed" if n_pass == n_total else "Some failed"
+    count = f"{n_pass}/{n_total} passed" if n_total else "nothing scored"
+    count = f":green[{count}]" if n_pass == n_total and n_total else f":red[{count}]"
+    if n_na:
+        count += f" &nbsp; :gray[{n_na} N/A]"
 
-    # Expander labels render as plain text (no Markdown/color markup), so keep
-    # the label unstyled and surface the colored status inside the expander body.
     with st.expander(
-        f"Q{qid}: {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
-        f"({n_pass}/{n_total} metrics passed)",
+        f"**Q{qid}:** {question_text[:120]}{'…' if len(question_text) > 120 else ''}"
+        f" &nbsp; {count}",
         expanded=False,
     ):
-        st.markdown(
-            f'<span style="color:{count_colour};font-weight:600;">'
-            f"{n_pass}/{n_total} metrics passed</span>",
-            unsafe_allow_html=True,
-        )
-        _render_metric_summary_table(metrics)
-
-        st.markdown("")  # spacer
-
-        detail_tab, chat_tab = st.tabs(["📊 Metric Detail", "💬 Chat Interaction"])
-
-        with detail_tab:
-            _render_metric_detail(metrics)
-
-        with chat_tab:
+        _render_metric_rows(metrics)
+        with st.expander("💬 Chat Interaction", expanded=False):
             _render_chat_interaction(response_records)
+
+
+_ALL_MODES = "All research types"
+
+
+def _render_mode_filter(modes_present: list[str]) -> str:
+    """Dropdown selecting which chat_mode to show. Returns the selection.
+
+    Only rendered when the database holds more than one research type, since
+    with one it would be a dropdown with a single choice.
+    """
+    if len(modes_present) < 2:
+        return _ALL_MODES
+    options = [_ALL_MODES, *modes_present]
+    col, _ = st.columns([1, 3])
+    with col:
+        return st.selectbox(
+            "Research type",
+            options,
+            index=0,
+            format_func=lambda m: m
+            if m == _ALL_MODES
+            else _chat_mode_badge(m).replace("_", " "),
+            help="Deep research and single-shot runs are scored and averaged "
+            "separately, never blended into one number.",
+        )
 
 
 def main() -> None:
@@ -933,24 +947,35 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    _render_top_summary(hierarchy)
+    modes_present = sorted({mode for _llm, mode in hierarchy})
+    selected_mode = _render_mode_filter(modes_present)
+    if selected_mode != _ALL_MODES:
+        hierarchy = {k: v for k, v in hierarchy.items() if k[1] == selected_mode}
+
+    # Only worth naming the mode on every group when more than one is in view.
+    show_mode = selected_mode == _ALL_MODES and len(modes_present) > 1
+
+    _render_top_summary(hierarchy, show_mode)
     st.divider()
 
-    llm_names = sorted(
-        hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)
-    )
-    llm_tabs = st.tabs(llm_names)
+    group_keys = _sorted_group_keys(hierarchy)
+    if not group_keys:
+        st.info("No eval results for this research type.")
+        return
 
-    for tab, llm in zip(llm_tabs, llm_names):
+    group_tabs = st.tabs([_group_label(k, show_mode) for k in group_keys])
+
+    for tab, key in zip(group_tabs, group_keys):
+        llm, mode = key
         with tab:
-            q_data = hierarchy[llm]
-            _render_llm_summary_bar(llm, q_data)
+            q_data = hierarchy[key]
+            _render_llm_summary_bar(q_data)
             st.markdown("")
 
             for qid in sorted(q_data.keys()):
                 metrics = q_data[qid]
                 question_text = metrics[0].get("question", "")
-                response_records = responses.get((llm, qid), [])
+                response_records = responses.get((llm, mode, qid), [])
                 _render_question_block(qid, question_text, metrics, response_records)
 
 
