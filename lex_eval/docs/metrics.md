@@ -100,6 +100,27 @@ steps report normally and nothing else in the harness would notice.
 link at all, that step fails. Score is the fraction of steps that pass; threshold is 1.0, so a single
 lost step fails the response.
 
+## Report Integration
+
+**Aim.** Deep research only. Checks that every step's own substantive finding survives into the final
+answer, rather than being quietly dropped when the Manager condenses several step reports into one
+response. Only checks steps that retrieved usable content and cited some of it in their own report; a
+step that retrieved nothing, or retrieved and cited nothing, has no finding of its own for the final
+answer to have kept or dropped, so is not scored here.
+
+**How.** Judge-based, one call per in-scope step. The judge is given that one step's own report and the
+final answer, and labels the step `represented` or `dropped`, quoting the final answer to justify
+`represented`. A quote that isn't really in the final answer is downgraded to dropped, so the judge can't
+invent survival. Score is the fraction of in-scope steps represented; threshold is 1.0, so a fully dropped
+step's finding fails the response.
+
+**Why one call per step, not one batched call.** The first version asked about every in-scope step in a
+single call alongside the full final answer. Re-run five times on the same stored response with no input
+change, it scored 0.75, 0.5, 0.75, 1.0, 0.5, flagging a different step each time: too unstable to read
+per record. Splitting into one narrower call per step, the same fix already used by Response Groundedness
+(a direct verdict instead of a multi-item grade), scored the same three previously unstable responses
+identically across five repeats each.
+
 ## Consistency (Cosine)
 
 **Aim.** Measures how similar a response is to one or more other responses to the same question

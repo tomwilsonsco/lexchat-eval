@@ -73,6 +73,7 @@ METRIC_FILES = {
     "citation_domain": "test_structure.py",
     "genuine_gap": "test_structure.py",
     "step_completion": "test_structure.py",
+    "report_integration": "test_structure.py",
     "citation_agreement": "test_reference.py",
     "reference_answer_agreement": "test_reference.py",
     "plan_coverage": "test_reference.py",
@@ -309,6 +310,7 @@ Metrics:
   citation_domain               Citations point to legislation.gov.uk (fast, offline)
   genuine_gap                  Failed retrieval is disclosed, not glossed over (fast, offline)
   step_completion               Every step's own retrieval reached its own report, deep research only (fast, offline)
+  report_integration            Every step's finding reached the final answer, deep research only (needs OPENROUTER_API_KEY)
   citation_agreement           Cites what the reference answer cites (fast, offline)
   reference_answer_agreement   States the reference answer's key points (needs OPENROUTER_API_KEY)
   plan_coverage                Deep research plan sets out to cover key points (needs OPENROUTER_API_KEY)

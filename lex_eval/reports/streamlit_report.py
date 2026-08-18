@@ -126,6 +126,11 @@ METRICS: list[tuple[str, str, str]] = [
         "Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step).",
     ),
     (
+        "report_integration",
+        "Report Integration",
+        "Deep research only, AI as a judge metric: For every step that reported a real, cited finding of its own, does the final answer reflect that finding, rather than dropping it when the Manager condenses several step reports into one response. A step with nothing of its own to check (empty or uncited retrieval) is not scored here; that is Step Completion's and Genuine Gap's question.",
+    ),
+    (
         "consistency",
         "Consistency (Cosine)",
         "Compare the answers provided when the same question is asked multiple times in the same chat mode, using TF cosine similarity. Research and deep research answers are never compared against each other, and a mode with only one stored run is not scored. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
