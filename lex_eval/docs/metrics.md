@@ -130,16 +130,30 @@ answer, the response also makes, and whether it contradicts any of them. This is
 compares a response against material a person researched, so it's the only one that can catch a
 response that is faithful to its own retrieval but wrong about the law.
 
-**How.** Judge-based. The statements (at most 5, most important first) are given to the judge as a
-fixed numbered list; the judge labels each `stated`, `contradicted`, or `missing`, quoting the response
-for stated and contradicted labels. A contradiction whose quote isn't actually present in the response
-is downgraded to missing, so an invented quote can't fail a record. Score is the fraction of statements
-stated. A genuine contradiction fails the metric outright regardless of score, since a confidently wrong
-statement of law is worse than an omitted one.
+**How.** Judge-based, in two calls. The first gives the judge the statements (at most 5, most
+important first) as a fixed numbered list and asks it to label each `stated`, `contradicted`, or
+`missing`, quoting the response. The second asks about nothing but contradictions. Score is the
+fraction of statements stated. A contradiction found by either call fails the metric outright
+regardless of score, since a confidently wrong statement of law is worse than an omitted one. Both
+calls have to quote the response, and a quote that isn't really there is ignored, so an invented
+quote can't fail a record.
+
+**Why two calls.** Asked in the same breath as "does the response make this point", the contradiction
+question loses: once the judge finds a passage stating the point, it labels the statement stated and
+stops reading. On the answer that prompted this design, which recited a closed list of nine regulated
+professions correctly and then, 65 lines later, called the reservation open ended, the single combined
+call caught the contradiction 0 times in 5. A call asking only about contradictions caught it 4 times
+in 5, with no false positives on two answers that get the same point right.
 
 **Why.** The statement list is frozen rather than left for the judge to choose fresh each run because
 letting the judge pick its own points was measured to disagree with itself 48% of the time run to run;
 labelling a fixed list cut that to 7%.
+
+**Reading it.** A contradiction is measured against a reference answer that a lawyer has not yet
+signed off, so it means "contradicts the draft reference", not "wrong in law". Treat a flagged
+contradiction as a prompt to read the two texts side by side. Across the 43 stored responses, 10 were
+flagged; the four checked by hand were all genuine, including an answer that put a strategic plan in
+the wrong Part of an Act and one that turned the s.29(3) purpose test into "purpose or effect".
 
 ## Plan Coverage
 

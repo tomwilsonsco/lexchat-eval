@@ -133,7 +133,7 @@ METRICS: list[tuple[str, str, str]] = [
     (
         "reference_answer_agreement",
         "Reference Answer Agreement",
-        "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
+        "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. The reference answers are unverified drafts, so read a flagged contradiction as a prompt to compare the two texts.",
     ),
     (
         "plan_coverage",

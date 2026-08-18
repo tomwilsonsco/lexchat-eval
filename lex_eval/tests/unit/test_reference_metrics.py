@@ -13,6 +13,8 @@ from lex_eval.metrics.citation_agreement import (
 from lex_eval.metrics.reference_answer_agreement import (
     ReferenceAnswerAgreementMetric,
     _AgreementJudgement,
+    _Contradiction,
+    _ContradictionJudgement,
     _Point,
 )
 
@@ -30,12 +32,21 @@ def _test_case(actual_output: str) -> LLMTestCase:
 
 
 class _StubJudge:
-    """A model stub returning fixed points, so no judge call is made."""
+    """A model stub returning fixed answers, so no judge call is made.
 
-    def __init__(self, points: list[_Point]) -> None:
+    The metric makes two calls, one labelling the statements and one looking
+    only for contradictions, so the stub answers by schema.
+    """
+
+    def __init__(
+        self, points: list[_Point], contradictions: list[_Contradiction] | None = None
+    ) -> None:
         self._points = points
+        self._contradictions = contradictions or []
 
     def generate(self, prompt, schema=None):
+        if schema is _ContradictionJudgement:
+            return _ContradictionJudgement(findings=self._contradictions)
         return _AgreementJudgement(points=self._points)
 
 
@@ -148,7 +159,8 @@ def test_a_contradiction_fails_the_metric_despite_a_high_score():
     assert "s.6 defines the controller" in metric.reason
 
 
-def test_a_contradiction_quoting_words_not_in_the_response_is_counted_as_missing():
+def test_a_contradiction_quoting_words_not_in_the_response_is_ignored():
+    """An invented quote cannot fail a record."""
     judge = _StubJudge(
         _labels(
             ("stated", "words one"), ("contradicted", "words the response never used")
@@ -161,7 +173,45 @@ def test_a_contradiction_quoting_words_not_in_the_response_is_counted_as_missing
 
     assert metric.score == 0.5
     assert metric.is_successful()
-    assert "not in the response" in metric.reason
+
+
+def test_a_contradiction_found_only_by_the_second_call_fails_the_metric():
+    """The failure this metric's contradiction sweep exists to catch.
+
+    A long answer states every reference point and then, well away from where
+    it made them, asserts something that undoes one. The labelling call sees
+    the point stated and says so; the contradiction call is what catches it.
+    """
+    judge = _StubJudge(
+        _labels(("stated", "words one"), ("stated", "words two"), ("stated", "three")),
+        contradictions=[
+            _Contradiction(index=2, contradicted=True, quote="but none of that applies")
+        ],
+    )
+    metric = ReferenceAnswerAgreementMetric(
+        statements=_STATEMENTS, model=judge, threshold=0.6
+    )
+    metric.measure(_test_case("words one, words two, three, but none of that applies"))
+
+    assert metric.score == 1.0
+    assert not metric.is_successful()
+    assert _STATEMENTS[1] in metric.reason
+
+
+def test_an_invented_quote_from_the_second_call_is_ignored():
+    judge = _StubJudge(
+        _labels(("stated", "words one"), ("stated", "words two"), ("stated", "three")),
+        contradictions=[
+            _Contradiction(index=2, contradicted=True, quote="never said this at all")
+        ],
+    )
+    metric = ReferenceAnswerAgreementMetric(
+        statements=_STATEMENTS, model=judge, threshold=0.6
+    )
+    metric.measure(_test_case("words one, words two, three"))
+
+    assert metric.score == 1.0
+    assert metric.is_successful()
 
 
 def test_judge_failure_is_flagged_not_scored_as_a_bad_answer():
@@ -179,9 +229,11 @@ def test_a_wrong_label_count_is_retried_once():
 
     class _FlakyJudge:
         def __init__(self):
-            self.calls = 0
+            self.calls = 0  # labelling calls only, not the contradiction sweep
 
         def generate(self, prompt, schema=None):
+            if schema is _ContradictionJudgement:
+                return _ContradictionJudgement(findings=[])
             self.calls += 1
             if self.calls == 1:
                 return _AgreementJudgement(points=_labels(("stated", "words one")))
