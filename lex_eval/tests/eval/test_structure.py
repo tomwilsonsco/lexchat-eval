@@ -23,6 +23,7 @@ from lex_eval.metrics.structure import (
     CitationPassthroughMetric,
     GenuineGapMetric,
     MandatoryStructureMetric,
+    StepCompletionMetric,
 )
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.test_helpers import (
@@ -32,6 +33,11 @@ from lex_eval.utils.test_helpers import (
 )
 
 records = load_records(read_only=True)
+
+# Written at the front of the reason when a record isn't deep_research, so
+# reports/streamlit_report.py keeps the row out of the mean (see
+# _NON_SCORED_PREFIXES).
+_NOT_DEEP_RESEARCH = "Not deep_research; Step Completion not measured"
 
 
 @pytest.mark.parametrize(
@@ -184,6 +190,50 @@ def test_genuine_gap(request, record):
         request,
         record=record,
         test_name="genuine_gap",
+        metric_name=metric.__name__,
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason,
+    )
+
+    assert metric.is_successful(), metric.reason
+
+
+@pytest.mark.parametrize(
+    "record",
+    records,
+    ids=[record_id(r) for r in records],
+)
+def test_step_completion(request, record):
+    """
+    Deep research only. Every step whose own tool calls retrieved usable
+    legal text must carry a citation from it into that step's own report.
+
+    Records that aren't deep_research are not measured (excluded from the
+    dashboard mean, not scored as a failure).
+    """
+    if record.get("chat_mode") != "deep_research":
+        attach_metric(
+            request,
+            record=record,
+            test_name="step_completion",
+            metric_name="Step Completion",
+            score=0.0,
+            threshold=1.0,
+            passed=False,
+            reason=_NOT_DEEP_RESEARCH,
+        )
+        pytest.skip(_NOT_DEEP_RESEARCH)
+
+    test_case = record_to_test_case(record)
+    metric = StepCompletionMetric(threshold=1.0)
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="step_completion",
         metric_name=metric.__name__,
         score=metric.score,
         threshold=metric.threshold,

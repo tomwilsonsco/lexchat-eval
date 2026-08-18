@@ -6,8 +6,10 @@ CitationPassthroughMetric: checks that Worker references reach the final respons
 CitationGroundingMetric:   checks that Worker citations were actually retrieved.
 CitationDomainMetric:      checks that Worker citation URLs are on legislation.gov.uk.
 GenuineGapMetric:          checks that an empty retrieval is disclosed, not papered over.
+StepCompletionMetric:      checks that a step's own retrieval reached that step's own
+                            report (deep research only).
 
-All five metrics inspect every ``delegate_research`` tool-call output, which is where
+All six metrics inspect every ``delegate_research`` tool-call output, which is where
 the Worker Agent's response is surfaced, one per delegation, so a deep-research run
 with several approved plan steps produces several outputs, and each must independently
 satisfy the check, not just the first.
@@ -71,22 +73,51 @@ REQUIRED_HEADINGS = {
 _HEADING_LINE_PREFIX = r"[\s#*\d.\-:]*"
 
 
+def _group_tools_by_delegation(test_case: LLMTestCase) -> list[dict]:
+    """Split ``test_case.tools_called`` into one group per delegation.
+
+    ``audit_capture.py`` appends a ``delegate_research`` entry immediately
+    followed by that delegation's own ``Worker: ...`` tool entries, one
+    delegation at a time, mirroring the server's own audit-trace structure.
+    Splitting the flat list at each ``delegate_research`` entry recovers
+    exactly those per-step boundaries: a single-shot run has one group, a
+    deep-research run has one per approved plan step, in order.
+
+    Each group is ``{"report": <that delegation's output>, "tools": [...]}``.
+    """
+    if not test_case.tools_called:
+        return []
+    groups: list[dict] = []
+    for tool in test_case.tools_called:
+        if tool.name == _DELEGATE_TOOL_NAME:
+            raw = tool.output
+            groups.append(
+                {"report": raw if isinstance(raw, str) else str(raw), "tools": []}
+            )
+        elif groups:
+            groups[-1]["tools"].append(tool)
+    return groups
+
+
 def _get_delegate_outputs(test_case: LLMTestCase) -> list[str]:
     """Return every ``delegate_research`` tool-call output, in order.
 
     A single-shot run has exactly one. A deep-research run has one per
-    approved plan step (``audit_capture.py`` synthesises one ``delegate_research``
-    tools_called entry per delegation), and every step's report must be
-    checked, not just the first, so a bad step can't hide behind a good one.
+    approved plan step, and every step's report must be checked, not just
+    the first, so a bad step can't hide behind a good one.
     """
-    if not test_case.tools_called:
-        return []
-    outputs = []
-    for tool in test_case.tools_called:
-        if tool.name == _DELEGATE_TOOL_NAME:
-            raw = tool.output
-            outputs.append(raw if isinstance(raw, str) else str(raw))
-    return outputs
+    return [g["report"] for g in _group_tools_by_delegation(test_case)]
+
+
+def _retrieved_usable_content(tools: list) -> bool:
+    """True if any ``search_legislation_sections``/``get_legislation_text``
+    call among *tools* returned non-empty output, i.e. retrieval wasn't empty."""
+    return any(
+        tool.name
+        in ("Worker: search_legislation_sections", "Worker: get_legislation_text")
+        and tool.output
+        for tool in tools
+    )
 
 
 class MandatoryStructureMetric(BaseMetric):
@@ -516,40 +547,28 @@ _GENUINE_GAP_KEYWORDS = (
 )
 
 
-def _has_usable_section_result(test_case: LLMTestCase) -> bool:
-    """
-    True if any ``search_legislation_sections`` or ``get_legislation_text`` Worker
-    tool call in this run returned non-empty output, i.e. retrieval wasn't empty.
-    """
-    if not test_case.tools_called:
-        return False
-    return any(
-        tool.name
-        in ("Worker: search_legislation_sections", "Worker: get_legislation_text")
-        and tool.output
-        for tool in test_case.tools_called
-    )
-
-
 class GenuineGapMetric(BaseMetric):
     """
-    When a run's own tool calls failed to retrieve any usable legislation section
-    text, checks that the Worker's report says so plainly instead of presenting a
-    confident but unsupported answer.
+    When a step's own tool calls failed to retrieve any usable legislation
+    section text, checks that step's own report says so plainly instead of
+    presenting a confident but unsupported answer.
 
     Only applies to ``legislation_only`` mode: the mandated disclosure sentence and
     the tools this check inspects (search_legislation_sections, get_legislation_text)
     are specific to legislation retrieval.
 
+    Scoped per step (a single-shot run has exactly one): a step whose own
+    retrieval succeeded is judged on its own report, not excused because a
+    sibling step elsewhere in the run happened to retrieve something.
+
     Score:
         0.0: no delegate_research call found; cannot be verified.
         1.0: research_mode is not legislation_only; check doesn't apply.
-        1.0: at least one section/full-text tool call returned usable content;
-               nothing to disclose.
-        1.0: retrieval was empty, and the exact mandated sentence is present.
-        0.5: retrieval was empty, and a paraphrase of it is present (disclosed
-               the gap, just not in the mandated wording).
-        0.0: retrieval was empty, and nothing disclosing the gap is present.
+        1.0: every step either retrieved usable content itself (nothing to
+               disclose) or, having retrieved nothing, disclosed that plainly.
+        0.5: the worst such step disclosed the gap only as a paraphrase of
+               the mandated sentence.
+        0.0: the worst such step didn't disclose the gap at all.
     """
 
     def __init__(
@@ -562,9 +581,9 @@ class GenuineGapMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_outputs = _get_delegate_outputs(test_case)
+        groups = _group_tools_by_delegation(test_case)
 
-        if not dr_outputs:
+        if not groups:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -582,20 +601,17 @@ class GenuineGapMetric(BaseMetric):
             )
             return self.score
 
-        if _has_usable_section_result(test_case):
-            self.score = 1.0
-            self.success = True
-            self.reason = (
-                "Retrieval returned usable section/full-text content; "
-                "nothing to disclose."
-            )
-            return self.score
-
-        # Retrieval was empty for the whole run, so every step's report must
-        # disclose it, not just one, a bad step can't hide behind a good one.
+        # Each step is judged on its own retrieval: a step whose own tool
+        # calls found usable content has nothing to disclose, regardless of
+        # whether a sibling step's retrieval was empty.
         step_scores = []
-        for dr_output in dr_outputs:
-            lowered = dr_output.lower()
+        n_retrieved = 0
+        for g in groups:
+            if _retrieved_usable_content(g["tools"]):
+                step_scores.append(1.0)
+                n_retrieved += 1
+                continue
+            lowered = (g["report"] or "").lower()
             if _GENUINE_GAP_PHRASE.lower() in lowered:
                 step_scores.append(1.0)
             elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
@@ -606,34 +622,40 @@ class GenuineGapMetric(BaseMetric):
         self.score = min(step_scores)
         self.success = self.score >= self.threshold
 
-        if len(dr_outputs) == 1:
-            if self.score == 1.0:
+        if all(s == 1.0 for s in step_scores):
+            n_disclosed = len(groups) - n_retrieved
+            if len(groups) == 1:
                 self.reason = (
-                    "Retrieval was empty and the Worker used the mandated "
-                    "disclosure sentence."
+                    "Retrieval returned usable section/full-text content; "
+                    "nothing to disclose."
+                    if n_retrieved
+                    else "Retrieval was empty and the Worker disclosed this "
+                    "as required."
                 )
-            elif self.score == 0.5:
+            elif not n_disclosed:
                 self.reason = (
-                    "Retrieval was empty; the Worker disclosed the gap but not "
-                    "in the mandated wording."
+                    f"All {len(groups)} steps retrieved usable content; "
+                    "nothing to disclose."
                 )
             else:
                 self.reason = (
-                    "Retrieval was empty and the Worker's report does not "
-                    "disclose this; answered without an honest gap statement."
+                    f"All {len(groups)} steps are clear: {n_retrieved} retrieved "
+                    f"usable content, {n_disclosed} had empty retrieval and "
+                    "disclosed it."
                 )
-        elif self.score == 1.0:
-            self.reason = (
-                f"Retrieval was empty and every one of {len(dr_outputs)} Worker "
-                "reports disclosed this."
-            )
         else:
             worst = step_scores.index(min(step_scores)) + 1
-            self.reason = (
-                f"Retrieval was empty across the run; step {worst} of "
-                f"{len(dr_outputs)} did not disclose this (worst step score "
-                f"{self.score})."
-            )
+            where = f"Step {worst} of {len(groups)}" if len(groups) > 1 else "The report"
+            if self.score == 0.5:
+                self.reason = (
+                    f"{where} had empty retrieval and disclosed the gap, but "
+                    "only as a paraphrase, not the mandated wording."
+                )
+            else:
+                self.reason = (
+                    f"{where} had empty retrieval and does not disclose this; "
+                    "answered without an honest gap statement."
+                )
 
         return self.score
 
@@ -646,3 +668,76 @@ class GenuineGapMetric(BaseMetric):
     @property
     def __name__(self) -> str:  # type: ignore[override]
         return "Genuine Gap"
+
+
+class StepCompletionMetric(BaseMetric):
+    """
+    Deep research only. Checks that every step's own retrieval reached that
+    step's own report, catching a step that made tool calls returning legal
+    text and then reported nothing (e.g. because it hit a tool-call budget
+    limit mid-step), while its sibling steps report normally and every other
+    metric in this file scores the run perfectly.
+
+    Score:
+        0.0: no delegate_research call found; cannot be verified.
+        1.0: no step both retrieved usable content and cited none of it.
+        <1.0: fraction of steps that pass; any lost step drags the score down.
+
+    A step whose own retrieval was genuinely empty passes automatically here
+    regardless of what its report says. That is GenuineGapMetric's question
+    to answer, not this one.
+    """
+
+    def __init__(self, threshold: float = 1.0) -> None:
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        groups = _group_tools_by_delegation(test_case)
+
+        if not groups:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "step completion cannot be verified."
+            )
+            return self.score
+
+        failed = [
+            i
+            for i, g in enumerate(groups, 1)
+            if _retrieved_usable_content(g["tools"])
+            and not _URL_RE.search(g["report"] or "")
+        ]
+
+        self.score = (len(groups) - len(failed)) / len(groups)
+        self.success = self.score >= self.threshold
+
+        if failed:
+            steps = ", ".join(str(i) for i in failed)
+            self.reason = (
+                f"Step(s) {steps} of {len(groups)} retrieved legal text but "
+                "their own report cites none of it."
+            )
+        else:
+            self.reason = (
+                f"All {len(groups)} step(s) carried their retrieved legal "
+                "text into their own report."
+                if len(groups) > 1
+                else "The report cites the legal text it retrieved."
+            )
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Step Completion"

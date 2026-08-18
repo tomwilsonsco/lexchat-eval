@@ -12,6 +12,7 @@ from .structure import (
     CitationPassthroughMetric,
     GenuineGapMetric,
     MandatoryStructureMetric,
+    StepCompletionMetric,
 )
 from .tool_usage import ToolUsageMetric
 
@@ -27,5 +28,6 @@ __all__ = [
     "PlanCoverageMetric",
     "ReferenceAnswerAgreementMetric",
     "ResponseGroundednessMetric",
+    "StepCompletionMetric",
     "ToolUsageMetric",
 ]

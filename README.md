@@ -140,7 +140,7 @@ clearing (useful for testing a metric's determinism).
 | Metric | Speed | Requires |
 |---|---|---|
 | `tool_usage` | Fast | Nothing extra |
-| `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_domain`, `genuine_gap` | Fast | Nothing extra |
+| `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_domain`, `genuine_gap`, `step_completion` | Fast | Nothing extra |
 | `citation_agreement` | Fast | Hand written reference answers |
 | `consistency` | Fast | ≥2 responses per question/LLM/chat mode |
 | `response_groundedness`, `claim_support` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
@@ -332,6 +332,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |
 | Citation Domain | Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite. |
 | Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
+| Step Completion | Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step). |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed for information, but does not decide pass or fail: an agent searching a live corpus twice will touch different secondary provisions each run. |
 | Citation Agreement | Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links. |
 | Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |

@@ -121,6 +121,11 @@ METRICS: list[tuple[str, str, str]] = [
         "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence.",
     ),
     (
+        "step_completion",
+        "Step Completion",
+        "Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step).",
+    ),
+    (
         "consistency",
         "Consistency (Cosine)",
         "Compare the answers provided when the same question is asked multiple times in the same chat mode, using TF cosine similarity. Research and deep research answers are never compared against each other, and a mode with only one stored run is not scored. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
@@ -178,6 +183,7 @@ _NON_SCORED_PREFIXES = (
     "No reference statements for this question;",
     "No reference answer citations to compare against;",
     "No research plan for this record;",
+    "Not deep_research;",
 )
 
 

@@ -81,10 +81,24 @@ domain its system prompt permits it to cite.
 Worker's report says so plainly rather than presenting a confidently unsupported answer. Only applies
 to `legislation_only` mode.
 
-**How.** Deterministic. If any section/full-text tool call returned usable content, the check doesn't
-apply and scores 1.0. If retrieval was genuinely empty, scores 1.0 if the exact mandated disclosure
-sentence is present, 0.5 if a looser paraphrase is present (e.g. "no relevant", "could not find"), and
-0.0 if nothing discloses the gap at all.
+**How.** Deterministic, scored per step (a single-shot run has one step). A step whose own tool calls
+returned usable section/full-text content doesn't apply and scores 1.0 for that step. A step whose own
+retrieval was genuinely empty scores 1.0 if its own report contains the exact mandated disclosure
+sentence, 0.5 if a looser paraphrase is present (e.g. "no relevant", "could not find"), and 0.0 if
+nothing discloses the gap at all. The run's score is the worst step's score, so one step disclosing
+honestly can't be credited to a sibling step that didn't.
+
+## Step Completion
+
+**Aim.** Deep research only. Checks that every step of the approved research plan carries its own
+retrieved legal text into its own report. Catches a step whose tool calls returned legal text and then
+reported nothing, most commonly because it hit a tool-call budget limit mid-step, while its sibling
+steps report normally and nothing else in the harness would notice.
+
+**How.** Deterministic. For each step, if its own tool calls returned usable
+`search_legislation_sections`/`get_legislation_text` content but its own report contains no citation
+link at all, that step fails. Score is the fraction of steps that pass; threshold is 1.0, so a single
+lost step fails the response.
 
 ## Consistency (Cosine)
 
