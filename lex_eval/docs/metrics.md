@@ -99,6 +99,11 @@ Any legislation.gov.uk section cited in one answer but not another is listed in 
 diagnostic, but does not affect the score, since an agent searching a live corpus twice will legitimately
 touch different secondary provisions each run.
 
+Responses are only compared within the same chat mode. A deep research answer and an ordinary
+research answer to the same question are not repeat runs of each other, so comparing them measures
+the gap between the two modes rather than the model's repeatability. A mode with only one stored run
+is not scored at all, since there is nothing to compare it against.
+
 **Why.** Skipping IDF is deliberate: with only a handful of responses being compared, IDF would
 down-weight exactly the shared legal terminology that should count most toward similarity. An earlier
 version let a citation-set mismatch fail the run outright; that was removed because cosine similarity

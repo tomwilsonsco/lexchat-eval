@@ -123,7 +123,7 @@ METRICS: list[tuple[str, str, str]] = [
     (
         "consistency",
         "Consistency (Cosine)",
-        "Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
+        "Compare the answers provided when the same question is asked multiple times in the same chat mode, using TF cosine similarity. Research and deep research answers are never compared against each other, and a mode with only one stored run is not scored. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
     ),
     (
         "citation_agreement",

@@ -118,31 +118,50 @@ def _deselect_args(covered: dict[str, set], test_file: str) -> list[str]:
     # Pytest appends a numeric suffix (0, 1, …) when multiple records share
     # the same base ID, so we must replicate that here for most metrics.
     # test_consistency.py is the one exception: _same_model_cases() assigns
-    # its own explicit ids of the form "{base_id}_run{n+1}" rather than
+    # its own explicit ids of the form "{group_key}_run{n+1}" rather than
     # letting pytest auto-number them, so its deselect ids must match that
     # instead, or they silently fail to match anything and consistency rows
-    # never get deselected.
-    from lex_eval.utils.test_helpers import load_records, record_id
+    # never get deselected. Its group key is built by consistency_group_key,
+    # the same function the test itself uses, so the two cannot drift apart.
+    from lex_eval.utils.test_helpers import (
+        consistency_group_key,
+        load_records,
+        record_id,
+    )
+
+    def _numbered(keys: list[str]) -> list[int]:
+        """Occurrence index of each key within the list, counting from 0."""
+        counts: dict[str, int] = {}
+        out: list[int] = []
+        for k in keys:
+            n = counts.get(k, 0)
+            out.append(n)
+            counts[k] = n + 1
+        return out
 
     records = load_records()
     base_ids = [record_id(r) for r in records]
-    id_counts: dict[str, int] = {}
-    occurrences: list[int] = []
-    for bid in base_ids:
-        n = id_counts.get(bid, 0)
-        occurrences.append(n)
-        id_counts[bid] = n + 1
+    occurrences = _numbered(base_ids)
+    # Consistency groups (and numbers within) by mode as well, so it needs its
+    # own key and its own run numbering.
+    cons_ids = [consistency_group_key(r) for r in records]
+    cons_occurrences = _numbered(cons_ids)
 
     deselect_args: list[str] = []
-    for record, bid, n in zip(records, base_ids, occurrences):
+    for record, bid, n, cons_id, cons_n in zip(
+        records, base_ids, occurrences, cons_ids, cons_occurrences
+    ):
         response_id = record.get("response_id")
         for metric, response_ids in covered.items():
             if response_id in response_ids:
-                suffix = f"_run{n + 1}" if metric == "consistency" else str(n)
+                if metric == "consistency":
+                    test_id = f"{cons_id}_run{cons_n + 1}"
+                else:
+                    test_id = f"{bid}{n}"
                 deselect_args.extend(
                     [
                         "--deselect",
-                        f"lex_eval/tests/eval/{test_file}::test_{metric}[{bid}{suffix}]",
+                        f"lex_eval/tests/eval/{test_file}::test_{metric}[{test_id}]",
                     ]
                 )
     return deselect_args

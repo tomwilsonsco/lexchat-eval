@@ -384,20 +384,39 @@ def load_records(
     return records
 
 
-def group_by_question_and_llm(
+def consistency_group_key(record: Dict[str, Any]) -> str:
+    """
+    Return the ``'Q{question_id}_{llm_name}_{chat_mode}'`` key used to decide
+    which responses are repeat runs of each other.
+
+    ``chat_mode`` is part of the key because consistency asks "did the same
+    question, asked the same way twice, get the same answer". A deep research
+    answer and an ordinary research answer are not repeat runs of each other,
+    and comparing them measures the difference between the two modes rather
+    than the model's repeatability.
+
+    Both the test IDs in ``tests/eval/test_consistency.py`` and the deselect
+    IDs in ``run_evals.py`` are built from this, so they cannot drift apart.
+    """
+    return (
+        f"Q{record['question_id']}_{record['llm_name']}_"
+        f"{record.get('chat_mode') or 'research'}"
+    )
+
+
+def group_by_question_llm_and_mode(
     path: Optional[Path] = None,
     read_only: bool = False,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Return records grouped by ``'Q{question_id}_{llm_name}'`` key.
+    Return records grouped by :func:`consistency_group_key`.
 
     Excludes error rows.
     """
     records = load_records(path, read_only=read_only)
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in records:
-        key = f"Q{r['question_id']}_{r['llm_name']}"
-        grouped.setdefault(key, []).append(r)
+        grouped.setdefault(consistency_group_key(r), []).append(r)
     return grouped
 
 

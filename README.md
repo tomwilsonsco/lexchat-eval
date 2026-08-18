@@ -142,7 +142,7 @@ clearing (useful for testing a metric's determinism).
 | `tool_usage` | Fast | Nothing extra |
 | `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_domain`, `genuine_gap` | Fast | Nothing extra |
 | `citation_agreement` | Fast | Hand written reference answers |
-| `consistency` | Fast | ≥2 responses per question/LLM pair |
+| `consistency` | Fast | ≥2 responses per question/LLM/chat mode |
 | `response_groundedness`, `claim_support` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
 | `reference_answer_agreement` | Medium (2 LLM calls/test) | `OPENROUTER_API_KEY` + hand written reference answers |
 
