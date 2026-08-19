@@ -476,6 +476,74 @@ def clean_incomplete_responses(
     return count
 
 
+def list_responses(path: Optional[Path] = None) -> None:
+    """Print id, llm_name, and timestamp for every row in the responses table."""
+    path = path or DEFAULT_DB
+    if not path.exists():
+        print("Database not found:", path)
+        return
+
+    conn = get_connection(path, read_only=True)
+    try:
+        rows = conn.execute(
+            "SELECT id, llm_name, timestamp FROM responses ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    print(f"{'id':>5}  {'llm_name':<35}  timestamp")
+    print("-" * 70)
+    for rid, llm_name, timestamp in rows:
+        print(f"{rid:>5}  {llm_name:<35}  {timestamp}")
+    print(f"\n{len(rows)} response(s)")
+
+
+def delete_response(response_id: int, path: Optional[Path] = None) -> Dict[str, int]:
+    """
+    Delete *response_id* from the responses table and from every eval_<metric>
+    table (only those that actually exist) that has rows for it.
+
+    Returns a dict of {"responses": <0 or 1>, "eval_<metric>": <rows deleted>, ...}
+    covering only the tables a row was actually deleted from.
+    """
+    from lex_eval.run_evals import METRIC_FILES
+
+    path = path or DEFAULT_DB
+    conn = get_connection(path)
+    deleted: Dict[str, int] = {}
+    try:
+        for metric in METRIC_FILES:
+            if not _eval_table_exists(conn, metric):
+                continue
+            table = _eval_table_name(metric)
+            count = conn.execute(
+                f"SELECT COUNT(*) FROM {table} WHERE response_id = ?", [response_id]
+            ).fetchone()[0]
+            if count:
+                conn.execute(f"DELETE FROM {table} WHERE response_id = ?", [response_id])
+                deleted[table] = count
+
+        count = conn.execute(
+            "SELECT COUNT(*) FROM responses WHERE id = ?", [response_id]
+        ).fetchone()[0]
+        if count:
+            conn.execute("DELETE FROM responses WHERE id = ?", [response_id])
+            deleted["responses"] = count
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    if "responses" not in deleted:
+        print(f"No response with id={response_id} found.")
+    else:
+        print(f"Deleted response id={response_id}:")
+        for table, count in deleted.items():
+            print(f"  {table}: {count} row(s)")
+
+    return deleted
+
+
 def completeness_report(path: Optional[Path] = None) -> None:
     """Print a summary of complete (non-empty) responses per question/LLM pair."""
     path = path or DEFAULT_DB
@@ -887,11 +955,26 @@ if __name__ == "__main__":
         nargs="?",
         const="",  # sentinel: use default path
     )
+    _parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List response id, llm_name, and timestamp for every response",
+    )
+    _parser.add_argument(
+        "--delete-response",
+        metavar="ID",
+        type=int,
+        help="Delete a response by id from responses and every eval_<metric> table",
+    )
     _args = _parser.parse_args()
 
     if _args.deploy_db is not None:
         _out = Path(_args.deploy_db) if _args.deploy_db else None
         make_deploy_db(output_path=_out)
+    elif _args.list:
+        list_responses()
+    elif _args.delete_response is not None:
+        delete_response(_args.delete_response)
     elif _args.clean or _args.dry_run:
         clean_incomplete_responses(dry_run=_args.dry_run)
         if not _args.dry_run:

@@ -285,11 +285,17 @@ Both appear in the Markdown so a reviewer can check every citation against them.
 # Show completeness report (responses per question/LLM pair):
 python -m lex_eval.utils.db
 
+# List every response (id, llm_name, timestamp):
+python -m lex_eval.utils.db --list
+
 # Remove incomplete / error rows:
 python -m lex_eval.utils.db --clean
 
 # Preview what --clean would remove without deleting:
 python -m lex_eval.utils.db --dry-run
+
+# Delete a single response by id, and its rows in every eval_<metric> table:
+python -m lex_eval.utils.db --delete-response <ID>
 ```
 
 ## Repository structure
