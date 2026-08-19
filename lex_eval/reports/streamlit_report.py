@@ -89,7 +89,15 @@ def load_responses(_mtime: float = 0.0) -> dict[tuple[str, str, int], list[dict]
 # Single source of truth for every metric this dashboard displays: its
 # eval_<key> table, its display name, and its tooltip, in display order.
 # Keys here must match run_evals.py::METRIC_FILES.
+#
+# Grouped, in this order: 1) deterministic metrics that run in research or
+# deep research mode, 2) AI-judge metrics that run in research or deep
+# research mode, 3) deep-research-only deterministic metrics, 4)
+# deep-research-only AI-judge metrics. The "(Deep research only)" suffix on
+# groups 3-4's display names is what shows that scope on the title bar
+# wherever the metric name is rendered.
 METRICS: list[tuple[str, str, str]] = [
+    # 1. Deterministic, research or deep research
     (
         "tool_usage",
         "Tool Usage",
@@ -121,16 +129,6 @@ METRICS: list[tuple[str, str, str]] = [
         "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence.",
     ),
     (
-        "step_completion",
-        "Step Completion",
-        "Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step).",
-    ),
-    (
-        "report_integration",
-        "Report Integration",
-        "Deep research only, AI as a judge metric: For every step that reported a real, cited finding of its own, does the final answer reflect that finding, rather than dropping it when the Manager condenses several step reports into one response. A step with nothing of its own to check (empty or uncited retrieval) is not scored here; that is Step Completion's and Genuine Gap's question.",
-    ),
-    (
         "consistency",
         "Consistency (Cosine)",
         "Compare the answers provided when the same question is asked multiple times in the same chat mode, using TF cosine similarity. Research and deep research answers are never compared against each other, and a mode with only one stored run is not scored. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
@@ -140,15 +138,11 @@ METRICS: list[tuple[str, str, str]] = [
         "Citation Agreement",
         "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
     ),
+    # 2. AI judge, research or deep research
     (
         "reference_answer_agreement",
         "Reference Answer Agreement",
         "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. The reference answers are unverified drafts, so read a flagged contradiction as a prompt to compare the two texts.",
-    ),
-    (
-        "plan_coverage",
-        "Plan Coverage",
-        "Deep research only, AI as a judge metric: Does the approved research plan set out to cover the question's key statements, before any research happens. Reuses the same fixed statement list as Reference Answer Agreement rather than a separately authored golden plan.",
     ),
     (
         "response_groundedness",
@@ -159,6 +153,23 @@ METRICS: list[tuple[str, str, str]] = [
         "claim_support",
         "Claim Support",
         "AI as a judge metric: What share of the report's verifiable legal claims are backed by text the researcher actually read? Claims whose truth depends on the absence of a provision are reported separately because absence generally cannot be established from retrieved excerpts or summaries.",
+    ),
+    # 3. Deterministic, deep research only
+    (
+        "step_completion",
+        "Step Completion (Deep research only)",
+        "Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step).",
+    ),
+    # 4. AI judge, deep research only
+    (
+        "report_integration",
+        "Report Integration (Deep research only)",
+        "Deep research only, AI as a judge metric: For every step that reported a real, cited finding of its own, does the final answer reflect that finding, rather than dropping it when the Manager condenses several step reports into one response. A step with nothing of its own to check (empty or uncited retrieval) is not scored here; that is Step Completion's and Genuine Gap's question.",
+    ),
+    (
+        "plan_coverage",
+        "Plan Coverage (Deep research only)",
+        "Deep research only, AI as a judge metric: Does the approved research plan set out to cover the question's key statements, before any research happens. Reuses the same fixed statement list as Reference Answer Agreement rather than a separately authored golden plan.",
     ),
 ]
 
@@ -333,10 +344,32 @@ def _sorted_group_keys(hierarchy: dict) -> list[tuple[str, str]]:
     )
 
 
+# Display priority for chat_mode in the top summary: deep research leads,
+# since that is the mode under active development, then single-shot research,
+# then conversational. Any other/unknown mode sorts after these.
+_MODE_ORDER = ["deep_research", "research", "conversational"]
+
+
+def _mode_sort_key(mode: str) -> int:
+    try:
+        return _MODE_ORDER.index(mode)
+    except ValueError:
+        return len(_MODE_ORDER)
+
+
+def _top_summary_sorted_group_keys(hierarchy: dict) -> list[tuple[str, str]]:
+    """Groups by chat_mode (in _MODE_ORDER), then worst pass rate first within
+    each mode, matching the per-mode ordering the page used before."""
+    return sorted(
+        hierarchy.keys(),
+        key=lambda k: (_mode_sort_key(k[1]), _get_group_pass_rate(k, hierarchy), k),
+    )
+
+
 def _render_top_summary(hierarchy: dict, show_mode: bool) -> None:
     """summary rows at the top of the page for each (llm, chat_mode) group.
     Expand to show mean score per metric across all questions."""
-    for key in _sorted_group_keys(hierarchy):
+    for key in _top_summary_sorted_group_keys(hierarchy):
         group_name = _group_label(key, show_mode)
         q_data = hierarchy[key]
         all_results = [r for results in q_data.values() for r in results]
