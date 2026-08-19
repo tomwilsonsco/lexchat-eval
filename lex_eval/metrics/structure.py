@@ -321,6 +321,17 @@ def _legislation_id_from_url(url: str) -> str:
     return "/".join(_url_path(url).split("/")[:3])
 
 
+def _leading_json(raw: str) -> dict:
+    """
+    Parse the JSON object at the start of *raw*, ignoring anything after it.
+
+    ``search_legislation`` returns its JSON results followed by a plain-text
+    "[NEXT STEP: ...]" hint for the Worker, so a plain ``json.loads`` of the
+    whole string raises "Extra data" and yields nothing.
+    """
+    return json.JSONDecoder().raw_decode(raw.lstrip())[0]
+
+
 def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:
     """
     Return the set of legislation_ids the run's own tool calls actually
@@ -336,7 +347,7 @@ def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:
         if tool.name == "Worker: search_legislation":
             raw = tool.output
             try:
-                data = json.loads(raw) if isinstance(raw, str) else raw
+                data = _leading_json(raw) if isinstance(raw, str) else raw
                 for r in (data or {}).get("results", []):
                     lid = r.get("legislation_id")
                     if lid:

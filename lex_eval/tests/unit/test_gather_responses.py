@@ -11,6 +11,7 @@ Tests focus on error handling:
     (not hardcoded to False/"").
 """
 
+import copy
 import json
 from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
@@ -379,3 +380,51 @@ class TestDeepResearchPlanCapture:
         assert result["needs_clarification"] is True
         assert result["clarification_question"] == "Which jurisdiction?"
         assert "error" not in result
+
+
+class TestTurnCapHaltReachesTheRecord:
+    """process_question builds its record by naming each key explicitly, so a
+    field added to audit_capture's output is silently dropped unless it is
+    named here too. This covers the whole capture -> record hand-off."""
+
+    def test_halt_counts_reach_the_record(self):
+        audit = copy.deepcopy(AUDIT_SUCCESS)
+        audit["timings"] = {**audit["timings"],
+                            "max_turns_halted": 1, "react_turns_max": 20}
+
+        with patch(
+            "lex_eval.gather_responses.get_authenticated_client",
+            return_value=_MockClient(_sse_lines(audit)),
+        ):
+            result = process_question(
+                question_id=1,
+                question="test question",
+                research_mode="legislation_only",
+                model_name="test-model",
+                summarisation_llm="test-model",
+                max_retries=1,
+            )
+
+        assert result["max_turns_halted"] == 1
+        assert result["react_turns_max"] == 20
+
+    def test_zero_halts_reaches_the_record_as_zero(self):
+        audit = copy.deepcopy(AUDIT_SUCCESS)
+        audit["timings"] = {**audit["timings"],
+                            "max_turns_halted": 0, "react_turns_max": 7}
+
+        with patch(
+            "lex_eval.gather_responses.get_authenticated_client",
+            return_value=_MockClient(_sse_lines(audit)),
+        ):
+            result = process_question(
+                question_id=1,
+                question="test question",
+                research_mode="legislation_only",
+                model_name="test-model",
+                summarisation_llm="test-model",
+                max_retries=1,
+            )
+
+        assert result["max_turns_halted"] == 0
+        assert result["react_turns_max"] == 7

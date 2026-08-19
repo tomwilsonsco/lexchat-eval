@@ -289,3 +289,39 @@ class TestLoadEvalResults:
     def test_requires_metric(self):
         with pytest.raises(ValueError):
             load_eval_results(metric=None)
+
+
+class TestTurnCapHaltColumns:
+    """max_turns_halted / react_turns_max round-trip, and 0 survives as 0."""
+
+    def test_round_trip_keeps_zero_distinct_from_null(self, tmp_path):
+        from lex_eval.utils.db import (
+            get_connection,
+            init_db,
+            insert_response,
+            load_records,
+        )
+
+        db = tmp_path / "r.db"
+        conn = get_connection(db)
+        init_db(conn)
+        insert_response(conn, {
+            "question_id": 1, "question": "q", "llm_name": "m", "timestamp": "t",
+            "chat_mode": "deep_research", "max_turns_halted": 0, "react_turns_max": 12,
+        })
+        insert_response(conn, {
+            "question_id": 2, "question": "q", "llm_name": "m", "timestamp": "t",
+            "chat_mode": "deep_research", "max_turns_halted": 1, "react_turns_max": 20,
+        })
+        insert_response(conn, {
+            "question_id": 3, "question": "q", "llm_name": "m", "timestamp": "t",
+        })
+        conn.commit()
+        conn.close()
+
+        by_q = {r["question_id"]: r for r in load_records(path=db)}
+        assert by_q[1]["max_turns_halted"] == 0
+        assert by_q[2]["max_turns_halted"] == 1
+        assert by_q[2]["react_turns_max"] == 20
+        # Not reported by the server at all stays NULL, not 0.
+        assert by_q[3]["max_turns_halted"] is None

@@ -15,8 +15,9 @@ Produces a dict with these keys:
     actual_output, retrieval_context, tools_called, research_output,
     research_mode, case_law_context, tool_sequence, fallback_used,
     summarisation_output, summarisation_used, is_error, error_message,
-    chat_mode, provider, total_cost_usd, total_ms, local_cache_hits,
-    memo_hits, reformatted, audit_schema_version, audit_json
+    chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
+    react_turns_max, local_cache_hits, memo_hits, reformatted,
+    audit_schema_version, audit_json
 """
 
 from __future__ import annotations
@@ -98,8 +99,9 @@ def audit_capture(
         ``tool_sequence``, ``fallback_used``, ``summarisation_output``,
         ``summarisation_used``, ``is_error``, ``error_message``,
         ``chat_mode``, ``provider``, ``total_cost_usd``, ``total_ms``,
-        ``local_cache_hits``, ``memo_hits``, ``reformatted``,
-        ``audit_schema_version``, ``audit_json``.
+        ``max_turns_halted``, ``react_turns_max``, ``local_cache_hits``,
+        ``memo_hits``, ``reformatted``, ``audit_schema_version``,
+        ``audit_json``.
     """
 
     # --- Verbose log file setup ------------------------------------------------
@@ -420,6 +422,13 @@ def audit_capture(
     timings = audit.get("timings") or {}
     total_cost_usd = timings.get("total_cost_usd")
     total_ms = timings.get("total_ms")
+    # How many research steps the server cut short at its ReAct turn cap, and
+    # the highest turn count any step reached. A halted step returns no report,
+    # so its findings are missing from the answer through no fault of the
+    # model. Without these the only trace is the words "Research halted" inside
+    # research_output, which the models phrase inconsistently.
+    max_turns_halted = timings.get("max_turns_halted")
+    react_turns_max = timings.get("react_turns_max")
     local_cache_hits = sum(
         1
         for d in audit.get("delegations", [])
@@ -474,6 +483,8 @@ def audit_capture(
     _vlog(_vf, f"provider:               {provider}")
     _vlog(_vf, f"total_cost_usd:         {total_cost_usd}")
     _vlog(_vf, f"total_ms:               {total_ms}")
+    _vlog(_vf, f"max_turns_halted:       {max_turns_halted}")
+    _vlog(_vf, f"react_turns_max:        {react_turns_max}")
     _vlog(_vf, f"local_cache_hits:       {local_cache_hits}")
     _vlog(_vf, f"memo_hits:              {memo_hits}")
     _vlog(_vf, f"reformatted:            {reformatted}")
@@ -509,6 +520,8 @@ def audit_capture(
         "provider": provider,
         "total_cost_usd": total_cost_usd,
         "total_ms": total_ms,
+        "max_turns_halted": max_turns_halted,
+        "react_turns_max": react_turns_max,
         "local_cache_hits": local_cache_hits,
         "memo_hits": memo_hits,
         "reformatted": reformatted,

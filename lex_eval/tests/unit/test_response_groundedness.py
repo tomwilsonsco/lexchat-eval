@@ -113,3 +113,42 @@ def test_judge_error_scores_zero_and_is_flagged_as_a_judge_error():
     assert metric.score == 0.0
     assert not metric.is_successful()
     assert metric.reason.startswith("Judge error:")
+
+
+class _PromptCapturingJudge:
+    """A model stub that records the prompt it was given and passes."""
+
+    def __init__(self) -> None:
+        self.prompt = ""
+
+    def generate(self, prompt, schema=None):
+        self.prompt = prompt
+        return _GroundednessJudgement(
+            analysis="stub analysis", verdict="pass", reason="Grounded."
+        )
+
+
+def test_scope_note_is_given_to_the_judge():
+    judge = _PromptCapturingJudge()
+    metric = ResponseGroundednessMetric(
+        research_output=_DIVERGENT_RESEARCH_OUTPUT,
+        model=judge,
+        scope_note="Case law is out of scope in this mode.",
+        research_mode="legislation_only",
+    )
+    metric.measure(_test_case(_DIVERGENT_ACTUAL_OUTPUT))
+
+    assert "Approved Research Scope" in judge.prompt
+    assert "Case law is out of scope in this mode." in judge.prompt
+    assert "legislation_only" in judge.prompt
+
+
+def test_no_scope_note_leaves_the_prompt_unchanged():
+    """Runs without a research plan (chat_mode 'research') pass no scope note."""
+    judge = _PromptCapturingJudge()
+    metric = ResponseGroundednessMetric(
+        research_output=_DIVERGENT_RESEARCH_OUTPUT, model=judge
+    )
+    metric.measure(_test_case(_DIVERGENT_ACTUAL_OUTPUT))
+
+    assert "Approved Research Scope" not in judge.prompt

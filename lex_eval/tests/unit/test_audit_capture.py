@@ -17,6 +17,8 @@ Test cases (per implementation plan §4.2):
 import json
 from contextlib import contextmanager
 
+import copy
+
 import pytest
 
 from lex_eval.utils.audit_capture import audit_capture
@@ -561,3 +563,36 @@ class TestMissingToolName:
         outputs = [t["output"] for t in unnamed_tools]
         assert "Result from unnamed tool" in outputs
         assert "Result from empty-named tool" in outputs
+
+
+class TestTurnCapHalt:
+    """A deep research step can be cut short at the server's ReAct turn cap.
+    The server reports this in audit.timings; the eval surfaces it as a column
+    so a step that returned no report is not mistaken for a model failure."""
+
+    @staticmethod
+    def _audit(**timings):
+        audit = copy.deepcopy(AUDIT_LEGISLATION)
+        audit["timings"] = {**audit["timings"], **timings}
+        return audit
+
+    def test_halt_counts_are_captured(self):
+        lines = _sse_lines(self._audit(max_turns_halted=1, react_turns_max=20))
+        result = audit_capture(_MockClient(lines), "q", "test-model")
+        assert result["max_turns_halted"] == 1
+        assert result["react_turns_max"] == 20
+
+    def test_zero_halts_is_kept_not_nulled(self):
+        """0 means "no step halted", which is different from "not reported"."""
+        lines = _sse_lines(self._audit(max_turns_halted=0, react_turns_max=12))
+        result = audit_capture(_MockClient(lines), "q", "test-model")
+        assert result["max_turns_halted"] == 0
+        assert result["react_turns_max"] == 12
+
+    def test_absent_from_timings_is_none(self):
+        """Older LexChat builds do not report these fields at all."""
+        audit = copy.deepcopy(AUDIT_LEGISLATION)
+        audit["timings"] = {"total_ms": 1000}
+        result = audit_capture(_MockClient(_sse_lines(audit)), "q", "test-model")
+        assert result["max_turns_halted"] is None
+        assert result["react_turns_max"] is None

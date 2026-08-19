@@ -24,6 +24,9 @@ responses
     fallback_used     BOOLEAN     (True when get_legislation_text was invoked)
     summarisation_llm TEXT        (model used for summarisation; equals llm_name when no separate model is configured)
     chat_mode         TEXT        (research | conversational | deep_research)
+    max_turns_halted  INTEGER     (research steps the server cut short at its ReAct turn cap;
+                                   >0 means at least one step returned no report)
+    react_turns_max   INTEGER     (highest ReAct turn count any step reached in this run)
     research_plan     JSON        (deep_research only: the plan from POST /api/research/plan, NULL otherwise)
     needs_clarification    BOOLEAN (True when POST /api/research/plan asked a clarifying question instead
                                     of proposing a plan; a valid outcome, distinct from is_error)
@@ -92,6 +95,8 @@ CREATE TABLE IF NOT EXISTS responses (
     provider          TEXT,
     total_cost_usd    DOUBLE,
     total_ms          INTEGER,
+    max_turns_halted  INTEGER,
+    react_turns_max   INTEGER,
     reformatted       BOOLEAN  NOT NULL DEFAULT FALSE,
     local_cache_hits  INTEGER  NOT NULL DEFAULT 0,
     memo_hits         INTEGER  NOT NULL DEFAULT 0,
@@ -135,6 +140,9 @@ _MIGRATE_RESPONSES = [
     "ALTER TABLE responses ADD COLUMN audit_json JSON",
     # --- deep_research plan capture (POST /api/research/plan) ---
     "ALTER TABLE responses ADD COLUMN research_plan JSON",
+    # --- research steps cut short at the server's ReAct turn cap ---
+    "ALTER TABLE responses ADD COLUMN max_turns_halted INTEGER",
+    "ALTER TABLE responses ADD COLUMN react_turns_max INTEGER",
     # --- deep_research clarification path (distinct outcome, not an error) ---
     "ALTER TABLE responses ADD COLUMN needs_clarification BOOLEAN",
     "ALTER TABLE responses ADD COLUMN clarification_question TEXT",
@@ -146,10 +154,11 @@ INSERT INTO responses (
     retrieval_context, tools_called, research_output, is_error, error_message,
     research_mode, case_law_context, tool_sequence, fallback_used,
     summarisation_output, summarisation_used, summarisation_llm,
-    chat_mode, provider, total_cost_usd, total_ms, reformatted,
+    chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
+    react_turns_max, reformatted,
     local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
     needs_clarification, clarification_question
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -246,6 +255,10 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             record.get("provider") or None,
             record.get("total_cost_usd") or None,
             record.get("total_ms") or None,
+            # 0 is meaningful (no step halted), so keep it rather than
+            # collapsing it to NULL the way the cost/timing fields do.
+            record.get("max_turns_halted"),
+            record.get("react_turns_max"),
             record.get("reformatted", False),
             record.get("local_cache_hits", 0),
             record.get("memo_hits", 0),
@@ -296,7 +309,8 @@ def load_records(
                    actual_output, retrieval_context, tools_called, research_output,
                    research_mode, case_law_context, tool_sequence, fallback_used,
                    summarisation_output, summarisation_used, summarisation_llm,
-                   chat_mode, provider, total_cost_usd, total_ms, reformatted,
+                   chat_mode, provider, total_cost_usd, total_ms,
+                   max_turns_halted, react_turns_max, reformatted,
                    local_cache_hits, memo_hits, audit_schema_version, audit_json,
                    research_plan, needs_clarification, clarification_question
             FROM responses
@@ -328,6 +342,8 @@ def load_records(
         provider,
         total_cost_usd,
         total_ms,
+        max_turns_halted,
+        react_turns_max,
         reformatted,
         local_cache_hits,
         memo_hits,
@@ -371,6 +387,8 @@ def load_records(
                 "provider": provider,
                 "total_cost_usd": total_cost_usd,
                 "total_ms": total_ms,
+                "max_turns_halted": max_turns_halted,
+                "react_turns_max": react_turns_max,
                 "reformatted": bool(reformatted),
                 "local_cache_hits": local_cache_hits or 0,
                 "memo_hits": memo_hits or 0,
@@ -545,19 +563,30 @@ def delete_response(response_id: int, path: Optional[Path] = None) -> Dict[str, 
 
 
 def completeness_report(path: Optional[Path] = None) -> None:
-    """Print a summary of complete (non-empty) responses per question/LLM pair."""
+    """Print complete (non-empty) responses per question, LLM, and chat mode.
+
+    Grouped the same way :func:`consistency_group_key` groups, so the "ok"
+    column answers the question the consistency metric actually asks. A deep
+    research answer and an ordinary research answer to the same question are
+    not repeat runs of each other, so counting them together would report a
+    pair as ready when consistency still cannot score it.
+    """
     path = path or DEFAULT_DB
     if not path.exists():
         print("Database not found:", path)
         return
 
-    conn = get_connection(path)
+    # This function only reads, so it takes no write lock of its own. DuckDB
+    # still refuses to open the file at all while a gather holds its lock, so
+    # this does not make the report runnable mid-gather.
+    conn = get_connection(path, read_only=True)
     try:
         rows = conn.execute("""
             SELECT
                 question_id,
                 llm_name,
-                COUNT(*) AS total_runs, -- Total number of runs for this Q/LLM pair
+                COALESCE(chat_mode, 'research') AS mode,
+                COUNT(*) AS total_runs, -- Total runs for this Q/LLM/mode group
                 SUM(CASE WHEN TRIM(actual_output) != '' AND NOT is_error THEN 1 ELSE 0 END) AS complete_runs,
                 SUM(CASE WHEN TRIM(actual_output) != '' AND NOT is_error THEN LENGTH(actual_output) ELSE 0 END) AS total_actual_output_chars,
                 SUM(
@@ -568,25 +597,112 @@ def completeness_report(path: Optional[Path] = None) -> None:
                     END
                 ) AS total_retrieval_context_chars
             FROM responses
-            GROUP BY question_id, llm_name
-            ORDER BY question_id, llm_name
+            GROUP BY question_id, llm_name, mode
+            ORDER BY mode, question_id, llm_name
             """).fetchall()
     finally:
         conn.close()
 
     print(
-        f"{'Q':>3}  {'LLM':<35}  {'total':>5}  {'comp':>4}  {'out_chars':>9}  {'ctx_chars':>9}  {'ok':>4}"
+        f"{'Q':>3}  {'LLM':<28}  {'mode':<14}  {'total':>5}  {'comp':>4}  "
+        f"{'out_chars':>9}  {'ctx_chars':>9}  {'ok':>4}"
     )
-    print("-" * 85)
-    for qid, llm, total, complete, out_chars, ctx_chars in rows:
+    print("-" * 95)
+    for qid, llm, mode, total, complete, out_chars, ctx_chars in rows:
         ok = "YES" if complete >= 2 else "NO "
         print(
-            f"{qid:>3}  {llm:<35}  {total:>5}  {complete:>4}  {out_chars:>9}  {ctx_chars:>9}  {ok}"
+            f"{qid:>3}  {llm:<28}  {mode:<14}  {total:>5}  {complete:>4}  "
+            f"{out_chars:>9}  {ctx_chars:>9}  {ok}"
         )
 
-    total_pairs = len(rows)
-    ready = sum(1 for _, _, _, complete, _, _ in rows if complete >= 2)
-    print(f"\n{ready}/{total_pairs} pairs have >= 2 complete responses")
+    print(f"\n{'mode':<16} {'groups':>6}  {'ready':>5}")
+    for mode in sorted({r[2] for r in rows}):
+        in_mode = [r for r in rows if r[2] == mode]
+        ready = sum(1 for r in in_mode if r[4] >= 2)
+        flag = "" if ready == len(in_mode) else "   <- consistency cannot score these"
+        print(f"{mode:<16} {len(in_mode):>6}  {ready:>5}{flag}")
+
+    total_groups = len(rows)
+    total_ready = sum(1 for r in rows if r[4] >= 2)
+    print(
+        f"\n{total_ready}/{total_groups} (question, LLM, mode) groups have "
+        f">= 2 complete responses"
+    )
+
+    _print_halt_summary(path)
+
+
+def backfill_halt_columns(path: Optional[Path] = None) -> int:
+    """Fill max_turns_halted/react_turns_max from audit_json for older rows.
+
+    Runs captured before these columns existed still hold the numbers inside
+    the stored audit event, so they can be recovered without gathering again.
+    Only rows where the column is NULL and the audit event has the value are
+    touched, so this is safe to run repeatedly.
+
+    Returns the number of rows updated.
+    """
+    path = path or DEFAULT_DB
+    if not path.exists():
+        print("Database not found:", path)
+        return 0
+
+    conn = get_connection(path)
+    try:
+        init_db(conn)
+        before = conn.execute(
+            "SELECT COUNT(*) FROM responses WHERE max_turns_halted IS NULL"
+        ).fetchone()[0]
+        conn.execute("""
+            UPDATE responses SET
+                max_turns_halted = CAST(
+                    json_extract(audit_json, '$.timings.max_turns_halted') AS INTEGER),
+                react_turns_max = CAST(
+                    json_extract(audit_json, '$.timings.react_turns_max') AS INTEGER)
+            WHERE audit_json IS NOT NULL
+              AND max_turns_halted IS NULL
+              AND json_extract(audit_json, '$.timings.max_turns_halted') IS NOT NULL
+            """)
+        conn.commit()
+        after = conn.execute(
+            "SELECT COUNT(*) FROM responses WHERE max_turns_halted IS NULL"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+    filled = before - after
+    print(f"Backfilled {filled} row(s) from audit_json; {after} still unset.")
+    return filled
+
+
+def _print_halt_summary(path: Path) -> None:
+    """Print which runs had a research step cut short at the ReAct turn cap.
+
+    A halted step returns no report, so its findings are missing from the
+    answer no matter how well the model performed. Worth seeing next to the
+    completeness counts, since it looks like a model failure otherwise.
+    """
+    conn = get_connection(path, read_only=True)
+    try:
+        rows = conn.execute("""
+            SELECT question_id, llm_name, max_turns_halted, react_turns_max
+            FROM responses
+            WHERE max_turns_halted > 0
+            ORDER BY question_id, llm_name
+            """).fetchall()
+    except duckdb.Error:
+        # Column absent: database predates the migration and has nothing to say.
+        return
+    finally:
+        conn.close()
+
+    if not rows:
+        print("No research steps were halted at the turn cap.")
+        return
+
+    print(f"\n{len(rows)} run(s) had a research step halted at the turn cap:")
+    for qid, llm, halted, turns_max in rows:
+        print(f"  Q{qid:<3} {llm:<35} {halted} step(s) halted, max turns {turns_max}")
 
 
 # ----------------------------
@@ -821,7 +937,8 @@ def make_deploy_db(
             "retrieval_context, tools_called, research_output, is_error, error_message, "
             "research_mode, case_law_context, tool_sequence, fallback_used, "
             "summarisation_output, summarisation_used, summarisation_llm, "
-            "chat_mode, provider, total_cost_usd, total_ms, reformatted, "
+            "chat_mode, provider, total_cost_usd, total_ms, "
+            "max_turns_halted, react_turns_max, reformatted, "
             "local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan, "
             "needs_clarification, clarification_question "
             "FROM responses ORDER BY id"
@@ -851,6 +968,8 @@ def make_deploy_db(
                 provider,
                 total_cost_usd,
                 total_ms,
+                max_turns_halted,
+                react_turns_max,
                 reformatted,
                 local_cache_hits,
                 memo_hits,
@@ -894,6 +1013,8 @@ def make_deploy_db(
                     provider,
                     total_cost_usd,
                     total_ms,
+                    max_turns_halted,
+                    react_turns_max,
                     bool(reformatted),
                     local_cache_hits or 0,
                     memo_hits or 0,
@@ -969,6 +1090,11 @@ if __name__ == "__main__":
         help="List response id, llm_name, and timestamp for every response",
     )
     _parser.add_argument(
+        "--backfill-halts",
+        action="store_true",
+        help="Fill max_turns_halted/react_turns_max from stored audit_json",
+    )
+    _parser.add_argument(
         "--delete-response",
         metavar="ID",
         type=int,
@@ -981,6 +1107,9 @@ if __name__ == "__main__":
         make_deploy_db(output_path=_out)
     elif _args.list:
         list_responses()
+    elif _args.backfill_halts:
+        backfill_halt_columns()
+        completeness_report()
     elif _args.delete_response is not None:
         delete_response(_args.delete_response)
     elif _args.clean or _args.dry_run:

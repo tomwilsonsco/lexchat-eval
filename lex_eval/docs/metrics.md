@@ -67,6 +67,13 @@ Act missing from the retrieved set scores 0.0, with no partial credit: unlike Re
 "some links survived" is meaningfully better than "none did", one fabricated citation is a full failure
 regardless of how many others were genuine.
 
+**Why the parsing is fussy.** `search_legislation` returns its JSON results with a plain-text
+"[NEXT STEP: ...]" hint appended for the Worker, so reading the whole string as JSON fails. That went
+unnoticed and silently emptied the search half of the retrieved set, leaving only the Acts a run
+fetched sections for, so an Act found in a search and cited without a follow-up fetch was reported as
+fabricated. Only the JSON at the start of the output is parsed now. Tool outputs that are not JSON at
+all (a LEX API error, or a model replying in prose) are still skipped.
+
 ## Citation Domain
 
 **Aim.** Checks that every citation URL in the Worker's report points to legislation.gov.uk, the only
@@ -251,6 +258,11 @@ fact rather than a judgement. Anything reworded enough to matter goes to the jud
 binary pass or fail: fail on any unsupported claim or meaningful misrepresentation, pass on trivial
 wording differences only. Score is 1.0 for pass, 0.0 for fail; no partial credit, so the metric's
 average across responses is effectively a pass rate.
+
+For a deep research run, the judge is also given the approved plan's scope note. Answers often say
+something like "case law was excluded under the approved research plan", which is true but is stated
+nowhere in the research output, so without the scope note the judge read it as an unsupported claim and
+failed the whole answer. Runs without a plan pass no scope note and the prompt is unchanged.
 
 **Why.** The 0.95 near-verbatim threshold sits in an observed gap: one model that follows a "do not
 condense" instruction literally measured 0.983-1.000 similarity, while one that habitually paraphrases

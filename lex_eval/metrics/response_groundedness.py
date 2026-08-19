@@ -23,6 +23,20 @@ from pydantic import BaseModel
 # 0.095-0.763. 0.95 sits in the gap between the two clusters.
 _NEAR_VERBATIM_THRESHOLD: float = 0.95
 
+# Wrapper for the approved plan's scope note, added to the prompt so the judge
+# treats it as a source alongside the research output. Without it, a true
+# statement like "case law was excluded under the approved research plan" reads
+# as unsupported, because the scope lives in the plan and never appears in the
+# research output itself.
+_SCOPE_BLOCK_TEMPLATE = """
+Approved Research Scope (from the research plan, mode: {research_mode}):
+{scope_note}
+
+The response may describe this scope, for example by saying that case law was
+excluded. Treat such a statement as grounded when it matches the scope above,
+even though it does not appear in the research output.
+"""
+
 
 class _GroundednessJudgement(BaseModel):
     analysis: str
@@ -34,7 +48,7 @@ _PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to decide 
 
 Research Output:
 {research_output}
-
+{scope_block}
 Final Response:
 {actual_output}
 
@@ -83,12 +97,25 @@ class ResponseGroundednessMetric(BaseMetric):
         model:           A DeepEval-compatible judge model.
         threshold:       Minimum score to pass. The score is binary, so this is
                          1.0 by default and there is no middle ground.
+        scope_note:      The approved research plan's scope note, if the run had
+                         a plan. Given to the judge so that a response
+                         describing its own scope is not read as unsupported.
+        research_mode:   The question's research mode, labelling the scope note.
     """
 
-    def __init__(self, research_output: str, model, threshold: float = 1.0) -> None:
+    def __init__(
+        self,
+        research_output: str,
+        model,
+        threshold: float = 1.0,
+        scope_note: str | None = None,
+        research_mode: str | None = None,
+    ) -> None:
         self.research_output = research_output
         self.model = model
         self.threshold = threshold
+        self.scope_note = scope_note
+        self.research_mode = research_mode
         self.score = 0.0
         self.reason = ""
         self.success = False
@@ -107,8 +134,17 @@ class ResponseGroundednessMetric(BaseMetric):
             self.success = True
             return self.score
 
+        scope_block = (
+            _SCOPE_BLOCK_TEMPLATE.format(
+                research_mode=self.research_mode or "unspecified",
+                scope_note=self.scope_note.strip(),
+            )
+            if self.scope_note and self.scope_note.strip()
+            else ""
+        )
         prompt = _PROMPT_TEMPLATE.format(
             research_output=self.research_output,
+            scope_block=scope_block,
             actual_output=actual_output,
         )
         try:
