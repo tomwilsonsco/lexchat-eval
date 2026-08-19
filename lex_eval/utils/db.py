@@ -678,10 +678,18 @@ def insert_eval_result(
     )
 
 
-def clear_eval_results(conn: duckdb.DuckDBPyConnection, metric: str) -> None:
-    """Delete all rows from the eval_<metric> table."""
+def clear_eval_results(
+    conn: duckdb.DuckDBPyConnection, metric: str, llm: Optional[str] = None
+) -> None:
+    """Delete rows from the eval_<metric> table.
+
+    Deletes only rows for *llm* if given, otherwise every row in the table.
+    """
     table = _eval_table_name(metric)
-    conn.execute(f"DELETE FROM {table}")
+    if llm:
+        conn.execute(f"DELETE FROM {table} WHERE llm_name = ?", [llm])
+    else:
+        conn.execute(f"DELETE FROM {table}")
 
 
 def covered_response_ids(conn: duckdb.DuckDBPyConnection, metric: str) -> set:

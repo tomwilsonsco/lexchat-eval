@@ -211,7 +211,7 @@ def run_evals(
             for metric in file_metrics:
                 init_eval_table(conn, metric)
                 if overwrite:
-                    clear_eval_results(conn, metric)
+                    clear_eval_results(conn, metric, llm=llm)
                 elif not append:
                     covered[metric] = covered_response_ids(conn, metric)
             conn.commit()

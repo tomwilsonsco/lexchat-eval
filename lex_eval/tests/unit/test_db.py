@@ -242,6 +242,21 @@ class TestEvalTableRoundTrip:
         assert covered_response_ids(conn, "consistency") == {1}
         conn.close()
 
+    def test_clear_eval_results_with_llm_only_deletes_that_llm(self):
+        conn = duckdb.connect(":memory:")
+        init_eval_table(conn, "tool_usage")
+        insert_eval_result(
+            conn, "tool_usage", _sample_record(response_id=1, llm_name="model-a")
+        )
+        insert_eval_result(
+            conn, "tool_usage", _sample_record(response_id=2, llm_name="model-b")
+        )
+
+        clear_eval_results(conn, "tool_usage", llm="model-a")
+
+        assert covered_response_ids(conn, "tool_usage") == {2}
+        conn.close()
+
 
 class TestLoadEvalResults:
     def test_round_trip_via_file(self, tmp_path):
