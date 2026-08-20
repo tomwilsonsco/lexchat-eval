@@ -161,6 +161,22 @@ INSERT INTO responses (
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
+# Same columns as _INSERT_RESPONSE plus an explicit id, for copying rows
+# (e.g. make_deploy_db) where the source id must be preserved rather than
+# reassigned from the destination's own sequence.
+_INSERT_RESPONSE_WITH_ID = """
+INSERT INTO responses (
+    id, question_id, question, llm_name, timestamp, actual_output,
+    retrieval_context, tools_called, research_output, is_error, error_message,
+    research_mode, case_law_context, tool_sequence, fallback_used,
+    summarisation_output, summarisation_used, summarisation_llm,
+    chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
+    react_turns_max, reformatted,
+    local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
+    needs_clarification, clarification_question
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
 
 def get_connection(
     path: Path = DEFAULT_DB, read_only: bool = False
@@ -448,6 +464,11 @@ def clean_incomplete_responses(
     - the row is an error (is_error = TRUE), OR
     - no context was captured (retrieval_context is '[]' or NULL).
 
+    A ``needs_clarification`` row (a Deep Research plan that asked the user a
+    clarifying question instead of running) is a valid outcome, not an
+    incomplete or error one, even though it also has empty actual_output and
+    retrieval_context, so it's excluded from all three conditions above.
+
     Args:
         path:    Path to the database file. Defaults to DEFAULT_DB.
         dry_run: If True, print what would be deleted without deleting.
@@ -458,17 +479,19 @@ def clean_incomplete_responses(
     path = path or DEFAULT_DB
     conn = get_connection(path)
     try:
+        where = (
+            "NOT COALESCE(needs_clarification, FALSE) AND (TRIM(actual_output) = '' "
+            "OR is_error OR retrieval_context = '[]' OR retrieval_context IS NULL)"
+        )
         count = conn.execute(
-            "SELECT COUNT(*) FROM responses WHERE TRIM(actual_output) = '' OR is_error "
-            "OR retrieval_context = '[]' OR retrieval_context IS NULL"
+            f"SELECT COUNT(*) FROM responses WHERE {where}"
         ).fetchone()[0]
 
         if dry_run:
-            rows = conn.execute("""
+            rows = conn.execute(f"""
                 SELECT id, question_id, llm_name, is_error, retrieval_context
                 FROM responses
-                WHERE TRIM(actual_output) = '' OR is_error 
-                OR retrieval_context = '[]' OR retrieval_context IS NULL
+                WHERE {where}
                 ORDER BY question_id, llm_name
                 """).fetchall()
             print(f"Dry run, {count} row(s) would be deleted:")
@@ -482,10 +505,7 @@ def clean_incomplete_responses(
                     tag = "empty output"
                 print(f"  id={rid}  Q{qid}  {llm}  [{tag}]")
         else:
-            conn.execute(
-                "DELETE FROM responses WHERE TRIM(actual_output) = '' OR is_error "
-                "OR retrieval_context = '[]' OR retrieval_context IS NULL"
-            )
+            conn.execute(f"DELETE FROM responses WHERE {where}")
             conn.commit()
             print(f"Deleted {count} incomplete/error/no-context row(s).")
     finally:
@@ -800,10 +820,22 @@ def clear_eval_results(
     """Delete rows from the eval_<metric> table.
 
     Deletes only rows for *llm* if given, otherwise every row in the table.
+
+    *llm* matches by substring, not exact equality, the same way run_evals.py
+    selects which tests to re-run via pytest's ``-k`` (a substring match
+    against the test id, which embeds llm_name). Exact matching here would
+    clear only "gpt-4"'s rows while ``-k gpt-4`` reruns "gpt-4o" too,
+    leaving gpt-4o with duplicate eval rows after --overwrite.
     """
     table = _eval_table_name(metric)
     if llm:
-        conn.execute(f"DELETE FROM {table} WHERE llm_name = ?", [llm])
+        rows = conn.execute(f"SELECT DISTINCT llm_name FROM {table}").fetchall()
+        matched = [name for (name,) in rows if name and llm in name]
+        if matched:
+            placeholders = ", ".join("?" for _ in matched)
+            conn.execute(
+                f"DELETE FROM {table} WHERE llm_name IN ({placeholders})", matched
+            )
     else:
         conn.execute(f"DELETE FROM {table}")
 
@@ -931,9 +963,13 @@ def make_deploy_db(
         # Recreate schema in the destination
         init_db(dst)
 
-        # Copy responses with trimmed retrieval_context
+        # Copy responses with trimmed retrieval_context. Source ids are
+        # preserved (not re-assigned from dst's own sequence): eval tables
+        # are copied below with their original response_id, so a gap in src
+        # ids (from a deleted response) must not shift every later row's id,
+        # or every eval row after the gap would point at the wrong response.
         rows = src.execute(
-            "SELECT question_id, question, llm_name, timestamp, actual_output, "
+            "SELECT id, question_id, question, llm_name, timestamp, actual_output, "
             "retrieval_context, tools_called, research_output, is_error, error_message, "
             "research_mode, case_law_context, tool_sequence, fallback_used, "
             "summarisation_output, summarisation_used, summarisation_llm, "
@@ -945,8 +981,10 @@ def make_deploy_db(
         ).fetchall()
 
         trimmed_count = 0
+        max_id = 0
         for row in rows:
             (
+                response_id,
                 question_id,
                 question,
                 llm_name,
@@ -985,9 +1023,11 @@ def make_deploy_db(
             if trimmed != ctx:
                 trimmed_count += 1
 
+            max_id = max(max_id, response_id)
             dst.execute(
-                _INSERT_RESPONSE,
+                _INSERT_RESPONSE_WITH_ID,
                 [
+                    response_id,
                     question_id,
                     question,
                     llm_name,
@@ -1025,6 +1065,13 @@ def make_deploy_db(
                     clarification_question,
                 ],
             )
+
+        # Keep dst's sequence past the highest id just inserted, so any
+        # future direct insert into the deploy DB (outside this function)
+        # won't collide with a preserved source id. DuckDB has no ALTER
+        # SEQUENCE RESTART, so the sequence is fast-forwarded by consuming it.
+        if max_id:
+            dst.execute("SELECT nextval('responses_id_seq') FROM range(?)", [max_id])
 
         # Copy each per-metric eval table verbatim. Tables are only ever
         # created on dst, never src: src must never be modified (see this

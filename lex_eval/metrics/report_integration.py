@@ -18,8 +18,9 @@ from pydantic import BaseModel
 from .claim_support import _quote_found
 from .structure import (
     _DELEGATE_TOOL_NAME,
-    _URL_RE,
+    _cited_legislation_ids,
     _group_tools_by_delegation,
+    _retrieved_legislation_ids,
     _retrieved_usable_content,
 )
 
@@ -60,11 +61,14 @@ class ReportIntegrationMetric(BaseMetric):
     the Manager condenses several step reports into one response.
 
     A step is in scope only if its own tool calls retrieved usable content
-    and its own report cites some of it. A step that retrieved nothing, and
-    a step that retrieved but cited nothing, both have no finding of their
-    own for the final answer to have kept or dropped, so neither is scored
-    here. Those two are GenuineGapMetric's and StepCompletionMetric's
-    questions to answer, not this one.
+    and its own report cites one of the Acts that retrieval actually
+    returned, not merely cites some URL (a report citing a sibling step's
+    Act instead of its own has no finding of its own either). A step that
+    retrieved nothing, and a step that retrieved but cited nothing of its
+    own, both have no finding of their own for the final answer to have
+    kept or dropped, so neither is scored here. Those two are
+    GenuineGapMetric's and StepCompletionMetric's questions to answer, not
+    this one.
 
     One judge call per in-scope step, asking only about that step's own
     finding, rather than one batched call listing every step alongside the
@@ -124,7 +128,7 @@ class ReportIntegrationMetric(BaseMetric):
             i: g["report"]
             for i, g in enumerate(groups, 1)
             if _retrieved_usable_content(g["tools"])
-            and _URL_RE.search(g["report"] or "")
+            and (_retrieved_legislation_ids(g["tools"]) & _cited_legislation_ids(g["report"]))
         }
 
         if not in_scope:
@@ -180,8 +184,8 @@ class ReportIntegrationMetric(BaseMetric):
         if dropped:
             steps = ", ".join(str(s) for s in dropped)
             self.reason = (
-                f"Step(s) {steps} of {n_in_scope} with a reportable finding "
-                "are not reflected in the final answer." + scope_note
+                f"Step(s) {steps} (of {n_in_scope} step(s) with a reportable "
+                "finding) are not reflected in the final answer." + scope_note
             )
         else:
             self.reason = (

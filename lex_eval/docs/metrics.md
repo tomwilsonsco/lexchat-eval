@@ -103,17 +103,19 @@ reported nothing, most commonly because it hit a tool-call budget limit mid-step
 steps report normally and nothing else in the harness would notice.
 
 **How.** Deterministic. For each step, if its own tool calls returned usable
-`search_legislation_sections`/`get_legislation_text` content but its own report contains no citation
-link at all, that step fails. Score is the fraction of steps that pass; threshold is 1.0, so a single
-lost step fails the response.
+`search_legislation_sections`/`get_legislation_text` content but its own report cites none of the Acts
+that retrieval actually returned (citing a sibling step's Act doesn't count, that step still has nothing
+of its own to show for its retrieval), that step fails. Score is the fraction of steps that pass;
+threshold is 1.0, so a single lost step fails the response.
 
 ## Report Integration
 
 **Aim.** Deep research only. Checks that every step's own substantive finding survives into the final
 answer, rather than being quietly dropped when the Manager condenses several step reports into one
-response. Only checks steps that retrieved usable content and cited some of it in their own report; a
-step that retrieved nothing, or retrieved and cited nothing, has no finding of its own for the final
-answer to have kept or dropped, so is not scored here.
+response. Only checks steps that retrieved usable content and cited one of the Acts that retrieval
+actually returned in their own report (citing a sibling step's Act doesn't count as a finding of its own);
+a step that retrieved nothing, or retrieved and cited nothing of its own, has no finding of its own for
+the final answer to have kept or dropped, so is not scored here.
 
 **How.** Judge-based, one call per in-scope step. The judge is given that one step's own report and the
 final answer, and labels the step `represented` or `dropped`, quoting the final answer to justify

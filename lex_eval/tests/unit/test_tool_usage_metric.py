@@ -58,6 +58,18 @@ def test_deep_research_step_skipping_discovery_still_fails():
     assert "step 1" in detail
 
 
+def test_deep_research_step_with_no_discovery_at_all_still_fails():
+    """A step whose Worker tools are only search_legislation_sections, with
+    no search_legislation call anywhere in that step, has nothing to compare
+    an index against and passed trivially before require_prerequisites was
+    added. Global presence (search_legislation used somewhere in the whole
+    run) doesn't cover this: it's checked per plan step here."""
+    sequence = [_DELEGATE, _SECTIONS]
+    ok, detail = _check_tool_order(sequence, "legislation_only", chat_mode="deep_research")
+    assert not ok
+    assert "step 1" in detail
+
+
 def test_deep_research_multiple_steps_each_checked_independently():
     """Step 1 is fine; step 2 skips discovery. The second step's violation
     must be caught even though the first step was clean."""

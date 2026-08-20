@@ -28,7 +28,11 @@ is checked per plan step instead of per run, and only for first-occurrence
 order, not the no-revisit rule, since a single deep-research step routinely
 covers more than one Act and legitimately interleaves discovery and
 retrieval across them (see ``_check_tool_order`` for the measurement this is
-based on).
+based on). A step is still required to have called each earlier phase at
+least once before a later one, e.g. a step that goes straight to
+search_legislation_sections with no search_legislation call in that step is
+a violation, since the top-level presence score only checks the whole run,
+not each step.
 
 Final score:
     - 1.0  all three required tools present AND correct order
@@ -96,20 +100,45 @@ def _segment_by_delegation(tool_sequence: List[str]) -> List[List[str]]:
 
 def _check_first_occurrence_order(
     worker_seq: List[str],
+    require_prerequisites: bool = False,
 ) -> tuple[bool, str, list[tuple[str, int]]]:
     """First-occurrence-only order check: each expected tool's first
     appearance must come in phase order. Does not penalise revisiting an
     earlier phase later in the sequence.
+
+    ``present`` only lists phases that appear at all, so on its own this
+    check is silent about a phase skipped entirely, e.g. a segment that goes
+    straight to ``search_legislation_sections`` with no ``search_legislation``
+    call has one present phase and no pair to compare, so it passes
+    trivially. Pass ``require_prerequisites=True`` (used for a deep-research
+    step, where nothing else checks that step's own presence) to also fail
+    when a later phase is present but an earlier one it depends on is not.
 
     Returns ``(order_ok, detail, present)`` where *present* is the list of
     ``(short_name, index)`` pairs for tools that appeared at all, reusable by
     a stricter caller that also wants to check for revisits.
     """
     present: list[tuple[str, int]] = []
+    present_names: set[str] = set()
     for name in EXPECTED_TOOL_ORDER:
         idx = _first_occurrence(worker_seq, name)
         if idx is not None:
             present.append((name.replace("Worker: ", ""), idx))
+            present_names.add(name)
+
+    if require_prerequisites and present:
+        last_phase = max(EXPECTED_TOOL_ORDER.index(f"Worker: {n}") for n, _ in present)
+        missing = [
+            EXPECTED_TOOL_ORDER[i].replace("Worker: ", "")
+            for i in range(last_phase)
+            if EXPECTED_TOOL_ORDER[i] not in present_names
+        ]
+        if missing:
+            return (
+                False,
+                f"{present[-1][0]} called without {', '.join(missing)} first",
+                present,
+            )
 
     order_ok = all(present[i][1] < present[i + 1][1] for i in range(len(present) - 1))
     if order_ok:
@@ -161,7 +190,9 @@ def _check_tool_order(
         if not segments:
             return True, "n/a (no Worker tools in sequence)"
         for i, seg in enumerate(segments, 1):
-            order_ok, detail, _ = _check_first_occurrence_order(seg)
+            order_ok, detail, _ = _check_first_occurrence_order(
+                seg, require_prerequisites=True
+            )
             if not order_ok:
                 return False, f"step {i}: {detail}"
         return True, f"{len(segments)} step(s), first-occurrence order OK"

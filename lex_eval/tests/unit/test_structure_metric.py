@@ -8,7 +8,9 @@ from deepeval.test_case import LLMTestCase, ToolCall
 
 from lex_eval.metrics.structure import (
     CitationGroundingMetric,
+    GenuineGapMetric,
     MandatoryStructureMetric,
+    _retrieved_usable_content,
 )
 
 pytestmark = pytest.mark.unit
@@ -185,3 +187,48 @@ class TestCitationGroundingParsesSearchResults:
         metric = CitationGroundingMetric()
         metric.measure(case)
         assert metric.score == 1.0
+
+
+class TestRetrievedUsableContentRejectsToolErrors:
+    """A LEX tool failure comes back as non-empty prose ("Error executing
+    tool: ..."), which truthiness alone would count as usable retrieval,
+    incorrectly excusing GenuineGapMetric's disclosure requirement."""
+
+    def test_error_string_is_not_usable_content(self):
+        tool = ToolCall(
+            name="Worker: search_legislation_sections",
+            input_parameters={},
+            output='Error executing tool: {"detail": "Internal server error"}',
+        )
+        assert _retrieved_usable_content([tool]) is False
+
+    def test_real_content_is_usable(self):
+        tool = ToolCall(
+            name="Worker: search_legislation_sections",
+            input_parameters={},
+            output="Section 6: ...",
+        )
+        assert _retrieved_usable_content([tool]) is True
+
+    def test_genuine_gap_requires_disclosure_after_a_tool_error(self):
+        """A step whose only search_legislation_sections call failed must be
+        judged as empty retrieval, not excused because the failure text was
+        non-empty."""
+        report = _VALID_REPORT  # confidently answers, no gap disclosure
+        case = LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research", input_parameters={}, output=report
+                ),
+                ToolCall(
+                    name="Worker: search_legislation_sections",
+                    input_parameters={},
+                    output='Error executing tool: {"detail": "Internal server error"}',
+                ),
+            ],
+        )
+        metric = GenuineGapMetric(research_mode="legislation_only")
+        metric.measure(case)
+        assert not metric.is_successful(), metric.reason

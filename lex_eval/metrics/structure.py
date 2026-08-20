@@ -111,11 +111,23 @@ def _get_delegate_outputs(test_case: LLMTestCase) -> list[str]:
 
 def _retrieved_usable_content(tools: list) -> bool:
     """True if any ``search_legislation_sections``/``get_legislation_text``
-    call among *tools* returned non-empty output, i.e. retrieval wasn't empty."""
+    call among *tools* returned non-empty output, i.e. retrieval wasn't empty.
+
+    A LEX tool failure comes back as non-empty prose starting "Error
+    executing tool: " (``LexChat/server_py/src/agent/tools/executor.py``),
+    not an empty string, so that's excluded explicitly rather than counted
+    as usable content.
+    """
+    def _usable(output) -> bool:
+        if not output:
+            return False
+        text = output if isinstance(output, str) else str(output)
+        return not text.startswith("Error executing tool:")
+
     return any(
         tool.name
         in ("Worker: search_legislation_sections", "Worker: get_legislation_text")
-        and tool.output
+        and _usable(tool.output)
         for tool in tools
     )
 
@@ -332,18 +344,20 @@ def _leading_json(raw: str) -> dict:
     return json.JSONDecoder().raw_decode(raw.lstrip())[0]
 
 
-def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:
+def _retrieved_legislation_ids(tools: list) -> set:
     """
-    Return the set of legislation_ids the run's own tool calls actually
-    retrieved: results returned by ``search_legislation``, plus the
-    legislation_id argument passed to ``search_legislation_sections`` /
-    ``get_legislation_text``.
+    Return the set of legislation_ids that *tools* actually retrieved:
+    results returned by ``search_legislation``, plus the legislation_id
+    argument passed to ``search_legislation_sections`` / ``get_legislation_text``.
+
+    Pass a single group's ``tools`` list to scope this to one delegation, or
+    ``test_case.tools_called`` for the whole run.
     """
     ids: set = set()
-    if not test_case.tools_called:
+    if not tools:
         return ids
 
-    for tool in test_case.tools_called:
+    for tool in tools:
         if tool.name == "Worker: search_legislation":
             raw = tool.output
             try:
@@ -364,6 +378,15 @@ def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:
                 ids.add(lid)
 
     return ids
+
+
+def _cited_legislation_ids(report: str) -> set:
+    """Return the set of Act-level legislation_ids cited by URL in *report*."""
+    return {
+        lid
+        for lid in (_legislation_id_from_url(u) for u in _URL_RE.findall(report or ""))
+        if lid
+    }
 
 
 class CitationGroundingMetric(BaseMetric):
@@ -423,7 +446,7 @@ class CitationGroundingMetric(BaseMetric):
             )
             return self.score
 
-        retrieved_ids = _retrieved_legislation_ids(test_case)
+        retrieved_ids = _retrieved_legislation_ids(test_case.tools_called)
         fabricated = cited_ids - retrieved_ids
 
         if fabricated:
@@ -689,6 +712,11 @@ class StepCompletionMetric(BaseMetric):
     limit mid-step), while its sibling steps report normally and every other
     metric in this file scores the run perfectly.
 
+    "Cited" means cites one of the Acts this step's own tool calls actually
+    retrieved, not merely cites some URL, a report citing an unrelated Act
+    (e.g. one a sibling step retrieved) passes no more here than a report
+    citing nothing at all.
+
     Score:
         0.0: no delegate_research call found; cannot be verified.
         1.0: no step both retrieved usable content and cited none of it.
@@ -721,7 +749,10 @@ class StepCompletionMetric(BaseMetric):
             i
             for i, g in enumerate(groups, 1)
             if _retrieved_usable_content(g["tools"])
-            and not _URL_RE.search(g["report"] or "")
+            and not (
+                _retrieved_legislation_ids(g["tools"])
+                & _cited_legislation_ids(g["report"])
+            )
         ]
 
         self.score = (len(groups) - len(failed)) / len(groups)
