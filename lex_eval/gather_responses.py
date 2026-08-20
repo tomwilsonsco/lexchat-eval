@@ -103,12 +103,15 @@ def process_question(
                     "provider": None,
                     "total_cost_usd": None,
                     "total_ms": None,
+                    "max_turns_halted": None,
+                    "react_turns_max": None,
                     "local_cache_hits": 0,
                     "memo_hits": 0,
                     "reformatted": False,
                     "audit_schema_version": None,
                     "audit_json": None,
-                    "error": f"Deep Research plan requires clarification: {plan_data.get('question', '')}",
+                    "needs_clarification": True,
+                    "clarification_question": plan_data.get("question", ""),
                 }
 
             deep_research_plan = plan_data.get("plan")
@@ -184,6 +187,8 @@ def process_question(
                     "provider": capture_result.get("provider"),
                     "total_cost_usd": capture_result.get("total_cost_usd"),
                     "total_ms": capture_result.get("total_ms"),
+                    "max_turns_halted": capture_result.get("max_turns_halted"),
+                    "react_turns_max": capture_result.get("react_turns_max"),
                     "local_cache_hits": capture_result.get("local_cache_hits", 0),
                     "memo_hits": capture_result.get("memo_hits", 0),
                     "reformatted": capture_result.get("reformatted", False),
@@ -229,6 +234,8 @@ def process_question(
                         "provider": None,
                         "total_cost_usd": None,
                         "total_ms": None,
+                        "max_turns_halted": None,
+                        "react_turns_max": None,
                         "local_cache_hits": 0,
                         "memo_hits": 0,
                         "reformatted": False,
@@ -408,8 +415,14 @@ def main() -> None:
                     insert_response(db_conn, result)
                     # Error records are signalled by an "error" key (and may not
                     # set is_error), so check both to avoid logging failures as OK.
+                    # A clarification request is a valid outcome, not an error.
                     is_error = result.get("is_error") or "error" in result
-                    status = "ERROR" if is_error else "OK"
+                    if result.get("needs_clarification"):
+                        status = "CLARIFICATION"
+                    elif is_error:
+                        status = "ERROR"
+                    else:
+                        status = "OK"
                     logger.info(
                         "Q%d (%s): %s [actual_output=%d chars]",
                         q["id"],
@@ -442,6 +455,8 @@ def main() -> None:
                             "provider": None,
                             "total_cost_usd": None,
                             "total_ms": None,
+                            "max_turns_halted": None,
+                            "react_turns_max": None,
                             "local_cache_hits": 0,
                             "memo_hits": 0,
                             "reformatted": False,

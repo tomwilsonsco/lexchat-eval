@@ -61,10 +61,12 @@ def test_tool_usage(request, record):
     test_case = record_to_test_case(record)
     research_mode = record.get("research_mode", "legislation_only")
     tool_sequence = record.get("tool_sequence") or []
+    chat_mode = record.get("chat_mode", "research")
     metric = ToolUsageMetric(
         threshold=1.0,
         research_mode=research_mode,
         tool_sequence=tool_sequence,
+        chat_mode=chat_mode,
     )
     metric.measure(test_case)
 

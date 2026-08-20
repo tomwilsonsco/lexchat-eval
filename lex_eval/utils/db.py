@@ -24,7 +24,13 @@ responses
     fallback_used     BOOLEAN     (True when get_legislation_text was invoked)
     summarisation_llm TEXT        (model used for summarisation; equals llm_name when no separate model is configured)
     chat_mode         TEXT        (research | conversational | deep_research)
+    max_turns_halted  INTEGER     (research steps the server cut short at its ReAct turn cap;
+                                   >0 means at least one step returned no report)
+    react_turns_max   INTEGER     (highest ReAct turn count any step reached in this run)
     research_plan     JSON        (deep_research only: the plan from POST /api/research/plan, NULL otherwise)
+    needs_clarification    BOOLEAN (True when POST /api/research/plan asked a clarifying question instead
+                                    of proposing a plan; a valid outcome, distinct from is_error)
+    clarification_question TEXT   (the clarifying question asked, NULL unless needs_clarification)
 
 eval_<metric>
     One table per metric (e.g. eval_tool_usage, eval_response_groundedness),
@@ -89,12 +95,16 @@ CREATE TABLE IF NOT EXISTS responses (
     provider          TEXT,
     total_cost_usd    DOUBLE,
     total_ms          INTEGER,
+    max_turns_halted  INTEGER,
+    react_turns_max   INTEGER,
     reformatted       BOOLEAN  NOT NULL DEFAULT FALSE,
     local_cache_hits  INTEGER  NOT NULL DEFAULT 0,
     memo_hits         INTEGER  NOT NULL DEFAULT 0,
     audit_schema_version INTEGER,
     audit_json        JSON,
-    research_plan     JSON
+    research_plan     JSON,
+    needs_clarification BOOLEAN NOT NULL DEFAULT FALSE,
+    clarification_question TEXT
 );
 """
 
@@ -130,6 +140,12 @@ _MIGRATE_RESPONSES = [
     "ALTER TABLE responses ADD COLUMN audit_json JSON",
     # --- deep_research plan capture (POST /api/research/plan) ---
     "ALTER TABLE responses ADD COLUMN research_plan JSON",
+    # --- research steps cut short at the server's ReAct turn cap ---
+    "ALTER TABLE responses ADD COLUMN max_turns_halted INTEGER",
+    "ALTER TABLE responses ADD COLUMN react_turns_max INTEGER",
+    # --- deep_research clarification path (distinct outcome, not an error) ---
+    "ALTER TABLE responses ADD COLUMN needs_clarification BOOLEAN",
+    "ALTER TABLE responses ADD COLUMN clarification_question TEXT",
 ]
 
 _INSERT_RESPONSE = """
@@ -138,9 +154,27 @@ INSERT INTO responses (
     retrieval_context, tools_called, research_output, is_error, error_message,
     research_mode, case_law_context, tool_sequence, fallback_used,
     summarisation_output, summarisation_used, summarisation_llm,
-    chat_mode, provider, total_cost_usd, total_ms, reformatted,
-    local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
+    react_turns_max, reformatted,
+    local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
+    needs_clarification, clarification_question
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+# Same columns as _INSERT_RESPONSE plus an explicit id, for copying rows
+# (e.g. make_deploy_db) where the source id must be preserved rather than
+# reassigned from the destination's own sequence.
+_INSERT_RESPONSE_WITH_ID = """
+INSERT INTO responses (
+    id, question_id, question, llm_name, timestamp, actual_output,
+    retrieval_context, tools_called, research_output, is_error, error_message,
+    research_mode, case_law_context, tool_sequence, fallback_used,
+    summarisation_output, summarisation_used, summarisation_llm,
+    chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
+    react_turns_max, reformatted,
+    local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
+    needs_clarification, clarification_question
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -237,6 +271,10 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             record.get("provider") or None,
             record.get("total_cost_usd") or None,
             record.get("total_ms") or None,
+            # 0 is meaningful (no step halted), so keep it rather than
+            # collapsing it to NULL the way the cost/timing fields do.
+            record.get("max_turns_halted"),
+            record.get("react_turns_max"),
             record.get("reformatted", False),
             record.get("local_cache_hits", 0),
             record.get("memo_hits", 0),
@@ -247,6 +285,8 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
                 if record.get("research_plan") is not None
                 else None
             ),
+            bool(record.get("needs_clarification", False)),
+            record.get("clarification_question") or None,
         ],
     )
 
@@ -285,9 +325,10 @@ def load_records(
                    actual_output, retrieval_context, tools_called, research_output,
                    research_mode, case_law_context, tool_sequence, fallback_used,
                    summarisation_output, summarisation_used, summarisation_llm,
-                   chat_mode, provider, total_cost_usd, total_ms, reformatted,
+                   chat_mode, provider, total_cost_usd, total_ms,
+                   max_turns_halted, react_turns_max, reformatted,
                    local_cache_hits, memo_hits, audit_schema_version, audit_json,
-                   research_plan
+                   research_plan, needs_clarification, clarification_question
             FROM responses
             {where}
             ORDER BY id
@@ -317,12 +358,16 @@ def load_records(
         provider,
         total_cost_usd,
         total_ms,
+        max_turns_halted,
+        react_turns_max,
         reformatted,
         local_cache_hits,
         memo_hits,
         audit_schema_version,
         audit_json,
         research_plan_json,
+        needs_clarification,
+        clarification_question,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -358,31 +403,54 @@ def load_records(
                 "provider": provider,
                 "total_cost_usd": total_cost_usd,
                 "total_ms": total_ms,
+                "max_turns_halted": max_turns_halted,
+                "react_turns_max": react_turns_max,
                 "reformatted": bool(reformatted),
                 "local_cache_hits": local_cache_hits or 0,
                 "memo_hits": memo_hits or 0,
                 "audit_schema_version": audit_schema_version,
                 "audit_json": audit_json,
                 "research_plan": research_plan,
+                "needs_clarification": bool(needs_clarification),
+                "clarification_question": clarification_question,
             }
         )
     return records
 
 
-def group_by_question_and_llm(
+def consistency_group_key(record: Dict[str, Any]) -> str:
+    """
+    Return the ``'Q{question_id}_{llm_name}_{chat_mode}'`` key used to decide
+    which responses are repeat runs of each other.
+
+    ``chat_mode`` is part of the key because consistency asks "did the same
+    question, asked the same way twice, get the same answer". A deep research
+    answer and an ordinary research answer are not repeat runs of each other,
+    and comparing them measures the difference between the two modes rather
+    than the model's repeatability.
+
+    Both the test IDs in ``tests/eval/test_consistency.py`` and the deselect
+    IDs in ``run_evals.py`` are built from this, so they cannot drift apart.
+    """
+    return (
+        f"Q{record['question_id']}_{record['llm_name']}_"
+        f"{record.get('chat_mode') or 'research'}"
+    )
+
+
+def group_by_question_llm_and_mode(
     path: Optional[Path] = None,
     read_only: bool = False,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Return records grouped by ``'Q{question_id}_{llm_name}'`` key.
+    Return records grouped by :func:`consistency_group_key`.
 
     Excludes error rows.
     """
     records = load_records(path, read_only=read_only)
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in records:
-        key = f"Q{r['question_id']}_{r['llm_name']}"
-        grouped.setdefault(key, []).append(r)
+        grouped.setdefault(consistency_group_key(r), []).append(r)
     return grouped
 
 
@@ -396,6 +464,11 @@ def clean_incomplete_responses(
     - the row is an error (is_error = TRUE), OR
     - no context was captured (retrieval_context is '[]' or NULL).
 
+    A ``needs_clarification`` row (a Deep Research plan that asked the user a
+    clarifying question instead of running) is a valid outcome, not an
+    incomplete or error one, even though it also has empty actual_output and
+    retrieval_context, so it's excluded from all three conditions above.
+
     Args:
         path:    Path to the database file. Defaults to DEFAULT_DB.
         dry_run: If True, print what would be deleted without deleting.
@@ -406,17 +479,19 @@ def clean_incomplete_responses(
     path = path or DEFAULT_DB
     conn = get_connection(path)
     try:
+        where = (
+            "NOT COALESCE(needs_clarification, FALSE) AND (TRIM(actual_output) = '' "
+            "OR is_error OR retrieval_context = '[]' OR retrieval_context IS NULL)"
+        )
         count = conn.execute(
-            "SELECT COUNT(*) FROM responses WHERE TRIM(actual_output) = '' OR is_error "
-            "OR retrieval_context = '[]' OR retrieval_context IS NULL"
+            f"SELECT COUNT(*) FROM responses WHERE {where}"
         ).fetchone()[0]
 
         if dry_run:
-            rows = conn.execute("""
+            rows = conn.execute(f"""
                 SELECT id, question_id, llm_name, is_error, retrieval_context
                 FROM responses
-                WHERE TRIM(actual_output) = '' OR is_error 
-                OR retrieval_context = '[]' OR retrieval_context IS NULL
+                WHERE {where}
                 ORDER BY question_id, llm_name
                 """).fetchall()
             print(f"Dry run, {count} row(s) would be deleted:")
@@ -430,10 +505,7 @@ def clean_incomplete_responses(
                     tag = "empty output"
                 print(f"  id={rid}  Q{qid}  {llm}  [{tag}]")
         else:
-            conn.execute(
-                "DELETE FROM responses WHERE TRIM(actual_output) = '' OR is_error "
-                "OR retrieval_context = '[]' OR retrieval_context IS NULL"
-            )
+            conn.execute(f"DELETE FROM responses WHERE {where}")
             conn.commit()
             print(f"Deleted {count} incomplete/error/no-context row(s).")
     finally:
@@ -442,20 +514,99 @@ def clean_incomplete_responses(
     return count
 
 
-def completeness_report(path: Optional[Path] = None) -> None:
-    """Print a summary of complete (non-empty) responses per question/LLM pair."""
+def list_responses(path: Optional[Path] = None) -> None:
+    """Print id, llm_name, and timestamp for every row in the responses table."""
     path = path or DEFAULT_DB
     if not path.exists():
         print("Database not found:", path)
         return
 
+    conn = get_connection(path, read_only=True)
+    try:
+        rows = conn.execute(
+            "SELECT id, llm_name, timestamp FROM responses ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    print(f"{'id':>5}  {'llm_name':<35}  timestamp")
+    print("-" * 70)
+    for rid, llm_name, timestamp in rows:
+        print(f"{rid:>5}  {llm_name:<35}  {timestamp}")
+    print(f"\n{len(rows)} response(s)")
+
+
+def delete_response(response_id: int, path: Optional[Path] = None) -> Dict[str, int]:
+    """
+    Delete *response_id* from the responses table and from every eval_<metric>
+    table (only those that actually exist) that has rows for it.
+
+    Returns a dict of {"responses": <0 or 1>, "eval_<metric>": <rows deleted>, ...}
+    covering only the tables a row was actually deleted from.
+    """
+    from lex_eval.run_evals import METRIC_FILES
+
+    path = path or DEFAULT_DB
     conn = get_connection(path)
+    deleted: Dict[str, int] = {}
+    try:
+        for metric in METRIC_FILES:
+            if not _eval_table_exists(conn, metric):
+                continue
+            table = _eval_table_name(metric)
+            count = conn.execute(
+                f"SELECT COUNT(*) FROM {table} WHERE response_id = ?", [response_id]
+            ).fetchone()[0]
+            if count:
+                conn.execute(f"DELETE FROM {table} WHERE response_id = ?", [response_id])
+                deleted[table] = count
+
+        count = conn.execute(
+            "SELECT COUNT(*) FROM responses WHERE id = ?", [response_id]
+        ).fetchone()[0]
+        if count:
+            conn.execute("DELETE FROM responses WHERE id = ?", [response_id])
+            deleted["responses"] = count
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    if "responses" not in deleted:
+        print(f"No response with id={response_id} found.")
+    else:
+        print(f"Deleted response id={response_id}:")
+        for table, count in deleted.items():
+            print(f"  {table}: {count} row(s)")
+
+    return deleted
+
+
+def completeness_report(path: Optional[Path] = None) -> None:
+    """Print complete (non-empty) responses per question, LLM, and chat mode.
+
+    Grouped the same way :func:`consistency_group_key` groups, so the "ok"
+    column answers the question the consistency metric actually asks. A deep
+    research answer and an ordinary research answer to the same question are
+    not repeat runs of each other, so counting them together would report a
+    pair as ready when consistency still cannot score it.
+    """
+    path = path or DEFAULT_DB
+    if not path.exists():
+        print("Database not found:", path)
+        return
+
+    # This function only reads, so it takes no write lock of its own. DuckDB
+    # still refuses to open the file at all while a gather holds its lock, so
+    # this does not make the report runnable mid-gather.
+    conn = get_connection(path, read_only=True)
     try:
         rows = conn.execute("""
             SELECT
                 question_id,
                 llm_name,
-                COUNT(*) AS total_runs, -- Total number of runs for this Q/LLM pair
+                COALESCE(chat_mode, 'research') AS mode,
+                COUNT(*) AS total_runs, -- Total runs for this Q/LLM/mode group
                 SUM(CASE WHEN TRIM(actual_output) != '' AND NOT is_error THEN 1 ELSE 0 END) AS complete_runs,
                 SUM(CASE WHEN TRIM(actual_output) != '' AND NOT is_error THEN LENGTH(actual_output) ELSE 0 END) AS total_actual_output_chars,
                 SUM(
@@ -466,25 +617,112 @@ def completeness_report(path: Optional[Path] = None) -> None:
                     END
                 ) AS total_retrieval_context_chars
             FROM responses
-            GROUP BY question_id, llm_name
-            ORDER BY question_id, llm_name
+            GROUP BY question_id, llm_name, mode
+            ORDER BY mode, question_id, llm_name
             """).fetchall()
     finally:
         conn.close()
 
     print(
-        f"{'Q':>3}  {'LLM':<35}  {'total':>5}  {'comp':>4}  {'out_chars':>9}  {'ctx_chars':>9}  {'ok':>4}"
+        f"{'Q':>3}  {'LLM':<28}  {'mode':<14}  {'total':>5}  {'comp':>4}  "
+        f"{'out_chars':>9}  {'ctx_chars':>9}  {'ok':>4}"
     )
-    print("-" * 85)
-    for qid, llm, total, complete, out_chars, ctx_chars in rows:
+    print("-" * 95)
+    for qid, llm, mode, total, complete, out_chars, ctx_chars in rows:
         ok = "YES" if complete >= 2 else "NO "
         print(
-            f"{qid:>3}  {llm:<35}  {total:>5}  {complete:>4}  {out_chars:>9}  {ctx_chars:>9}  {ok}"
+            f"{qid:>3}  {llm:<28}  {mode:<14}  {total:>5}  {complete:>4}  "
+            f"{out_chars:>9}  {ctx_chars:>9}  {ok}"
         )
 
-    total_pairs = len(rows)
-    ready = sum(1 for _, _, _, complete, _, _ in rows if complete >= 2)
-    print(f"\n{ready}/{total_pairs} pairs have >= 2 complete responses")
+    print(f"\n{'mode':<16} {'groups':>6}  {'ready':>5}")
+    for mode in sorted({r[2] for r in rows}):
+        in_mode = [r for r in rows if r[2] == mode]
+        ready = sum(1 for r in in_mode if r[4] >= 2)
+        flag = "" if ready == len(in_mode) else "   <- consistency cannot score these"
+        print(f"{mode:<16} {len(in_mode):>6}  {ready:>5}{flag}")
+
+    total_groups = len(rows)
+    total_ready = sum(1 for r in rows if r[4] >= 2)
+    print(
+        f"\n{total_ready}/{total_groups} (question, LLM, mode) groups have "
+        f">= 2 complete responses"
+    )
+
+    _print_halt_summary(path)
+
+
+def backfill_halt_columns(path: Optional[Path] = None) -> int:
+    """Fill max_turns_halted/react_turns_max from audit_json for older rows.
+
+    Runs captured before these columns existed still hold the numbers inside
+    the stored audit event, so they can be recovered without gathering again.
+    Only rows where the column is NULL and the audit event has the value are
+    touched, so this is safe to run repeatedly.
+
+    Returns the number of rows updated.
+    """
+    path = path or DEFAULT_DB
+    if not path.exists():
+        print("Database not found:", path)
+        return 0
+
+    conn = get_connection(path)
+    try:
+        init_db(conn)
+        before = conn.execute(
+            "SELECT COUNT(*) FROM responses WHERE max_turns_halted IS NULL"
+        ).fetchone()[0]
+        conn.execute("""
+            UPDATE responses SET
+                max_turns_halted = CAST(
+                    json_extract(audit_json, '$.timings.max_turns_halted') AS INTEGER),
+                react_turns_max = CAST(
+                    json_extract(audit_json, '$.timings.react_turns_max') AS INTEGER)
+            WHERE audit_json IS NOT NULL
+              AND max_turns_halted IS NULL
+              AND json_extract(audit_json, '$.timings.max_turns_halted') IS NOT NULL
+            """)
+        conn.commit()
+        after = conn.execute(
+            "SELECT COUNT(*) FROM responses WHERE max_turns_halted IS NULL"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+    filled = before - after
+    print(f"Backfilled {filled} row(s) from audit_json; {after} still unset.")
+    return filled
+
+
+def _print_halt_summary(path: Path) -> None:
+    """Print which runs had a research step cut short at the ReAct turn cap.
+
+    A halted step returns no report, so its findings are missing from the
+    answer no matter how well the model performed. Worth seeing next to the
+    completeness counts, since it looks like a model failure otherwise.
+    """
+    conn = get_connection(path, read_only=True)
+    try:
+        rows = conn.execute("""
+            SELECT question_id, llm_name, max_turns_halted, react_turns_max
+            FROM responses
+            WHERE max_turns_halted > 0
+            ORDER BY question_id, llm_name
+            """).fetchall()
+    except duckdb.Error:
+        # Column absent: database predates the migration and has nothing to say.
+        return
+    finally:
+        conn.close()
+
+    if not rows:
+        print("No research steps were halted at the turn cap.")
+        return
+
+    print(f"\n{len(rows)} run(s) had a research step halted at the turn cap:")
+    for qid, llm, halted, turns_max in rows:
+        print(f"  Q{qid:<3} {llm:<35} {halted} step(s) halted, max turns {turns_max}")
 
 
 # ----------------------------
@@ -576,10 +814,30 @@ def insert_eval_result(
     )
 
 
-def clear_eval_results(conn: duckdb.DuckDBPyConnection, metric: str) -> None:
-    """Delete all rows from the eval_<metric> table."""
+def clear_eval_results(
+    conn: duckdb.DuckDBPyConnection, metric: str, llm: Optional[str] = None
+) -> None:
+    """Delete rows from the eval_<metric> table.
+
+    Deletes only rows for *llm* if given, otherwise every row in the table.
+
+    *llm* matches by substring, not exact equality, the same way run_evals.py
+    selects which tests to re-run via pytest's ``-k`` (a substring match
+    against the test id, which embeds llm_name). Exact matching here would
+    clear only "gpt-4"'s rows while ``-k gpt-4`` reruns "gpt-4o" too,
+    leaving gpt-4o with duplicate eval rows after --overwrite.
+    """
     table = _eval_table_name(metric)
-    conn.execute(f"DELETE FROM {table}")
+    if llm:
+        rows = conn.execute(f"SELECT DISTINCT llm_name FROM {table}").fetchall()
+        matched = [name for (name,) in rows if name and llm in name]
+        if matched:
+            placeholders = ", ".join("?" for _ in matched)
+            conn.execute(
+                f"DELETE FROM {table} WHERE llm_name IN ({placeholders})", matched
+            )
+    else:
+        conn.execute(f"DELETE FROM {table}")
 
 
 def covered_response_ids(conn: duckdb.DuckDBPyConnection, metric: str) -> set:
@@ -705,20 +963,28 @@ def make_deploy_db(
         # Recreate schema in the destination
         init_db(dst)
 
-        # Copy responses with trimmed retrieval_context
+        # Copy responses with trimmed retrieval_context. Source ids are
+        # preserved (not re-assigned from dst's own sequence): eval tables
+        # are copied below with their original response_id, so a gap in src
+        # ids (from a deleted response) must not shift every later row's id,
+        # or every eval row after the gap would point at the wrong response.
         rows = src.execute(
-            "SELECT question_id, question, llm_name, timestamp, actual_output, "
+            "SELECT id, question_id, question, llm_name, timestamp, actual_output, "
             "retrieval_context, tools_called, research_output, is_error, error_message, "
             "research_mode, case_law_context, tool_sequence, fallback_used, "
             "summarisation_output, summarisation_used, summarisation_llm, "
-            "chat_mode, provider, total_cost_usd, total_ms, reformatted, "
-            "local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan "
+            "chat_mode, provider, total_cost_usd, total_ms, "
+            "max_turns_halted, react_turns_max, reformatted, "
+            "local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan, "
+            "needs_clarification, clarification_question "
             "FROM responses ORDER BY id"
         ).fetchall()
 
         trimmed_count = 0
+        max_id = 0
         for row in rows:
             (
+                response_id,
                 question_id,
                 question,
                 llm_name,
@@ -740,12 +1006,16 @@ def make_deploy_db(
                 provider,
                 total_cost_usd,
                 total_ms,
+                max_turns_halted,
+                react_turns_max,
                 reformatted,
                 local_cache_hits,
                 memo_hits,
                 audit_schema_version,
                 audit_json,
                 research_plan_json,
+                needs_clarification,
+                clarification_question,
             ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
@@ -753,9 +1023,11 @@ def make_deploy_db(
             if trimmed != ctx:
                 trimmed_count += 1
 
+            max_id = max(max_id, response_id)
             dst.execute(
-                _INSERT_RESPONSE,
+                _INSERT_RESPONSE_WITH_ID,
                 [
+                    response_id,
                     question_id,
                     question,
                     llm_name,
@@ -781,14 +1053,25 @@ def make_deploy_db(
                     provider,
                     total_cost_usd,
                     total_ms,
+                    max_turns_halted,
+                    react_turns_max,
                     bool(reformatted),
                     local_cache_hits or 0,
                     memo_hits or 0,
                     audit_schema_version,
                     audit_json,
                     research_plan_json,
+                    bool(needs_clarification),
+                    clarification_question,
                 ],
             )
+
+        # Keep dst's sequence past the highest id just inserted, so any
+        # future direct insert into the deploy DB (outside this function)
+        # won't collide with a preserved source id. DuckDB has no ALTER
+        # SEQUENCE RESTART, so the sequence is fast-forwarded by consuming it.
+        if max_id:
+            dst.execute("SELECT nextval('responses_id_seq') FROM range(?)", [max_id])
 
         # Copy each per-metric eval table verbatim. Tables are only ever
         # created on dst, never src: src must never be modified (see this
@@ -848,11 +1131,34 @@ if __name__ == "__main__":
         nargs="?",
         const="",  # sentinel: use default path
     )
+    _parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List response id, llm_name, and timestamp for every response",
+    )
+    _parser.add_argument(
+        "--backfill-halts",
+        action="store_true",
+        help="Fill max_turns_halted/react_turns_max from stored audit_json",
+    )
+    _parser.add_argument(
+        "--delete-response",
+        metavar="ID",
+        type=int,
+        help="Delete a response by id from responses and every eval_<metric> table",
+    )
     _args = _parser.parse_args()
 
     if _args.deploy_db is not None:
         _out = Path(_args.deploy_db) if _args.deploy_db else None
         make_deploy_db(output_path=_out)
+    elif _args.list:
+        list_responses()
+    elif _args.backfill_halts:
+        backfill_halt_columns()
+        completeness_report()
+    elif _args.delete_response is not None:
+        delete_response(_args.delete_response)
     elif _args.clean or _args.dry_run:
         clean_incomplete_responses(dry_run=_args.dry_run)
         if not _args.dry_run:

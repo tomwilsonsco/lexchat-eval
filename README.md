@@ -140,11 +140,12 @@ clearing (useful for testing a metric's determinism).
 | Metric | Speed | Requires |
 |---|---|---|
 | `tool_usage` | Fast | Nothing extra |
-| `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_domain`, `genuine_gap` | Fast | Nothing extra |
+| `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_domain`, `genuine_gap`, `step_completion` | Fast | Nothing extra |
 | `citation_agreement` | Fast | Hand written reference answers |
-| `consistency` | Fast | ≥2 responses per question/LLM pair |
+| `consistency` | Fast | ≥2 responses per question/LLM/chat mode |
 | `response_groundedness`, `claim_support` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
-| `reference_answer_agreement` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` + hand written reference answers |
+| `reference_answer_agreement` | Medium (2 LLM calls/test) | `OPENROUTER_API_KEY` + hand written reference answers |
+| `report_integration` | Slow (1 LLM call per plan step, each sending the whole final answer) | `OPENROUTER_API_KEY` |
 
 ## Step 4 Streamlit dashboard
 
@@ -284,11 +285,17 @@ Both appear in the Markdown so a reviewer can check every citation against them.
 # Show completeness report (responses per question/LLM pair):
 python -m lex_eval.utils.db
 
+# List every response (id, llm_name, timestamp):
+python -m lex_eval.utils.db --list
+
 # Remove incomplete / error rows:
 python -m lex_eval.utils.db --clean
 
 # Preview what --clean would remove without deleting:
 python -m lex_eval.utils.db --dry-run
+
+# Delete a single response by id, and its rows in every eval_<metric> table:
+python -m lex_eval.utils.db --delete-response <ID>
 ```
 
 ## Repository structure
@@ -332,8 +339,11 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |
 | Citation Domain | Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite. |
 | Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
+| Step Completion | Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step). |
+| Report Integration | Deep research only, AI as a judge metric: For every step that reported a real, cited finding of its own, does the final answer reflect it, rather than dropping it when the Manager condenses several step reports into one response. |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed for information, but does not decide pass or fail: an agent searching a live corpus twice will touch different secondary provisions each run. |
 | Citation Agreement | Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links. |
-| Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
+| Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
+| Plan Coverage | Deep research only, AI as a judge metric: Does the approved research plan set out to cover the question's key statements, before any research happens. Reuses the same fixed statement list as Reference Answer Agreement instead of a separately authored golden plan. |
 | Claim Support | AI as a judge metric: What share of the report's verifiable legal claims are backed by text the researcher actually read? Claims whose truth depends on the absence of a provision are reported separately because absence generally cannot be established from retrieved excerpts or summaries. |
 | Response Groundedness | Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which either passes it or fails it: it fails on any unsupported claim or meaningful misrepresentation, and passes only trivial wording differences. There is no partial credit, so the average for this metric is a pass rate. |

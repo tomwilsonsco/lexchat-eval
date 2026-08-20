@@ -11,6 +11,7 @@ Tests focus on error handling:
     (not hardcoded to False/"").
 """
 
+import copy
 import json
 from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
@@ -347,7 +348,11 @@ class TestDeepResearchPlanCapture:
 
     def test_plan_none_when_clarification_needed(self):
         """When the plan endpoint asks for clarification, no usable plan
-        exists yet, so the early-return record should carry research_plan=None."""
+        exists yet, so the early-return record should carry research_plan=None,
+        and the outcome must be a distinct needs_clarification record, not an
+        "error" (a model correctly asking a clarifying question is not a
+        capture failure, and must not be silently excluded from scoring by
+        load_records()'s default WHERE NOT is_error filter)."""
         lines = _sse_lines(AUDIT_SUCCESS)
         mock_client = _MockClient(
             lines,
@@ -372,4 +377,54 @@ class TestDeepResearchPlanCapture:
             )
 
         assert result["research_plan"] is None
-        assert "clarification" in result["error"].lower()
+        assert result["needs_clarification"] is True
+        assert result["clarification_question"] == "Which jurisdiction?"
+        assert "error" not in result
+
+
+class TestTurnCapHaltReachesTheRecord:
+    """process_question builds its record by naming each key explicitly, so a
+    field added to audit_capture's output is silently dropped unless it is
+    named here too. This covers the whole capture -> record hand-off."""
+
+    def test_halt_counts_reach_the_record(self):
+        audit = copy.deepcopy(AUDIT_SUCCESS)
+        audit["timings"] = {**audit["timings"],
+                            "max_turns_halted": 1, "react_turns_max": 20}
+
+        with patch(
+            "lex_eval.gather_responses.get_authenticated_client",
+            return_value=_MockClient(_sse_lines(audit)),
+        ):
+            result = process_question(
+                question_id=1,
+                question="test question",
+                research_mode="legislation_only",
+                model_name="test-model",
+                summarisation_llm="test-model",
+                max_retries=1,
+            )
+
+        assert result["max_turns_halted"] == 1
+        assert result["react_turns_max"] == 20
+
+    def test_zero_halts_reaches_the_record_as_zero(self):
+        audit = copy.deepcopy(AUDIT_SUCCESS)
+        audit["timings"] = {**audit["timings"],
+                            "max_turns_halted": 0, "react_turns_max": 7}
+
+        with patch(
+            "lex_eval.gather_responses.get_authenticated_client",
+            return_value=_MockClient(_sse_lines(audit)),
+        ):
+            result = process_question(
+                question_id=1,
+                question="test question",
+                research_mode="legislation_only",
+                model_name="test-model",
+                summarisation_llm="test-model",
+                max_retries=1,
+            )
+
+        assert result["max_turns_halted"] == 0
+        assert result["react_turns_max"] == 7

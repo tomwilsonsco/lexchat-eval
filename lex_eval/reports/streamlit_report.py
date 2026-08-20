@@ -25,27 +25,63 @@ data_dir = script_dir.parent / "data"
 RESPONSES_DB = DEFAULT_DB
 
 
+DEFAULT_CHAT_MODE = "research"
+
+
 @st.cache_data
 def load_eval_results(_db_mtime: float = 0.0) -> list[dict]:
     """Load every metric's eval_<metric> table and tag each row with the
     test_name/metric_name implied by which table it came from (the table
-    itself doesn't store them, since the table name already is the metric)."""
+    itself doesn't store them, since the table name already is the metric).
+
+    Also tags each row with the chat_mode of the response it scored. The
+    eval_<metric> tables have no chat_mode column, so it is looked up through
+    response_id. Everything downstream groups on it, so a deep research run is
+    never averaged together with a single-shot one."""
+    modes = _response_chat_modes()
     results: list[dict] = []
     for key, display_name, _tooltip in METRICS:
         for row in db_load_eval_results(RESPONSES_DB, metric=key):
-            results.append({**row, "test_name": key, "metric_name": display_name})
+            results.append(
+                {
+                    **row,
+                    "test_name": key,
+                    "metric_name": display_name,
+                    # "unknown" rather than a silent default: an eval row whose
+                    # response_id matches no response is a broken FK, and it
+                    # should surface as its own group rather than quietly
+                    # inflating the single-shot numbers.
+                    "chat_mode": modes.get(row.get("response_id"), "unknown"),
+                }
+            )
     return results
 
 
+def _response_chat_modes() -> dict[int, str]:
+    """response_id -> chat_mode, for tagging eval rows."""
+    return {
+        int(rec["response_id"]): (rec.get("chat_mode") or DEFAULT_CHAT_MODE)
+        for rec in db_load_records(RESPONSES_DB)
+        if rec.get("response_id") is not None
+    }
+
+
 @st.cache_data
-def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
+def load_responses(_mtime: float = 0.0) -> dict[tuple[str, str, int], list[dict]]:
     """
-    Load responses from DuckDB and index by (llm_name, question_id).
+    Load responses from DuckDB and index by (llm_name, chat_mode, question_id).
     Each key maps to a list of response records (could be 2+ runs).
+
+    chat_mode is part of the key so the Chat Interaction tab shows the same runs
+    the metrics above it were scored on, rather than every run of the question.
     """
-    idx: dict[tuple[str, int], list[dict]] = defaultdict(list)
+    idx: dict[tuple[str, str, int], list[dict]] = defaultdict(list)
     for rec in db_load_records(RESPONSES_DB):
-        key = (rec["llm_name"], int(rec["question_id"]))
+        key = (
+            rec["llm_name"],
+            rec.get("chat_mode") or DEFAULT_CHAT_MODE,
+            int(rec["question_id"]),
+        )
         idx[key].append(rec)
     return dict(idx)
 
@@ -53,7 +89,15 @@ def load_responses(_mtime: float = 0.0) -> dict[tuple[str, int], list[dict]]:
 # Single source of truth for every metric this dashboard displays: its
 # eval_<key> table, its display name, and its tooltip, in display order.
 # Keys here must match run_evals.py::METRIC_FILES.
+#
+# Grouped, in this order: 1) deterministic metrics that run in research or
+# deep research mode, 2) AI-judge metrics that run in research or deep
+# research mode, 3) deep-research-only deterministic metrics, 4)
+# deep-research-only AI-judge metrics. The "(Deep research only)" suffix on
+# groups 3-4's display names is what shows that scope on the title bar
+# wherever the metric name is rendered.
 METRICS: list[tuple[str, str, str]] = [
+    # 1. Deterministic, research or deep research
     (
         "tool_usage",
         "Tool Usage",
@@ -87,17 +131,18 @@ METRICS: list[tuple[str, str, str]] = [
     (
         "consistency",
         "Consistency (Cosine)",
-        "Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
+        "Compare the answers provided when the same question is asked multiple times in the same chat mode, using TF cosine similarity. Research and deep research answers are never compared against each other, and a mode with only one stored run is not scored. Any legislation section cited in one answer but not the other is listed in the detail, but does not decide pass or fail.",
     ),
     (
         "citation_agreement",
         "Citation Agreement",
         "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
     ),
+    # 2. AI judge, research or deep research
     (
         "reference_answer_agreement",
         "Reference Answer Agreement",
-        "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one.",
+        "AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. The reference answers are unverified drafts, so read a flagged contradiction as a prompt to compare the two texts.",
     ),
     (
         "response_groundedness",
@@ -108,6 +153,23 @@ METRICS: list[tuple[str, str, str]] = [
         "claim_support",
         "Claim Support",
         "AI as a judge metric: What share of the report's verifiable legal claims are backed by text the researcher actually read? Claims whose truth depends on the absence of a provision are reported separately because absence generally cannot be established from retrieved excerpts or summaries.",
+    ),
+    # 3. Deterministic, deep research only
+    (
+        "step_completion",
+        "Step Completion (Deep research only)",
+        "Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step).",
+    ),
+    # 4. AI judge, deep research only
+    (
+        "report_integration",
+        "Report Integration (Deep research only)",
+        "Deep research only, AI as a judge metric: For every step that reported a real, cited finding of its own, does the final answer reflect that finding, rather than dropping it when the Manager condenses several step reports into one response. A step with nothing of its own to check (empty or uncited retrieval) is not scored here; that is Step Completion's and Genuine Gap's question.",
+    ),
+    (
+        "plan_coverage",
+        "Plan Coverage (Deep research only)",
+        "Deep research only, AI as a judge metric: Does the approved research plan set out to cover the question's key statements, before any research happens. Reuses the same fixed statement list as Reference Answer Agreement rather than a separately authored golden plan.",
     ),
 ]
 
@@ -136,6 +198,8 @@ _NON_SCORED_PREFIXES = (
     "No reference answer for this question;",
     "No reference statements for this question;",
     "No reference answer citations to compare against;",
+    "No research plan for this record;",
+    "Not deep_research;",
 )
 
 
@@ -197,19 +261,26 @@ def _aggregate_metrics(results: list[dict]) -> list[dict]:
 
 def _build_hierarchy(
     raw: list[dict],
-) -> dict[str, dict[int, list[dict]]]:
+) -> dict[tuple[str, str], dict[int, list[dict]]]:
     """
     group raw results
-    llm_name + question_id + [aggregated metric results]
+    (llm_name, chat_mode) + question_id + [aggregated metric results]
+
+    chat_mode is part of the key because a deep research run and a single-shot
+    run of the same question are different products of the same model, and
+    averaging them into one score hides the difference between them.
     """
-    grouped: dict[str, dict[int, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    grouped: dict[tuple[str, str], dict[int, list[dict]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     for r in raw:
-        grouped[r["llm_name"]][int(r["question_id"])].append(r)
-    hierarchy: dict[str, dict[int, list[dict]]] = {}
-    for llm, questions in grouped.items():
-        hierarchy[llm] = {}
+        key = (r["llm_name"], r.get("chat_mode") or DEFAULT_CHAT_MODE)
+        grouped[key][int(r["question_id"])].append(r)
+    hierarchy: dict[tuple[str, str], dict[int, list[dict]]] = {}
+    for key, questions in grouped.items():
+        hierarchy[key] = {}
         for qid, results in questions.items():
-            hierarchy[llm][qid] = _aggregate_metrics(results)
+            hierarchy[key][qid] = _aggregate_metrics(results)
     return hierarchy
 
 
@@ -248,31 +319,59 @@ def _score_badge(score: float | str, level: str | None = None) -> str:
     )
 
 
-def _status_icon(passed: bool) -> str:
-    colour = "#3fb950" if passed else "#f85149"
-    text = "Passed" if passed else "Failed"
-    return f'<span style="color:{colour};font-weight:600;">{text}</span>'
-
-
-def _get_llm_pass_rate(llm: str, hierarchy: dict) -> float:
-    """Calculate the overall pass rate for an LLM.
+def _get_group_pass_rate(key: tuple[str, str], hierarchy: dict) -> float:
+    """Calculate the overall pass rate for one (llm, chat_mode) group.
 
     Metric groups with nothing scored (every run a judge error or capture
     gate) are excluded entirely, not counted as failed.
     """
-    q_data = hierarchy.get(llm, {})
+    q_data = hierarchy.get(key, {})
     all_m = [r for results in q_data.values() for r in results if r.get("scored", True)]
     total = len(all_m)
     return (sum(1 for r in all_m if r["passed"]) / total) if total else 0.0
 
 
-def _render_top_summary(hierarchy: dict) -> None:
-    """summary rows at the top of the page for each LLM. Expand to show
-    mean score per metric across all questions."""
-    for llm in sorted(
-        hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)
-    ):
-        q_data = hierarchy[llm]
+def _group_label(key: tuple[str, str], show_mode: bool) -> str:
+    """Display name for an (llm, chat_mode) group."""
+    llm, mode = key
+    return f"{llm}  ·  {_chat_mode_badge(mode)}" if show_mode else llm
+
+
+def _sorted_group_keys(hierarchy: dict) -> list[tuple[str, str]]:
+    """Groups worst pass rate first, so the ones needing attention lead."""
+    return sorted(
+        hierarchy.keys(), key=lambda k: (_get_group_pass_rate(k, hierarchy), k)
+    )
+
+
+# Display priority for chat_mode in the top summary: deep research leads,
+# since that is the mode under active development, then single-shot research,
+# then conversational. Any other/unknown mode sorts after these.
+_MODE_ORDER = ["deep_research", "research", "conversational"]
+
+
+def _mode_sort_key(mode: str) -> int:
+    try:
+        return _MODE_ORDER.index(mode)
+    except ValueError:
+        return len(_MODE_ORDER)
+
+
+def _top_summary_sorted_group_keys(hierarchy: dict) -> list[tuple[str, str]]:
+    """Groups by chat_mode (in _MODE_ORDER), then worst pass rate first within
+    each mode, matching the per-mode ordering the page used before."""
+    return sorted(
+        hierarchy.keys(),
+        key=lambda k: (_mode_sort_key(k[1]), _get_group_pass_rate(k, hierarchy), k),
+    )
+
+
+def _render_top_summary(hierarchy: dict, show_mode: bool) -> None:
+    """summary rows at the top of the page for each (llm, chat_mode) group.
+    Expand to show mean score per metric across all questions."""
+    for key in _top_summary_sorted_group_keys(hierarchy):
+        group_name = _group_label(key, show_mode)
+        q_data = hierarchy[key]
         all_results = [r for results in q_data.values() for r in results]
         all_m = [r for r in all_results if r.get("scored", True)]
         n_na = len(all_results) - len(all_m)
@@ -280,11 +379,10 @@ def _render_top_summary(hierarchy: dict) -> None:
         passed = sum(1 for r in all_m if r["passed"])
         failed = total - passed
         pct = passed / total * 100 if total else 0.0
-        pct_colour = "#3fb950" if pct >= 80 else "#f0ad4e" if pct >= 50 else "#f85149"
 
         na_part = f" &nbsp; N/A: **{n_na}**" if n_na else ""
         label = (
-            f"**{llm}** &nbsp;|&nbsp; "
+            f"**{group_name}** &nbsp;|&nbsp; "
             f"Passed: **{passed}** &nbsp; Failed: **{failed}** &nbsp; "
             f"Total: **{total}**{na_part} &nbsp; Pass Rate: **{pct:.1f}%**"
         )
@@ -347,8 +445,8 @@ def _render_top_summary(hierarchy: dict) -> None:
             )
 
 
-def _render_llm_summary_bar(llm: str, q_data: dict[int, list[dict]]) -> None:
-    """header stats for an LLM"""
+def _render_llm_summary_bar(q_data: dict[int, list[dict]]) -> None:
+    """header stats for one (llm, chat_mode) group"""
     all_m = [r for results in q_data.values() for r in results if r.get("scored", True)]
     total = len(all_m)
     passed = sum(1 for r in all_m if r["passed"])
@@ -361,133 +459,96 @@ def _render_llm_summary_bar(llm: str, q_data: dict[int, list[dict]]) -> None:
     )
 
 
-def _render_metric_summary_table(metrics: list[dict]) -> None:
+def _metric_row_label(m: dict) -> str:
+    """One-line summary of a metric, used as its expander label.
+
+    Carries everything the old summary table's row carried, so opening the row
+    is the only step between seeing a score and reading why it came out that
+    way. Expander labels take Markdown, including :red[] / :green[] colour.
     """
-    summary row per metric showing:
-    metric name, score badge, min/max, threshold, status
+    name = m["metric_name"].strip()
+
+    if not m.get("scored", True):
+        # Every run in this group was a judge error or capture gate, so there
+        # is no score or pass/fail status to show.
+        return f"**{name}** &nbsp; `N/A` &nbsp; :gray[Not scored]"
+
+    status = ":green[Passed]" if m["passed"] else ":red[Failed]"
+    label = (
+        f"**{name}** &nbsp; `{m['score']:.3f}` &nbsp; {status} "
+        f"&nbsp; :gray[threshold {m['threshold']:.2f}]"
+    )
+
+    # Only worth the space when the runs actually disagreed.
+    if "min_score" in m and m["min_score"] != m["max_score"]:
+        label += f" &nbsp; :gray[runs {m['min_score']:.3f} to {m['max_score']:.3f}]"
+
+    if m.get("not_scored_count"):
+        label += f" &nbsp; :orange[{m['not_scored_count']} not scored]"
+
+    return label
+
+
+def _is_failure(m: dict) -> bool:
+    """A scored metric that did not meet its threshold.
+
+    Not-scored metrics are excluded: a judge error is not a failure.
     """
-    rows_html = ""
-    for m in metrics:
-        name = m["metric_name"].strip()
-        score = m["score"]
-        threshold = m["threshold"]
-        passed = m["passed"]
-        has_range = "min_score" in m and "max_score" in m
-        not_scored_count = m.get("not_scored_count", 0)
+    return m.get("scored", True) and not m["passed"]
 
-        if not m.get("scored", True):
-            # Every run in this group was a judge error or capture gate,
-            # nothing to show a score or pass/fail status for.
-            score_cell = (
-                '<span style="background:#30363d;color:#8b949e;padding:2px 8px;'
-                "border-radius:4px;font-family:monospace;font-size:0.85em;"
-                'font-weight:600;" title="No run produced a quality verdict '
-                '(judge error or capture gate)">N/A</span>'
-            )
-            status = '<span style="color:#8b949e;font-weight:600;">Not scored</span>'
-        else:
-            badge = _score_badge(score)
-            status = _status_icon(passed)
 
-            if has_range:
-                min_s = m["min_score"]
-                max_s = m["max_score"]
-                score_cell = (
-                    f"{badge}"
-                    f'&nbsp;<span style="font-size:0.78em;color:#8b949e;">'
-                    f"min&nbsp;<code>{min_s:.3f}</code>&nbsp;"
-                    f"max&nbsp;<code>{max_s:.3f}</code></span>"
+def _render_metric_rows(metrics: list[dict], failures_only: bool = False) -> None:
+    """One expander per metric: the label is the summary row, the body is that
+    metric's per-run detail.
+
+    Failed metrics open by default, passed ones stay shut, so the reasons you
+    need are on screen and the rest is one line each.
+    """
+    shown = [m for m in metrics if _is_failure(m)] if failures_only else metrics
+    for m in shown:
+        scored = m.get("scored", True)
+        with st.expander(
+            _metric_row_label(m),
+            expanded=scored and not m["passed"],
+        ):
+            tooltip = METRIC_TOOLTIPS.get(m["metric_name"].strip(), "")
+            if tooltip:
+                st.caption(tooltip)
+            if not scored:
+                st.markdown(
+                    ":gray[No run produced a quality verdict "
+                    "(judge error or capture gate).]"
                 )
-            else:
-                score_cell = badge
+            _render_metric_body(m)
 
-            if not_scored_count:
-                score_cell += (
-                    f'&nbsp;<span style="font-size:0.78em;color:#d29922;" '
-                    f'title="Excluded from the mean: judge errors or capture '
-                    f'gates, not quality verdicts">&#9888; {not_scored_count} '
-                    f"not scored</span>"
-                )
 
-        tooltip = METRIC_TOOLTIPS.get(name, "")
-        if tooltip:
-            name_cell = (
-                f'<span title="{tooltip}" style="cursor:help;color:#c9d1d9;">'
-                f"{name}</span>"
-            )
-        else:
-            name_cell = f'<span style="color:#c9d1d9;">{name}</span>'
+def _render_metric_body(m: dict) -> None:
+    """
+    show individual raw eval results for one metric.
+    aggregated metrics also show a per-run breakdown.
+    """
+    if "min_score" not in m:
+        # Consistency - single aggregated result, no per-run breakdown
+        _render_single_eval_result(m)
+        return
 
-        rows_html += (
-            f"<tr>"
-            f'<td style="padding:6px 12px;">{name_cell}</td>'
-            f'<td style="padding:6px 12px;">{score_cell}</td>'
-            f'<td style="padding:6px 12px;font-family:monospace;color:#8b949e;">{threshold:.3f}</td>'
-            f'<td style="padding:6px 12px;font-size:1.1em;">{status}</td>'
-            f"</tr>"
+    # Mean/threshold are already in the row label; only the run count adds
+    # anything here, and only once there is more than one run.
+    n = m.get("n_runs", len(m.get("raw_results", [])))
+    if n > 1:
+        st.caption(f"Mean of {n} runs")
+
+    not_scored_reasons = m.get("not_scored_reasons") or []
+    if not_scored_reasons:
+        reasons_list = "; ".join(html.escape(reason) for reason in not_scored_reasons)
+        st.markdown(
+            f":orange[**{len(not_scored_reasons)} run(s) not scored** "
+            f"(excluded from the mean above, not a quality verdict): "
+            f"{reasons_list}]"
         )
 
-    table_html = f"""
-    <table style="border-collapse:collapse;width:100%;
-                  background:#161b22;border-radius:6px;overflow:hidden;">
-      <thead>
-        <tr style="background:#21262d;color:#8b949e;font-size:0.8em;text-transform:uppercase;">
-          <th style="padding:8px 12px;text-align:left;">Metric</th>
-          <th style="padding:8px 12px;text-align:left;">Score</th>
-          <th style="padding:8px 12px;text-align:left;">Threshold</th>
-          <th style="padding:8px 12px;text-align:left;">Status</th>
-        </tr>
-      </thead>
-      <tbody>{rows_html}</tbody>
-    </table>
-    """
-    st.markdown(table_html, unsafe_allow_html=True)
-
-
-def _render_metric_detail(metrics: list[dict]) -> None:
-    """
-    show individual raw eval results for each metric.
-    aggregated metrics also shows per-run breakdown.
-    """
-    for m in metrics:
-        name = m["metric_name"]
-        has_range = "min_score" in m
-        if m.get("scored", True):
-            icon = _status_icon(m["passed"])
-            st.markdown(
-                f"**{name}** {icon} - score: `{m['score']:.3f}`",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f"**{name}** :grey[Not scored] - no run produced a quality verdict"
-            )
-        with st.container():
-            if has_range:
-                n = m.get("n_runs", len(m.get("raw_results", [])))
-                st.markdown(
-                    f"**Mean:** `{m['score']:.3f}` &nbsp;|&nbsp; "
-                    f"**Min:** `{m['min_score']:.3f}` &nbsp;|&nbsp; "
-                    f"**Max:** `{m['max_score']:.3f}` &nbsp;|&nbsp; "
-                    f"**Threshold:** `{m['threshold']:.3f}` &nbsp;|&nbsp; "
-                    f"**Runs:** `{n}`"
-                )
-                not_scored_reasons = m.get("not_scored_reasons") or []
-                if not_scored_reasons:
-                    reasons_list = "; ".join(
-                        html.escape(reason) for reason in not_scored_reasons
-                    )
-                    st.markdown(
-                        f":orange[**{len(not_scored_reasons)} run(s) not scored** "
-                        f"(excluded from the mean above, not a quality verdict): "
-                        f"{reasons_list}]"
-                    )
-                for idx, raw in enumerate(m.get("raw_results", []), 1):
-                    _render_single_eval_result(raw, run_label=f"Run {idx}")
-            else:
-                # Consistency - single aggregated result, no per-run breakdown
-                _render_single_eval_result(m)
-        st.divider()
+    for idx, raw in enumerate(m.get("raw_results", []), 1):
+        _render_single_eval_result(raw, run_label=f"Run {idx}" if n > 1 else None)
 
 
 def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
@@ -504,6 +565,10 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         label = "N/A"
         score_text = "not scored"
 
+    # Escaped, then newlines turned into <br>, so a multi-line reason (e.g.
+    # Plan Coverage's per-statement breakdown) renders as line breaks rather
+    # than one run-on line, without trusting judge/reason text as raw HTML.
+    reason_html = html.escape(r.get("reason", "")).replace("\n", "<br>")
     st.markdown(
         f'<div style="background:#0d1117;border-left:3px solid {colour};'
         f'padding:10px 14px;border-radius:4px;margin:6px 0;">'
@@ -512,7 +577,7 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         f'<span style="color:{colour};font-size:0.85em;font-weight:600;">{label}</span>'
         f"&nbsp;&nbsp;score: <code>{score_text}</code>"
         f'<div style="color:#8b949e;font-size:0.85em;margin-top:6px;">'
-        f'{r.get("reason","")}</div>'
+        f'{reason_html}</div>'
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -844,40 +909,118 @@ def _render_question_block(
     question_text: str,
     metrics: list[dict],
     response_records: list[dict],
+    chat_key: str,
+    failures_only: bool = False,
 ) -> None:
     """Full block for one question within an LLM section."""
     scored_metrics = [m for m in metrics if m.get("scored", True)]
-    all_pass = all(m["passed"] for m in scored_metrics)
     n_pass = sum(1 for m in scored_metrics if m["passed"])
     n_total = len(scored_metrics)
+    n_na = len(metrics) - n_total
+    n_fail = sum(1 for m in metrics if _is_failure(m))
 
-    # Determine the colour for the metric count
-    count_colour = "#3fb950" if n_pass == n_total else "#f85149"
-    status_text = "All passed" if n_pass == n_total else "Some failed"
+    count = f"{n_pass}/{n_total} passed" if n_total else "nothing scored"
+    count = f":green[{count}]" if n_pass == n_total and n_total else f":red[{count}]"
+    if n_na:
+        count += f" &nbsp; :gray[{n_na} N/A]"
 
-    # Expander labels render as plain text (no Markdown/color markup), so keep
-    # the label unstyled and surface the colored status inside the expander body.
+    # In failures-only mode the failing questions are the point, so open them
+    # rather than making the reader click through to what they asked to see.
     with st.expander(
-        f"Q{qid}: {question_text[:120]}{'…' if len(question_text) > 120 else ''}  "
-        f"({n_pass}/{n_total} metrics passed)",
-        expanded=False,
+        f"**Q{qid}:** {question_text[:120]}{'…' if len(question_text) > 120 else ''}"
+        f" &nbsp; {count}",
+        expanded=failures_only and bool(n_fail),
     ):
-        st.markdown(
-            f'<span style="color:{count_colour};font-weight:600;">'
-            f"{n_pass}/{n_total} metrics passed</span>",
-            unsafe_allow_html=True,
-        )
-        _render_metric_summary_table(metrics)
+        _render_metric_rows(metrics, failures_only=failures_only)
 
-        st.markdown("")  # spacer
-
-        detail_tab, chat_tab = st.tabs(["📊 Metric Detail", "💬 Chat Interaction"])
-
-        with detail_tab:
-            _render_metric_detail(metrics)
-
-        with chat_tab:
+        # Loaded on demand. Streamlit runs an expander's body whether or not it
+        # is open, so rendering every question's transcript on every rerun cost
+        # about 1.6 of the 1.8 seconds each filter change used to take. The
+        # toggle keeps its own state, so this builds only for a question the
+        # reader actually opened.
+        if st.toggle("💬 Chat interaction", key=chat_key):
             _render_chat_interaction(response_records)
+
+
+_ALL_MODES = "All research types"
+
+
+def _render_mode_filter(container, modes_present: list[str]) -> str:
+    """Dropdown selecting which chat_mode to show. Returns the selection.
+
+    Only rendered when the database holds more than one research type, since
+    with one it would be a dropdown with a single choice.
+    """
+    if len(modes_present) < 2:
+        return _ALL_MODES
+    return container.selectbox(
+        "Research type",
+        [_ALL_MODES, *modes_present],
+        index=0,
+        format_func=lambda m: m
+        if m == _ALL_MODES
+        else _chat_mode_badge(m).replace("_", " "),
+        help="Deep research and single-shot runs are scored and averaged "
+        "separately, never blended into one number.",
+    )
+
+
+def _render_model_selector(container, llms: list[str]) -> str:
+    """Dropdown selecting which model's detail to show.
+
+    A selectbox rather than st.tabs because Streamlit renders every tab's
+    contents on every rerun, so tabs made the page cost grow with the number of
+    models evaluated even though only one is ever on screen.
+    """
+    return container.selectbox(
+        "Model", llms, index=0, help="Worst pass rate first."
+    )
+
+
+_ALL_RESULTS = "All results"
+_FAILURES_ONLY = "Failures only"
+
+
+def _render_show_filter(container) -> str:
+    """Dropdown selecting whether to show every metric or only the failures."""
+    return container.selectbox(
+        "Show",
+        [_ALL_RESULTS, _FAILURES_ONLY],
+        index=0,
+        help="Failures only hides passing metrics and questions, and opens what "
+        "is left, so the reasons are on screen without hunting.",
+    )
+
+
+def _render_mode_comparison(
+    llm: str, keys: list[tuple[str, str]], hierarchy: dict, failures_only: bool
+) -> None:
+    """Metrics passed per question, one column per research type.
+
+    Only shown when a model has been run under more than one research type,
+    which is the case where the numbers are otherwise only comparable by
+    flipping the filter and remembering what was there.
+    """
+    qids = sorted({q for k in keys for q in hierarchy[k]})
+    rows = []
+    for qid in qids:
+        row = {"Question": f"Q{qid}"}
+        for _llm, mode in keys:
+            metrics = hierarchy[(llm, mode)].get(qid, [])
+            scored = [m for m in metrics if m.get("scored", True)]
+            n_fail = sum(1 for m in metrics if _is_failure(m))
+            if not scored:
+                row[mode] = "-"
+            elif failures_only:
+                row[mode] = str(n_fail)
+            else:
+                row[mode] = f"{len(scored) - n_fail}/{len(scored)}"
+        rows.append(row)
+
+    st.caption(
+        "Failures per question" if failures_only else "Metrics passed per question"
+    )
+    st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
 def main() -> None:
@@ -911,7 +1054,7 @@ def main() -> None:
 
     if not responses:
         st.warning(
-            f"responses.db not found at {RESPONSES_DB} - chat interaction tab will be empty."
+            f"responses.db not found at {RESPONSES_DB} - chat interaction will be empty."
         )
 
     st.markdown(
@@ -923,25 +1066,62 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    _render_top_summary(hierarchy)
+    modes_present = sorted({mode for _llm, mode in hierarchy})
+    multiple_modes = len(modes_present) > 1
+
+    # Every model and research type in the database, rendered above the filters
+    # because the filters do not narrow it. They control the per question detail
+    # below, and a control that changed something above it would not read that
+    # way.
+    _render_top_summary(hierarchy, multiple_modes)
     st.divider()
 
-    llm_names = sorted(
-        hierarchy.keys(), key=lambda x: (_get_llm_pass_rate(x, hierarchy), x)
-    )
-    llm_tabs = st.tabs(llm_names)
+    model_col, mode_col, show_col = st.columns([2, 1, 1])
 
-    for tab, llm in zip(llm_tabs, llm_names):
-        with tab:
-            q_data = hierarchy[llm]
-            _render_llm_summary_bar(llm, q_data)
-            st.markdown("")
+    # Models worst pass rate first, matching the summary above.
+    llms = list(dict.fromkeys(llm for llm, _mode in _sorted_group_keys(hierarchy)))
+    llm = _render_model_selector(model_col, llms)
+    selected_mode = _render_mode_filter(mode_col, modes_present)
+    failures_only = _render_show_filter(show_col) == _FAILURES_ONLY
 
-            for qid in sorted(q_data.keys()):
-                metrics = q_data[qid]
-                question_text = metrics[0].get("question", "")
-                response_records = responses.get((llm, qid), [])
-                _render_question_block(qid, question_text, metrics, response_records)
+    # Model and research type are independent axes, so "All research types" for a
+    # model that has several shows them one after another rather than picking one.
+    keys = [
+        k
+        for k in _sorted_group_keys(hierarchy)
+        if k[0] == llm and (selected_mode == _ALL_MODES or k[1] == selected_mode)
+    ]
+    if not keys:
+        st.info(f"No {selected_mode} results for {llm}.")
+        return
+
+    if len(keys) > 1:
+        _render_mode_comparison(llm, keys, hierarchy, failures_only)
+        st.markdown("")
+
+    for key in keys:
+        _llm, mode = key
+        q_data = hierarchy[key]
+        st.subheader(_group_label(key, show_mode=multiple_modes))
+        _render_llm_summary_bar(q_data)
+        st.markdown("")
+
+        shown_any = False
+        for qid in sorted(q_data.keys()):
+            metrics = q_data[qid]
+            if failures_only and not any(_is_failure(m) for m in metrics):
+                continue
+            shown_any = True
+            _render_question_block(
+                qid,
+                metrics[0].get("question", ""),
+                metrics,
+                responses.get((llm, mode, qid), []),
+                chat_key=f"chat::{llm}::{mode}::{qid}",
+                failures_only=failures_only,
+            )
+        if not shown_any:
+            st.success("No failures. Every scored metric passed for this model.")
 
 
 if __name__ == "__main__":

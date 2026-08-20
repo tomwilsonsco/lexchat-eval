@@ -242,6 +242,40 @@ class TestEvalTableRoundTrip:
         assert covered_response_ids(conn, "consistency") == {1}
         conn.close()
 
+    def test_clear_eval_results_with_llm_only_deletes_that_llm(self):
+        conn = duckdb.connect(":memory:")
+        init_eval_table(conn, "tool_usage")
+        insert_eval_result(
+            conn, "tool_usage", _sample_record(response_id=1, llm_name="model-a")
+        )
+        insert_eval_result(
+            conn, "tool_usage", _sample_record(response_id=2, llm_name="model-b")
+        )
+
+        clear_eval_results(conn, "tool_usage", llm="model-a")
+
+        assert covered_response_ids(conn, "tool_usage") == {2}
+        conn.close()
+
+    def test_clear_eval_results_with_llm_matches_overlapping_names(self):
+        """run_evals.py --overwrite --llm selects re-run tests with pytest's
+        substring ``-k``, so clearing must use the same substring match, or
+        an overlapping name like "gpt-4" vs "gpt-4o" gets re-run without its
+        old rows cleared, leaving duplicates."""
+        conn = duckdb.connect(":memory:")
+        init_eval_table(conn, "tool_usage")
+        insert_eval_result(
+            conn, "tool_usage", _sample_record(response_id=1, llm_name="gpt-4")
+        )
+        insert_eval_result(
+            conn, "tool_usage", _sample_record(response_id=2, llm_name="gpt-4o")
+        )
+
+        clear_eval_results(conn, "tool_usage", llm="gpt-4")
+
+        assert covered_response_ids(conn, "tool_usage") == set()
+        conn.close()
+
 
 class TestLoadEvalResults:
     def test_round_trip_via_file(self, tmp_path):
@@ -274,3 +308,106 @@ class TestLoadEvalResults:
     def test_requires_metric(self):
         with pytest.raises(ValueError):
             load_eval_results(metric=None)
+
+
+class TestTurnCapHaltColumns:
+    """max_turns_halted / react_turns_max round-trip, and 0 survives as 0."""
+
+    def test_round_trip_keeps_zero_distinct_from_null(self, tmp_path):
+        from lex_eval.utils.db import (
+            get_connection,
+            init_db,
+            insert_response,
+            load_records,
+        )
+
+        db = tmp_path / "r.db"
+        conn = get_connection(db)
+        init_db(conn)
+        insert_response(conn, {
+            "question_id": 1, "question": "q", "llm_name": "m", "timestamp": "t",
+            "chat_mode": "deep_research", "max_turns_halted": 0, "react_turns_max": 12,
+        })
+        insert_response(conn, {
+            "question_id": 2, "question": "q", "llm_name": "m", "timestamp": "t",
+            "chat_mode": "deep_research", "max_turns_halted": 1, "react_turns_max": 20,
+        })
+        insert_response(conn, {
+            "question_id": 3, "question": "q", "llm_name": "m", "timestamp": "t",
+        })
+        conn.commit()
+        conn.close()
+
+        by_q = {r["question_id"]: r for r in load_records(path=db)}
+        assert by_q[1]["max_turns_halted"] == 0
+        assert by_q[2]["max_turns_halted"] == 1
+        assert by_q[2]["react_turns_max"] == 20
+        # Not reported by the server at all stays NULL, not 0.
+        assert by_q[3]["max_turns_halted"] is None
+
+
+class TestCleanIncompleteResponsesSparesClarification:
+    """A needs_clarification row has empty actual_output/retrieval_context by
+    design, the same shape clean_incomplete_responses() otherwise treats as
+    an incomplete capture, so it must be excluded from cleanup."""
+
+    def test_clarification_row_is_not_deleted(self, tmp_path):
+        from lex_eval.utils.db import (
+            clean_incomplete_responses,
+            get_connection,
+            init_db,
+            insert_response,
+        )
+
+        db = tmp_path / "r.db"
+        conn = get_connection(db)
+        init_db(conn)
+        insert_response(conn, {
+            "question_id": 1, "question": "q", "llm_name": "m", "timestamp": "t",
+            "chat_mode": "deep_research", "needs_clarification": True,
+            "clarification_question": "Which tax year?",
+        })
+        insert_response(conn, {
+            "question_id": 2, "question": "q", "llm_name": "m", "timestamp": "t",
+        })
+        conn.commit()
+        conn.close()
+
+        deleted = clean_incomplete_responses(path=db)
+
+        assert deleted == 1
+        conn = get_connection(db, read_only=True)
+        remaining = conn.execute(
+            "SELECT question_id FROM responses"
+        ).fetchall()
+        conn.close()
+        assert remaining == [(1,)]
+
+
+class TestMakeDeployDbPreservesIds:
+    """Eval rows are copied with their original response_id, so a deploy
+    copy must keep source response ids intact, even across a gap left by a
+    deleted response, or later eval rows point at the wrong response."""
+
+    def test_ids_survive_a_gap(self, tmp_path):
+        from lex_eval.utils.db import get_connection, init_db, insert_response, make_deploy_db
+
+        src = tmp_path / "responses.db"
+        conn = get_connection(src)
+        init_db(conn)
+        for i in range(1, 4):
+            insert_response(conn, {
+                "question_id": i, "question": "q", "llm_name": "m", "timestamp": "t",
+            })
+        conn.commit()
+        conn.execute("DELETE FROM responses WHERE id = 2")
+        conn.commit()
+        conn.close()
+
+        deploy = tmp_path / "deploy.db"
+        make_deploy_db(source_path=src, output_path=deploy)
+
+        conn = get_connection(deploy, read_only=True)
+        ids = {r[0] for r in conn.execute("SELECT id FROM responses").fetchall()}
+        conn.close()
+        assert ids == {1, 3}

@@ -17,14 +17,17 @@ failing score.
 
 import pytest
 
+from lex_eval.metrics import ReportIntegrationMetric
 from lex_eval.metrics.structure import (
     CitationDomainMetric,
     CitationGroundingMetric,
     CitationPassthroughMetric,
     GenuineGapMetric,
     MandatoryStructureMetric,
+    StepCompletionMetric,
 )
 from lex_eval.utils.collector import attach_metric
+from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
     load_records,
     record_id,
@@ -32,6 +35,17 @@ from lex_eval.utils.test_helpers import (
 )
 
 records = load_records(read_only=True)
+
+# Written at the front of the reason when a record isn't deep_research, so
+# reports/streamlit_report.py keeps the row out of the mean (see
+# _NON_SCORED_PREFIXES).
+_NOT_DEEP_RESEARCH = "Not deep_research; Step Completion not measured"
+_NOT_DEEP_RESEARCH_INTEGRATION = "Not deep_research; Report Integration not measured"
+
+_skip_no_api_key = pytest.mark.skipif(
+    _judge is None,
+    reason="Configured judge API key not set (check lex_eval/.env)",
+)
 
 
 @pytest.mark.parametrize(
@@ -189,6 +203,99 @@ def test_genuine_gap(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=metric.reason,
+    )
+
+    assert metric.is_successful(), metric.reason
+
+
+@pytest.mark.parametrize(
+    "record",
+    records,
+    ids=[record_id(r) for r in records],
+)
+def test_step_completion(request, record):
+    """
+    Deep research only. Every step whose own tool calls retrieved usable
+    legal text must carry a citation from it into that step's own report.
+
+    Records that aren't deep_research are not measured (excluded from the
+    dashboard mean, not scored as a failure).
+    """
+    if record.get("chat_mode") != "deep_research":
+        attach_metric(
+            request,
+            record=record,
+            test_name="step_completion",
+            metric_name="Step Completion",
+            score=0.0,
+            threshold=1.0,
+            passed=False,
+            reason=_NOT_DEEP_RESEARCH,
+        )
+        pytest.skip(_NOT_DEEP_RESEARCH)
+
+    test_case = record_to_test_case(record)
+    metric = StepCompletionMetric(threshold=1.0)
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="step_completion",
+        metric_name=metric.__name__,
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason,
+    )
+
+    assert metric.is_successful(), metric.reason
+
+
+@pytest.mark.parametrize(
+    "record",
+    records,
+    ids=[record_id(r) for r in records],
+)
+@_skip_no_api_key
+def test_report_integration(request, record):
+    """
+    Deep research only. Every step whose own report carried a real, cited
+    finding must have that finding reflected in the final answer, not
+    dropped when the Manager condenses several steps into one response.
+
+    Records that aren't deep_research are not measured (excluded from the
+    dashboard mean, not scored as a failure).
+    """
+    if record.get("chat_mode") != "deep_research":
+        attach_metric(
+            request,
+            record=record,
+            test_name="report_integration",
+            metric_name="Report Integration",
+            score=0.0,
+            threshold=1.0,
+            passed=False,
+            reason=_NOT_DEEP_RESEARCH_INTEGRATION,
+        )
+        pytest.skip(_NOT_DEEP_RESEARCH_INTEGRATION)
+
+    test_case = record_to_test_case(record)
+    metric = ReportIntegrationMetric(model=_judge, threshold=1.0)
+    _judge.last_model, _judge.total_usage_tokens = None, None
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="report_integration",
+        metric_name=metric.__name__,
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason,
+        judge_llm=_judge.last_model,
+        judge_tokens=_judge.total_usage_tokens,
     )
 
     assert metric.is_successful(), metric.reason

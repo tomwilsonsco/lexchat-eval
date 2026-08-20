@@ -12,7 +12,7 @@ from lex_eval.metrics.consistency import ConsistencyMetric
 from lex_eval.utils.test_helpers import (
     load_records,
     record_to_test_case,
-    group_by_question_and_llm,
+    group_by_question_llm_and_mode,
 )
 from lex_eval.utils.collector import attach_metric
 
@@ -30,10 +30,12 @@ def _same_model_cases():
     """
     Yield (record, other_outputs, test_id) for same-model repeatability.
 
-    Only produces cases when a (question, LLM) pair has more than one
-    captured response.
+    Only produces cases when a (question, LLM, chat_mode) group has more than
+    one captured response. A deep research answer and an ordinary research
+    answer to the same question are not repeat runs of each other, so they are
+    never compared, and a mode with only one run is simply not scored.
     """
-    grouped = group_by_question_and_llm(read_only=True)
+    grouped = group_by_question_llm_and_mode(read_only=True)
     cases = []
     for key, records in sorted(grouped.items()):
         if len(records) < 2:

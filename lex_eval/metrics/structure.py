@@ -6,9 +6,13 @@ CitationPassthroughMetric: checks that Worker references reach the final respons
 CitationGroundingMetric:   checks that Worker citations were actually retrieved.
 CitationDomainMetric:      checks that Worker citation URLs are on legislation.gov.uk.
 GenuineGapMetric:          checks that an empty retrieval is disclosed, not papered over.
+StepCompletionMetric:      checks that a step's own retrieval reached that step's own
+                            report (deep research only).
 
-All five metrics inspect the ``delegate_research`` tool-call output, which is where
-the Worker Agent's response is surfaced.
+All six metrics inspect every ``delegate_research`` tool-call output, which is where
+the Worker Agent's response is surfaced, one per delegation, so a deep-research run
+with several approved plan steps produces several outputs, and each must independently
+satisfy the check, not just the first.
 """
 
 import json
@@ -69,14 +73,63 @@ REQUIRED_HEADINGS = {
 _HEADING_LINE_PREFIX = r"[\s#*\d.\-:]*"
 
 
-def _get_delegate_output(test_case: LLMTestCase) -> str | None:
-    """Return the ``delegate_research`` tool-call output, or None if absent."""
-    if test_case.tools_called:
-        for tool in test_case.tools_called:
-            if tool.name == _DELEGATE_TOOL_NAME:
-                raw = tool.output
-                return raw if isinstance(raw, str) else str(raw)
-    return None
+def _group_tools_by_delegation(test_case: LLMTestCase) -> list[dict]:
+    """Split ``test_case.tools_called`` into one group per delegation.
+
+    ``audit_capture.py`` appends a ``delegate_research`` entry immediately
+    followed by that delegation's own ``Worker: ...`` tool entries, one
+    delegation at a time, mirroring the server's own audit-trace structure.
+    Splitting the flat list at each ``delegate_research`` entry recovers
+    exactly those per-step boundaries: a single-shot run has one group, a
+    deep-research run has one per approved plan step, in order.
+
+    Each group is ``{"report": <that delegation's output>, "tools": [...]}``.
+    """
+    if not test_case.tools_called:
+        return []
+    groups: list[dict] = []
+    for tool in test_case.tools_called:
+        if tool.name == _DELEGATE_TOOL_NAME:
+            raw = tool.output
+            groups.append(
+                {"report": raw if isinstance(raw, str) else str(raw), "tools": []}
+            )
+        elif groups:
+            groups[-1]["tools"].append(tool)
+    return groups
+
+
+def _get_delegate_outputs(test_case: LLMTestCase) -> list[str]:
+    """Return every ``delegate_research`` tool-call output, in order.
+
+    A single-shot run has exactly one. A deep-research run has one per
+    approved plan step, and every step's report must be checked, not just
+    the first, so a bad step can't hide behind a good one.
+    """
+    return [g["report"] for g in _group_tools_by_delegation(test_case)]
+
+
+def _retrieved_usable_content(tools: list) -> bool:
+    """True if any ``search_legislation_sections``/``get_legislation_text``
+    call among *tools* returned non-empty output, i.e. retrieval wasn't empty.
+
+    A LEX tool failure comes back as non-empty prose starting "Error
+    executing tool: " (``LexChat/server_py/src/agent/tools/executor.py``),
+    not an empty string, so that's excluded explicitly rather than counted
+    as usable content.
+    """
+    def _usable(output) -> bool:
+        if not output:
+            return False
+        text = output if isinstance(output, str) else str(output)
+        return not text.startswith("Error executing tool:")
+
+    return any(
+        tool.name
+        in ("Worker: search_legislation_sections", "Worker: get_legislation_text")
+        and _usable(tool.output)
+        for tool in tools
+    )
 
 
 class MandatoryStructureMetric(BaseMetric):
@@ -106,9 +159,9 @@ class MandatoryStructureMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -117,12 +170,11 @@ class MandatoryStructureMetric(BaseMetric):
             )
             return self.score
 
-        lowered = dr_output.lower()
         headings = REQUIRED_HEADINGS.get(
             self.research_mode, REQUIRED_HEADINGS["legislation_only"]
         )
 
-        def _heading_present(heading) -> bool:
+        def _heading_present(heading, lowered: str) -> bool:
             variants = heading if isinstance(heading, list) else [heading]
             return any(
                 re.search(
@@ -131,17 +183,28 @@ class MandatoryStructureMetric(BaseMetric):
                 for v in variants
             )
 
-        missing = [h for h in headings if not _heading_present(h)]
+        step_failures = []
+        for i, dr_output in enumerate(dr_outputs, 1):
+            lowered = dr_output.lower()
+            missing = [h for h in headings if not _heading_present(h, lowered)]
+            if missing:
+                display = [h[0] if isinstance(h, list) else h for h in missing]
+                label = f"step {i}: " if len(dr_outputs) > 1 else ""
+                step_failures.append(f"{label}{', '.join(display)}")
 
-        if missing:
+        if step_failures:
             self.score = 0.0
             self.success = False
-            display = [h[0] if isinstance(h, list) else h for h in missing]
-            self.reason = f"Missing mandatory headings: {', '.join(display)}"
+            self.reason = f"Missing mandatory headings: {'; '.join(step_failures)}"
         else:
             self.score = 1.0
             self.success = True
-            self.reason = "All mandatory Markdown headings present in Worker output."
+            self.reason = (
+                "All mandatory Markdown headings present in Worker output."
+                if len(dr_outputs) == 1
+                else f"All mandatory Markdown headings present in all "
+                f"{len(dr_outputs)} Worker report(s)."
+            )
 
         return self.score
 
@@ -177,9 +240,9 @@ class CitationPassthroughMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -188,7 +251,9 @@ class CitationPassthroughMetric(BaseMetric):
             )
             return self.score
 
-        worker_links = set(_URL_RE.findall(dr_output))
+        worker_links: set[str] = set()
+        for dr_output in dr_outputs:
+            worker_links.update(_URL_RE.findall(dr_output))
 
         if not worker_links:
             self.score = 0.0
@@ -268,22 +333,35 @@ def _legislation_id_from_url(url: str) -> str:
     return "/".join(_url_path(url).split("/")[:3])
 
 
-def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:
+def _leading_json(raw: str) -> dict:
     """
-    Return the set of legislation_ids the run's own tool calls actually
-    retrieved: results returned by ``search_legislation``, plus the
-    legislation_id argument passed to ``search_legislation_sections`` /
-    ``get_legislation_text``.
+    Parse the JSON object at the start of *raw*, ignoring anything after it.
+
+    ``search_legislation`` returns its JSON results followed by a plain-text
+    "[NEXT STEP: ...]" hint for the Worker, so a plain ``json.loads`` of the
+    whole string raises "Extra data" and yields nothing.
+    """
+    return json.JSONDecoder().raw_decode(raw.lstrip())[0]
+
+
+def _retrieved_legislation_ids(tools: list) -> set:
+    """
+    Return the set of legislation_ids that *tools* actually retrieved:
+    results returned by ``search_legislation``, plus the legislation_id
+    argument passed to ``search_legislation_sections`` / ``get_legislation_text``.
+
+    Pass a single group's ``tools`` list to scope this to one delegation, or
+    ``test_case.tools_called`` for the whole run.
     """
     ids: set = set()
-    if not test_case.tools_called:
+    if not tools:
         return ids
 
-    for tool in test_case.tools_called:
+    for tool in tools:
         if tool.name == "Worker: search_legislation":
             raw = tool.output
             try:
-                data = json.loads(raw) if isinstance(raw, str) else raw
+                data = _leading_json(raw) if isinstance(raw, str) else raw
                 for r in (data or {}).get("results", []):
                     lid = r.get("legislation_id")
                     if lid:
@@ -300,6 +378,15 @@ def _retrieved_legislation_ids(test_case: LLMTestCase) -> set:
                 ids.add(lid)
 
     return ids
+
+
+def _cited_legislation_ids(report: str) -> set:
+    """Return the set of Act-level legislation_ids cited by URL in *report*."""
+    return {
+        lid
+        for lid in (_legislation_id_from_url(u) for u in _URL_RE.findall(report or ""))
+        if lid
+    }
 
 
 class CitationGroundingMetric(BaseMetric):
@@ -332,9 +419,9 @@ class CitationGroundingMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -343,7 +430,9 @@ class CitationGroundingMetric(BaseMetric):
             )
             return self.score
 
-        cited_urls = set(_URL_RE.findall(dr_output))
+        cited_urls: set[str] = set()
+        for dr_output in dr_outputs:
+            cited_urls.update(_URL_RE.findall(dr_output))
         cited_ids = {
             lid for lid in (_legislation_id_from_url(u) for u in cited_urls) if lid
         }
@@ -357,7 +446,7 @@ class CitationGroundingMetric(BaseMetric):
             )
             return self.score
 
-        retrieved_ids = _retrieved_legislation_ids(test_case)
+        retrieved_ids = _retrieved_legislation_ids(test_case.tools_called)
         fabricated = cited_ids - retrieved_ids
 
         if fabricated:
@@ -415,9 +504,9 @@ class CitationDomainMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        dr_outputs = _get_delegate_outputs(test_case)
 
-        if dr_output is None:
+        if not dr_outputs:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -426,7 +515,9 @@ class CitationDomainMetric(BaseMetric):
             )
             return self.score
 
-        cited_urls = set(_URL_RE.findall(dr_output))
+        cited_urls: set[str] = set()
+        for dr_output in dr_outputs:
+            cited_urls.update(_URL_RE.findall(dr_output))
 
         if not cited_urls:
             self.score = 1.0
@@ -490,40 +581,28 @@ _GENUINE_GAP_KEYWORDS = (
 )
 
 
-def _has_usable_section_result(test_case: LLMTestCase) -> bool:
-    """
-    True if any ``search_legislation_sections`` or ``get_legislation_text`` Worker
-    tool call in this run returned non-empty output, i.e. retrieval wasn't empty.
-    """
-    if not test_case.tools_called:
-        return False
-    return any(
-        tool.name
-        in ("Worker: search_legislation_sections", "Worker: get_legislation_text")
-        and tool.output
-        for tool in test_case.tools_called
-    )
-
-
 class GenuineGapMetric(BaseMetric):
     """
-    When a run's own tool calls failed to retrieve any usable legislation section
-    text, checks that the Worker's report says so plainly instead of presenting a
-    confident but unsupported answer.
+    When a step's own tool calls failed to retrieve any usable legislation
+    section text, checks that step's own report says so plainly instead of
+    presenting a confident but unsupported answer.
 
     Only applies to ``legislation_only`` mode: the mandated disclosure sentence and
     the tools this check inspects (search_legislation_sections, get_legislation_text)
     are specific to legislation retrieval.
 
+    Scoped per step (a single-shot run has exactly one): a step whose own
+    retrieval succeeded is judged on its own report, not excused because a
+    sibling step elsewhere in the run happened to retrieve something.
+
     Score:
         0.0: no delegate_research call found; cannot be verified.
         1.0: research_mode is not legislation_only; check doesn't apply.
-        1.0: at least one section/full-text tool call returned usable content;
-               nothing to disclose.
-        1.0: retrieval was empty, and the exact mandated sentence is present.
-        0.5: retrieval was empty, and a paraphrase of it is present (disclosed
-               the gap, just not in the mandated wording).
-        0.0: retrieval was empty, and nothing disclosing the gap is present.
+        1.0: every step either retrieved usable content itself (nothing to
+               disclose) or, having retrieved nothing, disclosed that plainly.
+        0.5: the worst such step disclosed the gap only as a paraphrase of
+               the mandated sentence.
+        0.0: the worst such step didn't disclose the gap at all.
     """
 
     def __init__(
@@ -536,9 +615,9 @@ class GenuineGapMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_output = _get_delegate_output(test_case)
+        groups = _group_tools_by_delegation(test_case)
 
-        if dr_output is None:
+        if not groups:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -556,38 +635,61 @@ class GenuineGapMetric(BaseMetric):
             )
             return self.score
 
-        if _has_usable_section_result(test_case):
-            self.score = 1.0
-            self.success = True
-            self.reason = (
-                "Retrieval returned usable section/full-text content; "
-                "nothing to disclose."
-            )
-            return self.score
+        # Each step is judged on its own retrieval: a step whose own tool
+        # calls found usable content has nothing to disclose, regardless of
+        # whether a sibling step's retrieval was empty.
+        step_scores = []
+        n_retrieved = 0
+        for g in groups:
+            if _retrieved_usable_content(g["tools"]):
+                step_scores.append(1.0)
+                n_retrieved += 1
+                continue
+            lowered = (g["report"] or "").lower()
+            if _GENUINE_GAP_PHRASE.lower() in lowered:
+                step_scores.append(1.0)
+            elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
+                step_scores.append(0.5)
+            else:
+                step_scores.append(0.0)
 
-        lowered = dr_output.lower()
+        self.score = min(step_scores)
+        self.success = self.score >= self.threshold
 
-        if _GENUINE_GAP_PHRASE.lower() in lowered:
-            self.score = 1.0
-            self.success = True
-            self.reason = (
-                "Retrieval was empty and the Worker used the mandated "
-                "disclosure sentence."
-            )
-        elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
-            self.score = 0.5
-            self.success = False
-            self.reason = (
-                "Retrieval was empty; the Worker disclosed the gap but not in "
-                "the mandated wording."
-            )
+        if all(s == 1.0 for s in step_scores):
+            n_disclosed = len(groups) - n_retrieved
+            if len(groups) == 1:
+                self.reason = (
+                    "Retrieval returned usable section/full-text content; "
+                    "nothing to disclose."
+                    if n_retrieved
+                    else "Retrieval was empty and the Worker disclosed this "
+                    "as required."
+                )
+            elif not n_disclosed:
+                self.reason = (
+                    f"All {len(groups)} steps retrieved usable content; "
+                    "nothing to disclose."
+                )
+            else:
+                self.reason = (
+                    f"All {len(groups)} steps are clear: {n_retrieved} retrieved "
+                    f"usable content, {n_disclosed} had empty retrieval and "
+                    "disclosed it."
+                )
         else:
-            self.score = 0.0
-            self.success = False
-            self.reason = (
-                "Retrieval was empty and the Worker's report does not disclose "
-                "this; answered without an honest gap statement."
-            )
+            worst = step_scores.index(min(step_scores)) + 1
+            where = f"Step {worst} of {len(groups)}" if len(groups) > 1 else "The report"
+            if self.score == 0.5:
+                self.reason = (
+                    f"{where} had empty retrieval and disclosed the gap, but "
+                    "only as a paraphrase, not the mandated wording."
+                )
+            else:
+                self.reason = (
+                    f"{where} had empty retrieval and does not disclose this; "
+                    "answered without an honest gap statement."
+                )
 
         return self.score
 
@@ -600,3 +702,84 @@ class GenuineGapMetric(BaseMetric):
     @property
     def __name__(self) -> str:  # type: ignore[override]
         return "Genuine Gap"
+
+
+class StepCompletionMetric(BaseMetric):
+    """
+    Deep research only. Checks that every step's own retrieval reached that
+    step's own report, catching a step that made tool calls returning legal
+    text and then reported nothing (e.g. because it hit a tool-call budget
+    limit mid-step), while its sibling steps report normally and every other
+    metric in this file scores the run perfectly.
+
+    "Cited" means cites one of the Acts this step's own tool calls actually
+    retrieved, not merely cites some URL, a report citing an unrelated Act
+    (e.g. one a sibling step retrieved) passes no more here than a report
+    citing nothing at all.
+
+    Score:
+        0.0: no delegate_research call found; cannot be verified.
+        1.0: no step both retrieved usable content and cited none of it.
+        <1.0: fraction of steps that pass; any lost step drags the score down.
+
+    A step whose own retrieval was genuinely empty passes automatically here
+    regardless of what its report says. That is GenuineGapMetric's question
+    to answer, not this one.
+    """
+
+    def __init__(self, threshold: float = 1.0) -> None:
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        groups = _group_tools_by_delegation(test_case)
+
+        if not groups:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "step completion cannot be verified."
+            )
+            return self.score
+
+        failed = [
+            i
+            for i, g in enumerate(groups, 1)
+            if _retrieved_usable_content(g["tools"])
+            and not (
+                _retrieved_legislation_ids(g["tools"])
+                & _cited_legislation_ids(g["report"])
+            )
+        ]
+
+        self.score = (len(groups) - len(failed)) / len(groups)
+        self.success = self.score >= self.threshold
+
+        if failed:
+            steps = ", ".join(str(i) for i in failed)
+            self.reason = (
+                f"Step(s) {steps} of {len(groups)} retrieved legal text but "
+                "their own report cites none of it."
+            )
+        else:
+            self.reason = (
+                f"All {len(groups)} step(s) carried their retrieved legal "
+                "text into their own report."
+                if len(groups) > 1
+                else "The report cites the legal text it retrieved."
+            )
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Step Completion"

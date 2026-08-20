@@ -174,6 +174,8 @@ def test_response_groundedness(request, record):
         research_output=record["research_output"],
         model=_judge,
         threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
+        scope_note=(record.get("research_plan") or {}).get("scope_note"),
+        research_mode=record.get("research_mode"),
     )
     # Reset here, not just inside generate(): a near-verbatim response passes
     # without calling the judge at all, so without this the row would wrongly

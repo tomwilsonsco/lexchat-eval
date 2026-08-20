@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from deepeval.test_case import LLMTestCase, ToolCall
 
 from .db import load_records as _db_load_records
-from .db import DEFAULT_DB
+from .db import DEFAULT_DB, consistency_group_key
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 
@@ -112,28 +112,29 @@ def group_by_question(
     return grouped
 
 
-def group_by_question_and_llm(
+def group_by_question_llm_and_mode(
     records: Optional[List[Dict[str, Any]]] = None,
     filepath: Optional[Path] = None,
     read_only: bool = False,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Group records by (question_id, llm_name) tuple key.
+    Group records by (question_id, llm_name, chat_mode), see
+    :func:`consistency_group_key`.
 
-    Useful for testing repeatability of the same LLM on the same question
-    when ``gather_responses.py`` is run with ``--append``.
+    Useful for testing repeatability of the same LLM answering the same
+    question the same way, when ``gather_responses.py`` is run with
+    ``--append``.
 
     Pass ``read_only=True`` at pytest collection time (see ``load_records``).
     """
     if records is None:
-        from .db import group_by_question_and_llm as _db_group
+        from .db import group_by_question_llm_and_mode as _db_group
 
         return _db_group(path=filepath, read_only=read_only)
 
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in records:
-        key = f"Q{r['question_id']}_{r['llm_name']}"
-        grouped.setdefault(key, []).append(r)
+        grouped.setdefault(consistency_group_key(r), []).append(r)
     return grouped
 
 
