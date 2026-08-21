@@ -46,6 +46,12 @@ python lex_eval/gather_responses.py
 # Specific question:
 python lex_eval/gather_responses.py --question-id 1
 
+# Multiple specific questions:
+python lex_eval/gather_responses.py --question-id 1 2 4
+
+# A different questions file (default: lex_eval/data/questions.json):
+python lex_eval/gather_responses.py --questions lex_eval/data/questions_new.json --question-id 7 8
+
 # Overwrite existing results (start fresh):
 python lex_eval/gather_responses.py --overwrite
 
