@@ -454,6 +454,56 @@ def group_by_question_llm_and_mode(
     return grouped
 
 
+def _eval_rows_for(
+    conn: duckdb.DuckDBPyConnection, response_ids: List[int]
+) -> Dict[str, int]:
+    """How many rows in each eval_<metric> table point at *response_ids*.
+
+    Only tables that exist and actually have rows are in the result, keyed by
+    table name.
+    """
+    from lex_eval.run_evals import METRIC_FILES
+
+    if not response_ids:
+        return {}
+
+    placeholders = ",".join("?" for _ in response_ids)
+    counts: Dict[str, int] = {}
+    for metric in METRIC_FILES:
+        if not _eval_table_exists(conn, metric):
+            continue
+        table = _eval_table_name(metric)
+        count = conn.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE response_id IN ({placeholders})",
+            response_ids,
+        ).fetchone()[0]
+        if count:
+            counts[table] = count
+    return counts
+
+
+def _delete_eval_rows(
+    conn: duckdb.DuckDBPyConnection, response_ids: List[int]
+) -> Dict[str, int]:
+    """Delete every eval_<metric> row pointing at *response_ids*.
+
+    Deleting a response without this leaves eval rows behind whose response_id
+    no longer resolves, so every caller that removes a response must call this
+    first. Returns the same {table: rows deleted} shape as _eval_rows_for.
+    """
+    counts = _eval_rows_for(conn, response_ids)
+    if not counts:
+        return {}
+
+    placeholders = ",".join("?" for _ in response_ids)
+    for table in counts:
+        conn.execute(
+            f"DELETE FROM {table} WHERE response_id IN ({placeholders})",
+            response_ids,
+        )
+    return counts
+
+
 def clean_incomplete_responses(
     path: Optional[Path] = None,
     dry_run: bool = False,
@@ -483,17 +533,16 @@ def clean_incomplete_responses(
             "NOT COALESCE(needs_clarification, FALSE) AND (TRIM(actual_output) = '' "
             "OR is_error OR retrieval_context = '[]' OR retrieval_context IS NULL)"
         )
-        count = conn.execute(
-            f"SELECT COUNT(*) FROM responses WHERE {where}"
-        ).fetchone()[0]
+        rows = conn.execute(f"""
+            SELECT id, question_id, llm_name, is_error, retrieval_context
+            FROM responses
+            WHERE {where}
+            ORDER BY question_id, llm_name
+            """).fetchall()
+        count = len(rows)
+        ids = [row[0] for row in rows]
 
         if dry_run:
-            rows = conn.execute(f"""
-                SELECT id, question_id, llm_name, is_error, retrieval_context
-                FROM responses
-                WHERE {where}
-                ORDER BY question_id, llm_name
-                """).fetchall()
             print(f"Dry run, {count} row(s) would be deleted:")
             for row in rows:
                 rid, qid, llm, is_err, ctx = row
@@ -504,10 +553,15 @@ def clean_incomplete_responses(
                 else:
                     tag = "empty output"
                 print(f"  id={rid}  Q{qid}  {llm}  [{tag}]")
+            for table, n in _eval_rows_for(conn, ids).items():
+                print(f"  {table}: {n} row(s) would be deleted with them")
         else:
+            eval_deleted = _delete_eval_rows(conn, ids)
             conn.execute(f"DELETE FROM responses WHERE {where}")
             conn.commit()
             print(f"Deleted {count} incomplete/error/no-context row(s).")
+            for table, n in eval_deleted.items():
+                print(f"  {table}: {n} row(s)")
     finally:
         conn.close()
 
@@ -544,22 +598,10 @@ def delete_response(response_id: int, path: Optional[Path] = None) -> Dict[str, 
     Returns a dict of {"responses": <0 or 1>, "eval_<metric>": <rows deleted>, ...}
     covering only the tables a row was actually deleted from.
     """
-    from lex_eval.run_evals import METRIC_FILES
-
     path = path or DEFAULT_DB
     conn = get_connection(path)
-    deleted: Dict[str, int] = {}
     try:
-        for metric in METRIC_FILES:
-            if not _eval_table_exists(conn, metric):
-                continue
-            table = _eval_table_name(metric)
-            count = conn.execute(
-                f"SELECT COUNT(*) FROM {table} WHERE response_id = ?", [response_id]
-            ).fetchone()[0]
-            if count:
-                conn.execute(f"DELETE FROM {table} WHERE response_id = ?", [response_id])
-                deleted[table] = count
+        deleted = _delete_eval_rows(conn, [response_id])
 
         count = conn.execute(
             "SELECT COUNT(*) FROM responses WHERE id = ?", [response_id]
