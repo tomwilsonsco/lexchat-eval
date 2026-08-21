@@ -157,7 +157,7 @@
   },
   {
     "id": 20,
-    "question": "Can the requirements under section 35A and section 35ZA be run concurrently?",
+    "question": "Can the requirements under section 35A and section 35ZA of the Climate Change (Scotland) Act 2009 be run concurrently?",
     "research_mode": "legislation_only",
     "chat_mode": "conversational",
     "source_session": 6338,
@@ -165,7 +165,7 @@
     "question_provenance": "reworded",
     "source_mode_verified": false,
     "user_confidence": 1,
-    "known_gap": "Said the requirements under sections 35A and 35ZA must run sequentially, when the reviewer says they can and do run concurrently. The reviewer also found no exact reference in the sources to justify the answer. Reworded only to repair the user's typo, \"an\" for \"Can\"; the source turn named no Act, because the session had already established the Climate Change (Scotland) Act 2009."
+    "known_gap": "Said the requirements under sections 35A and 35ZA must run sequentially, when the reviewer says they can and do run concurrently. The reviewer also found no exact reference in the sources to justify the answer. Reworded twice over: to repair the user's typo, \"an\" for \"Can\", and to name the Act. The source turn named no Act because the session had already established it two turns earlier, and without it LexChat rightly asks which Act is meant rather than answering."
   },
   {
     "id": 21,
