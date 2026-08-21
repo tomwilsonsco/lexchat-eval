@@ -921,6 +921,52 @@ def load_eval_results(
 
 
 # ---------------------------------------------------------------------------
+# Compaction
+# ---------------------------------------------------------------------------
+
+
+def compact_db(path: Optional[Path] = None) -> Path:
+    """
+    Rewrite the database file to reclaim space left behind by deletes and
+    ``--overwrite`` runs.
+
+    DuckDB never shrinks its file on disk: blocks freed by a DELETE or a
+    dropped/recreated table are kept around for internal reuse, not returned
+    to the OS, so the file only ever grows. This copies every table into a
+    fresh file (which contains only live data, none of the old free blocks)
+    and replaces the original with it.
+
+    Args:
+        path: Path to the database to compact (default: ``data/responses.db``).
+
+    Returns:
+        The (unchanged) path of the compacted database.
+    """
+    path = path or DEFAULT_DB
+    if not path.exists():
+        raise FileNotFoundError(f"Database not found: {path}")
+
+    before = path.stat().st_size / 1024 / 1024
+    tmp_path = path.with_suffix(".compact.db")
+    if tmp_path.exists():
+        tmp_path.unlink()
+
+    conn = get_connection(path)
+    try:
+        source_db = conn.execute("SELECT current_database()").fetchone()[0]
+        conn.execute(f"ATTACH '{tmp_path}' AS compacted")
+        conn.execute(f"COPY FROM DATABASE {source_db} TO compacted")
+        conn.execute("DETACH compacted")
+    finally:
+        conn.close()
+
+    tmp_path.replace(path)
+    after = path.stat().st_size / 1024 / 1024
+    print(f"Compacted {path}\n  Before: {before:.1f} MB\n  After : {after:.1f} MB")
+    return path
+
+
+# ---------------------------------------------------------------------------
 # Deploy copy
 # ---------------------------------------------------------------------------
 
@@ -1147,9 +1193,16 @@ if __name__ == "__main__":
         type=int,
         help="Delete a response by id from responses and every eval_<metric> table",
     )
+    _parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Rewrite the database file to reclaim space left by deletes/--overwrite runs",
+    )
     _args = _parser.parse_args()
 
-    if _args.deploy_db is not None:
+    if _args.compact:
+        compact_db()
+    elif _args.deploy_db is not None:
         _out = Path(_args.deploy_db) if _args.deploy_db else None
         make_deploy_db(output_path=_out)
     elif _args.list:
