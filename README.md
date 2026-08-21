@@ -218,7 +218,20 @@ Useful flags:
 python -m lex_eval.reference.build --question-id 7    # one question only
 python -m lex_eval.reference.build --refetch          # re-run searches after editing searches.json
 python -m lex_eval.reference.build --overwrite        # rebuild a question that already has an answer
+python -m lex_eval.reference.build --questions ...    # a different question file (see below)
 ```
+
+### A different question set
+
+`--questions` defaults to `lex_eval/data/questions.json`. Point it at another file to build answers
+for that one instead:
+
+```bash
+python -m lex_eval.reference.build --questions lex_eval/data/questions_new.json --author "Your Name"
+```
+
+All question files build into the same answers directory, so their ids have to be unique across
+files: an answer is matched to a response by question id.
 
 ### The three files you write
 

@@ -1,6 +1,7 @@
 """Build reference ("gold") answers for the questions in `questions.json`.
 
     python -m lex_eval.reference.build
+    python -m lex_eval.reference.build --questions data/questions_new.json
 
 Run it repeatedly. Each run advances every question that has no `q{id}.md` yet
 through three stages, and prints what it needs from you next:
@@ -27,6 +28,7 @@ from typing import Any, Dict, List, Optional
 from .lex_client import TOOLS, LexTools, _section_text, _sections_of
 from .store import (
     ANSWERS_DIR,
+    QUESTIONS_PATH,
     carry_review_forward,
     load_manifest,
     load_questions,
@@ -386,6 +388,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             "replaying their searches or touching their retrieval audit."
         ),
     )
+    parser.add_argument(
+        "--questions",
+        type=Path,
+        default=QUESTIONS_PATH,
+        help=(
+            "Question file to build answers for (default: data/questions.json). "
+            "Every question file builds into the same --answers-dir; question ids "
+            "must be unique across them, since answers are keyed by id alone."
+        ),
+    )
     parser.add_argument("--answers-dir", type=Path, default=ANSWERS_DIR)
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -395,11 +407,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         format="%(levelname)s: %(message)s",
     )
 
-    questions = load_questions()
+    questions = load_questions(args.questions)
     if args.question_id is not None:
         questions = [q for q in questions if q["id"] == args.question_id]
         if not questions:
-            parser.error(f"No question with id {args.question_id} in questions.json")
+            parser.error(f"No question with id {args.question_id} in {args.questions}")
 
     skipped = [
         q

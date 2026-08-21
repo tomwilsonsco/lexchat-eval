@@ -6,6 +6,9 @@ SSE endpoint and writes the structured results to responses.db.
 
 This is Step 2 of the eval pipeline.
 
+A question may carry its own "chat_mode", in which case it wins over the
+--chat-mode flag, so a file mixing modes can be gathered in a single run.
+
 Usage:
     python -m lex_eval.gather_responses
     python -m lex_eval.gather_responses --overwrite
@@ -298,7 +301,8 @@ def main() -> None:
         "--chat-mode",
         default="research",
         choices=["research", "conversational", "deep_research"],
-        help="Chat mode to pass to /api/system/chat (default: research)",
+        help="Chat mode to pass to /api/system/chat, for questions that do not "
+        "set their own chat_mode (default: research)",
     )
     parser.add_argument(
         "--questions",
@@ -417,7 +421,7 @@ def main() -> None:
                         model_name,
                         summ_model_name,
                         args.retries,
-                        args.chat_mode,
+                        q.get("chat_mode", args.chat_mode),
                         debug_fh,
                         verbose_log_path,
                     )
@@ -465,7 +469,7 @@ def main() -> None:
                             "summarisation_output": [],
                             "summarisation_used": False,
                             "summarisation_llm": summ_model_name,
-                            "chat_mode": args.chat_mode,
+                            "chat_mode": q.get("chat_mode", args.chat_mode),
                             "research_plan": None,
                             "provider": None,
                             "total_cost_usd": None,
