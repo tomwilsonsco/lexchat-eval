@@ -351,16 +351,41 @@ def _legislation_id_from_url(url: str) -> str:
     return "/".join(_url_path(url).split("/")[:3])
 
 
-_ALLOWED_CITATION_DOMAIN = "legislation.gov.uk"
+_LEGISLATION_DOMAIN = "legislation.gov.uk"
+_CASE_LAW_DOMAIN = "caselaw.nationalarchives.gov.uk"
+
+# The domains each research mode's Worker system prompt tells it to cite
+# (LexChat/server_py/src/prompts.py, CITATION PROTOCOL in each Worker prompt).
+# The legislation-only prompt permits legislation.gov.uk and nothing else; the
+# two case law prompts mandate caselaw.nationalarchives.gov.uk for judgments.
+_PERMITTED_DOMAINS = {
+    "legislation_only": (_LEGISLATION_DOMAIN,),
+    "case_law_only": (_LEGISLATION_DOMAIN, _CASE_LAW_DOMAIN),
+    "legislation_and_case_law": (_LEGISLATION_DOMAIN, _CASE_LAW_DOMAIN),
+}
 
 
-def _on_allowed_domain(url: str) -> bool:
-    """True if *url* is on legislation.gov.uk, the only domain the Worker's
-    system prompt permits it to cite."""
+def _on_domain(url: str, domain: str) -> bool:
+    """True if *url*'s host is *domain* or a subdomain of it."""
     netloc = urlparse(url).netloc.lower()
-    return netloc == _ALLOWED_CITATION_DOMAIN or netloc.endswith(
-        f".{_ALLOWED_CITATION_DOMAIN}"
-    )
+    return netloc == domain or netloc.endswith(f".{domain}")
+
+
+def _is_legislation_url(url: str) -> bool:
+    """True if *url* points at legislation.gov.uk.
+
+    This is what separates an Act citation from a judgment citation, so it
+    gates every place a URL is turned into a legislation_id. A case law link
+    such as caselaw.nationalarchives.gov.uk/uksc/2025/13 would otherwise
+    become Act id "uksc/2025", which no legislation tool call can ever have
+    retrieved.
+    """
+    return _on_domain(url, _LEGISLATION_DOMAIN)
+
+
+def _permitted_domains(research_mode: str) -> tuple:
+    """The citation domains this research mode's Worker prompt permits."""
+    return _PERMITTED_DOMAINS.get(research_mode, (_LEGISLATION_DOMAIN,))
 
 
 def _leading_json(raw: str) -> dict:
@@ -410,7 +435,7 @@ def _retrieved_legislation_ids(tools: list) -> set:
     return ids
 
 
-def _cited_gov_uk_ids(report: str) -> set:
+def _cited_legislation_ids(report: str) -> set:
     """Act-level ids cited by legislation.gov.uk URL in *report*.
 
     Case law links are skipped: there is no legislation retrieval to check
@@ -421,7 +446,7 @@ def _cited_gov_uk_ids(report: str) -> set:
         for lid in (
             _legislation_id_from_url(u)
             for u in _URL_RE.findall(report or "")
-            if _on_allowed_domain(u)
+            if _is_legislation_url(u)
         )
         if lid
     }
@@ -440,7 +465,7 @@ def _sibling_read_note(groups: list) -> str:
     all_read: set = set().union(*read_per)
     notes = []
     for i, g in enumerate(groups, 1):
-        sibling = (_cited_gov_uk_ids(g["report"]) - read_per[i - 1]) & all_read
+        sibling = (_cited_legislation_ids(g["report"]) - read_per[i - 1]) & all_read
         if sibling:
             notes.append(f"step {i} cites {sorted(sibling)}")
     if not notes:
@@ -469,15 +494,6 @@ def _read_legislation_ids(tools: list) -> set:
             if lid:
                 ids.add(lid)
     return ids
-
-
-def _cited_legislation_ids(report: str) -> set:
-    """Return the set of Act-level legislation_ids cited by URL in *report*."""
-    return {
-        lid
-        for lid in (_legislation_id_from_url(u) for u in _URL_RE.findall(report or ""))
-        if lid
-    }
 
 
 class CitationGroundingMetric(BaseMetric):
@@ -521,12 +537,9 @@ class CitationGroundingMetric(BaseMetric):
             )
             return self.score
 
-        cited_urls: set[str] = set()
+        cited_ids: set[str] = set()
         for dr_output in dr_outputs:
-            cited_urls.update(_URL_RE.findall(dr_output))
-        cited_ids = {
-            lid for lid in (_legislation_id_from_url(u) for u in cited_urls) if lid
-        }
+            cited_ids |= _cited_legislation_ids(dr_output)
 
         if not cited_ids:
             self.score = 1.0
@@ -610,13 +623,13 @@ class CitationReadMetric(BaseMetric):
 
         cited_ids: set = set()
         for g in groups:
-            cited_ids |= _cited_gov_uk_ids(g["report"])
+            cited_ids |= _cited_legislation_ids(g["report"])
 
         if not cited_ids:
             self.score = 1.0
             self.success = True
             self.reason = (
-                f"No {_ALLOWED_CITATION_DOMAIN} citations found in Worker "
+                f"No {_LEGISLATION_DOMAIN} citations found in Worker "
                 "output; nothing to check."
             )
             return self.score
@@ -657,22 +670,33 @@ class CitationReadMetric(BaseMetric):
 
 class CitationDomainMetric(BaseMetric):
     """
-    Checks that every citation URL in the Worker's report points to
-    legislation.gov.uk, the only domain the Worker's system prompt permits
-    ("Do not invent URLs for domains other than legislation.gov.uk").
+    Checks that every citation URL in the Worker's report points to a domain
+    its system prompt told it to cite.
+
+    Which domains those are follows the research mode: legislation.gov.uk for
+    legislation_only, and caselaw.nationalarchives.gov.uk as well for the two
+    case law modes, whose prompts mandate that format for judgments.
 
     Score:
         0.0: no delegate_research call found; domains cannot be verified.
         1.0: no citation URLs in Worker output (nothing to check).
-        0.0: one or more citation URLs point to a different domain.
-        1.0: every citation URL is on legislation.gov.uk.
+        0.0: one or more citation URLs point to some other domain.
+        1.0: every citation URL is on a permitted domain.
 
     No partial credit, same reasoning as Citation Grounding: one invented
     domain is a full failure regardless of how many other citations are fine.
+
+    Args:
+        threshold:     Minimum score to pass (default 1.0).
+        research_mode: ``legislation_only`` (default), ``case_law_only``, or
+            ``legislation_and_case_law``. Decides the permitted domain set.
     """
 
-    def __init__(self, threshold: float = 1.0) -> None:
+    def __init__(
+        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+    ) -> None:
         self.threshold = threshold
+        self.research_mode = research_mode
         self.score = 0.0
         self.success = False
         self.reason = ""
@@ -699,22 +723,25 @@ class CitationDomainMetric(BaseMetric):
             self.reason = "No citation URLs found in Worker output; nothing to check."
             return self.score
 
-        off_domain = {u for u in cited_urls if not _on_allowed_domain(u)}
+        permitted = _permitted_domains(self.research_mode)
+        off_domain = {
+            u for u in cited_urls if not any(_on_domain(u, d) for d in permitted)
+        }
+        permitted_str = " or ".join(permitted)
 
         if off_domain:
             self.score = 0.0
             self.success = False
             self.reason = (
                 f"Off-domain citation(s): {sorted(off_domain)} do not point to "
-                f"{_ALLOWED_CITATION_DOMAIN}, the only domain the Worker's "
-                "system prompt permits."
+                f"{permitted_str}, the domain(s) the Worker's system prompt "
+                f"permits in {self.research_mode} mode."
             )
         else:
             self.score = 1.0
             self.success = True
             self.reason = (
-                f"All {len(cited_urls)} citation URL(s) are on "
-                f"{_ALLOWED_CITATION_DOMAIN}."
+                f"All {len(cited_urls)} citation URL(s) are on {permitted_str}."
             )
 
         return self.score

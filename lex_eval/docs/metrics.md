@@ -74,6 +74,11 @@ Act missing from the retrieved set scores 0.0, with no partial credit: unlike Re
 "some links survived" is meaningfully better than "none did", one fabricated citation is a full failure
 regardless of how many others were genuine.
 
+**Only legislation.gov.uk URLs are read as Act ids.** A judgment link such as
+`caselaw.nationalarchives.gov.uk/uksc/2025/13` would otherwise become Act id `uksc/2025`, which no
+legislation tool call can ever have retrieved, so every case law citation was reported as fabricated.
+See `docs/case-law-issues.md` issue 3.
+
 **Why the parsing is fussy.** `search_legislation` returns its JSON results with a plain-text
 "[NEXT STEP: ...]" hint appended for the Worker, so reading the whole string as JSON fails. That went
 unnoticed and silently emptied the search half of the retrieved set, leaving only the Acts a run
@@ -115,11 +120,17 @@ flagged claims are probably true. Treat a fail as a claim the run cannot show it
 
 ## Citation Domain
 
-**Aim.** Checks that every citation URL in the Worker's report points to legislation.gov.uk, the only
-domain its system prompt permits it to cite.
+**Aim.** Checks that every citation URL in the Worker's report points to a domain its system prompt
+told it to cite.
 
 **How.** Deterministic, same no-partial-credit reasoning as Citation Grounding. No citation URLs scores
-1.0; any URL on a different domain scores 0.0; all on legislation.gov.uk scores 1.0.
+1.0; any URL on a domain outside the permitted set scores 0.0; all inside it scores 1.0. The permitted
+set follows the research mode: legislation.gov.uk for `legislation_only`, and
+caselaw.nationalarchives.gov.uk as well for `case_law_only` and `legislation_and_case_law`, whose
+Worker prompts mandate that format for judgments.
+
+**Why it is mode-dependent.** A single legislation-only rule failed every case law response outright,
+for citing judgments in exactly the format it was told to use. See `docs/case-law-issues.md` issue 3.
 
 ## Genuine Gap
 

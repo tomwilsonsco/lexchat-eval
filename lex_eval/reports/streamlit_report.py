@@ -126,7 +126,7 @@ METRICS: list[tuple[str, str, str]] = [
     (
         "citation_domain",
         "Citation Domain",
-        "Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite.",
+        "Does every citation link in the researcher's report point to a domain the Worker is permitted to cite. That is legislation.gov.uk, plus caselaw.nationalarchives.gov.uk in the two case law research modes, which is what those Worker prompts ask for.",
     ),
     (
         "genuine_gap",

@@ -208,14 +208,17 @@ def test_citation_read(request, record):
 )
 def test_citation_domain(request, record):
     """
-    Every citation URL in the Worker output must point to legislation.gov.uk,
-    the only domain the Worker's system prompt permits.
+    Every citation URL in the Worker output must point to a domain the
+    Worker's system prompt told it to cite: legislation.gov.uk, plus
+    caselaw.nationalarchives.gov.uk in the two case law research modes.
 
     Records with no delegate_research call automatically score 0.0.
     Records with no citation URLs at all score 1.0 (nothing to check).
     """
     test_case = record_to_test_case(record)
-    metric = CitationDomainMetric(threshold=1.0)
+    metric = CitationDomainMetric(
+        threshold=1.0, research_mode=record.get("research_mode", "legislation_only")
+    )
     metric.measure(test_case)
 
     attach_metric(
