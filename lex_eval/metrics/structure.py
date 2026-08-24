@@ -356,11 +356,18 @@ _CASE_LAW_DOMAIN = "caselaw.nationalarchives.gov.uk"
 
 # The domains each research mode's Worker system prompt tells it to cite
 # (LexChat/server_py/src/prompts.py, CITATION PROTOCOL in each Worker prompt).
-# The legislation-only prompt permits legislation.gov.uk and nothing else; the
-# two case law prompts mandate caselaw.nationalarchives.gov.uk for judgments.
+# One entry per mode, and each is exactly what that prompt allows:
+#   legislation_only         legislation.gov.uk and nothing else.
+#   case_law_only            case law only. That prompt requires findings to be
+#                            grounded "EXCLUSIVELY in case law retrieved via the
+#                            search_case_law tool", with every legal proposition
+#                            citing a specific case, and never mentions
+#                            legislation.gov.uk. Allowing it here would let a run
+#                            score 1.0 for citing a source its brief excluded.
+#   legislation_and_case_law both, since that prompt's protocol names both.
 _PERMITTED_DOMAINS = {
     "legislation_only": (_LEGISLATION_DOMAIN,),
-    "case_law_only": (_LEGISLATION_DOMAIN, _CASE_LAW_DOMAIN),
+    "case_law_only": (_CASE_LAW_DOMAIN,),
     "legislation_and_case_law": (_LEGISLATION_DOMAIN, _CASE_LAW_DOMAIN),
 }
 
@@ -765,14 +772,26 @@ _GENUINE_GAP_PHRASE = (
     "The available database does not contain information on this specific issue."
 )
 
-# Paraphrases of the mandated sentence that still count as disclosing the gap,
-# just not in the exact required wording (0.5 partial credit).
+# Wordings that disclose the gap without using the research prompt's mandated
+# sentence. Two groups, and both are needed:
+#   - paraphrases of the mandated sentence, worth 0.5 in research mode because
+#     the wording there is prescribed and was not used;
+#   - the phrasing the conversational Worker prompt asks for in its own words,
+#     "If the retrieved text does not answer the question, say so plainly and
+#     suggest the user switch to Research mode". A conversational report that
+#     follows that instruction literally matches none of the paraphrases above,
+#     so without these entries it scored 0.0 for doing exactly what it was told.
+# "not answer" also covers "do not answer" and "cannot answer"; "n't answer"
+# covers the contracted forms.
 _GENUINE_GAP_KEYWORDS = (
     "does not contain information",
     "no relevant",
     "could not find",
     "no information",
     "unable to find",
+    "not answer",
+    "n't answer",
+    "switch to research mode",
 )
 
 
