@@ -24,6 +24,8 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "pytest-xdist",
+    "black",
+    "ruff",
 ]
 
 [tool.pytest.ini_options]

@@ -231,3 +231,7 @@ lexchat/
 
 # Local-only project instructions, not published to GitHub
 /CLAUDE.md
+
+# Personal Claude Code settings (hooks, permissions). Project-wide settings
+# would go in .claude/settings.json, which is not ignored.
+.claude/settings.local.json
