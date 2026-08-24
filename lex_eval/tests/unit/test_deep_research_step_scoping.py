@@ -37,7 +37,9 @@ def _search_sections(legislation_id: str) -> ToolCall:
 
 
 def _step(delegate_report: str, *tools: ToolCall) -> list:
-    return [ToolCall(name="delegate_research", input_parameters={}, output=delegate_report)] + list(tools)
+    return [
+        ToolCall(name="delegate_research", input_parameters={}, output=delegate_report)
+    ] + list(tools)
 
 
 class _JudgeNotInvoked:
@@ -51,9 +53,14 @@ class TestStepCompletionRequiresOwnCitation:
         retrieves Act B. Step 1's report links to Act B (a sibling's Act,
         not its own), which must not count as completing step 1."""
         step1_report = "See [the Act](http://www.legislation.gov.uk/ukpga/2000/7)."
-        tools = (
-            _step(step1_report, _search_legislation("asp/2021/3"), _search_sections("asp/2021/3"))
-            + _step("some other finding", _search_legislation("ukpga/2000/7"), _search_sections("ukpga/2000/7"))
+        tools = _step(
+            step1_report,
+            _search_legislation("asp/2021/3"),
+            _search_sections("asp/2021/3"),
+        ) + _step(
+            "some other finding",
+            _search_legislation("ukpga/2000/7"),
+            _search_sections("ukpga/2000/7"),
         )
         case = LLMTestCase(input="q", actual_output="final", tools_called=tools)
         metric = StepCompletionMetric()
@@ -63,7 +70,11 @@ class TestStepCompletionRequiresOwnCitation:
 
     def test_citing_own_act_passes(self):
         step1_report = "See [the Act](http://www.legislation.gov.uk/asp/2021/3)."
-        tools = _step(step1_report, _search_legislation("asp/2021/3"), _search_sections("asp/2021/3"))
+        tools = _step(
+            step1_report,
+            _search_legislation("asp/2021/3"),
+            _search_sections("asp/2021/3"),
+        )
         case = LLMTestCase(input="q", actual_output="final", tools_called=tools)
         metric = StepCompletionMetric()
         metric.measure(case)
@@ -76,11 +87,20 @@ class TestReportIntegrationScopingRequiresOwnCitation:
         finding of its own to check, so the judge must never be invoked."""
         step1_report = "See [the Act](http://www.legislation.gov.uk/ukpga/2000/7)."
         step2_report = "See [the Act](http://www.legislation.gov.uk/asp/2021/3)."
-        tools = (
-            _step(step1_report, _search_legislation("asp/2021/3"), _search_sections("asp/2021/3"))
-            + _step(step2_report, _search_legislation("ukpga/2000/7"), _search_sections("ukpga/2000/7"))
+        tools = _step(
+            step1_report,
+            _search_legislation("asp/2021/3"),
+            _search_sections("asp/2021/3"),
+        ) + _step(
+            step2_report,
+            _search_legislation("ukpga/2000/7"),
+            _search_sections("ukpga/2000/7"),
         )
-        case = LLMTestCase(input="q", actual_output="final answer with no citations", tools_called=tools)
+        case = LLMTestCase(
+            input="q",
+            actual_output="final answer with no citations",
+            tools_called=tools,
+        )
         metric = ReportIntegrationMetric(model=_JudgeNotInvoked())
         metric.measure(case)
         assert metric.is_successful()

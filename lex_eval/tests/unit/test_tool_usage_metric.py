@@ -44,7 +44,9 @@ def test_deep_research_step_with_multi_act_loop_back_passes():
         _SEARCH,  # a second Act, discovered after the first Act's sections
         _SECTIONS,
     ]
-    ok, detail = _check_tool_order(sequence, "legislation_only", chat_mode="deep_research")
+    ok, detail = _check_tool_order(
+        sequence, "legislation_only", chat_mode="deep_research"
+    )
     assert ok, detail
 
 
@@ -53,7 +55,9 @@ def test_deep_research_step_skipping_discovery_still_fails():
     a real violation in deep-research mode, first-occurrence order is
     relaxed on revisits, not dropped entirely."""
     sequence = [_DELEGATE, _SECTIONS, _SEARCH]
-    ok, detail = _check_tool_order(sequence, "legislation_only", chat_mode="deep_research")
+    ok, detail = _check_tool_order(
+        sequence, "legislation_only", chat_mode="deep_research"
+    )
     assert not ok
     assert "step 1" in detail
 
@@ -65,7 +69,9 @@ def test_deep_research_step_with_no_discovery_at_all_still_fails():
     added. Global presence (search_legislation used somewhere in the whole
     run) doesn't cover this: it's checked per plan step here."""
     sequence = [_DELEGATE, _SECTIONS]
-    ok, detail = _check_tool_order(sequence, "legislation_only", chat_mode="deep_research")
+    ok, detail = _check_tool_order(
+        sequence, "legislation_only", chat_mode="deep_research"
+    )
     assert not ok
     assert "step 1" in detail
 
@@ -81,7 +87,9 @@ def test_deep_research_multiple_steps_each_checked_independently():
         _SECTIONS,  # step 2: retrieval with no discovery first
         _SEARCH,
     ]
-    ok, detail = _check_tool_order(sequence, "legislation_only", chat_mode="deep_research")
+    ok, detail = _check_tool_order(
+        sequence, "legislation_only", chat_mode="deep_research"
+    )
     assert not ok
     assert "step 2" in detail
 

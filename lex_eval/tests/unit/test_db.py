@@ -324,17 +324,39 @@ class TestTurnCapHaltColumns:
         db = tmp_path / "r.db"
         conn = get_connection(db)
         init_db(conn)
-        insert_response(conn, {
-            "question_id": 1, "question": "q", "llm_name": "m", "timestamp": "t",
-            "chat_mode": "deep_research", "max_turns_halted": 0, "react_turns_max": 12,
-        })
-        insert_response(conn, {
-            "question_id": 2, "question": "q", "llm_name": "m", "timestamp": "t",
-            "chat_mode": "deep_research", "max_turns_halted": 1, "react_turns_max": 20,
-        })
-        insert_response(conn, {
-            "question_id": 3, "question": "q", "llm_name": "m", "timestamp": "t",
-        })
+        insert_response(
+            conn,
+            {
+                "question_id": 1,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+                "chat_mode": "deep_research",
+                "max_turns_halted": 0,
+                "react_turns_max": 12,
+            },
+        )
+        insert_response(
+            conn,
+            {
+                "question_id": 2,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+                "chat_mode": "deep_research",
+                "max_turns_halted": 1,
+                "react_turns_max": 20,
+            },
+        )
+        insert_response(
+            conn,
+            {
+                "question_id": 3,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+            },
+        )
         conn.commit()
         conn.close()
 
@@ -362,14 +384,27 @@ class TestCleanIncompleteResponsesSparesClarification:
         db = tmp_path / "r.db"
         conn = get_connection(db)
         init_db(conn)
-        insert_response(conn, {
-            "question_id": 1, "question": "q", "llm_name": "m", "timestamp": "t",
-            "chat_mode": "deep_research", "needs_clarification": True,
-            "clarification_question": "Which tax year?",
-        })
-        insert_response(conn, {
-            "question_id": 2, "question": "q", "llm_name": "m", "timestamp": "t",
-        })
+        insert_response(
+            conn,
+            {
+                "question_id": 1,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+                "chat_mode": "deep_research",
+                "needs_clarification": True,
+                "clarification_question": "Which tax year?",
+            },
+        )
+        insert_response(
+            conn,
+            {
+                "question_id": 2,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+            },
+        )
         conn.commit()
         conn.close()
 
@@ -377,9 +412,7 @@ class TestCleanIncompleteResponsesSparesClarification:
 
         assert deleted == 1
         conn = get_connection(db, read_only=True)
-        remaining = conn.execute(
-            "SELECT question_id FROM responses"
-        ).fetchall()
+        remaining = conn.execute("SELECT question_id FROM responses").fetchall()
         conn.close()
         assert remaining == [(1,)]
 
@@ -404,20 +437,42 @@ class TestCleanIncompleteResponsesCascades:
         init_db(conn)
         init_eval_table(conn, "tool_usage")
         # Incomplete: no retrieval context, so cleanup takes it.
-        insert_response(conn, {
-            "question_id": 1, "question": "q", "llm_name": "m", "timestamp": "t",
-            "actual_output": "Could you narrow this down?",
-        })
+        insert_response(
+            conn,
+            {
+                "question_id": 1,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+                "actual_output": "Could you narrow this down?",
+            },
+        )
         # Complete, so it stays, and so must its eval row.
-        insert_response(conn, {
-            "question_id": 2, "question": "q", "llm_name": "m", "timestamp": "t",
-            "actual_output": "an answer", "retrieval_context": ["s.1 text"],
-        })
+        insert_response(
+            conn,
+            {
+                "question_id": 2,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+                "actual_output": "an answer",
+                "retrieval_context": ["s.1 text"],
+            },
+        )
         for response_id in (1, 2):
-            insert_eval_result(conn, "tool_usage", {
-                "response_id": response_id, "llm_name": "m", "question_id": response_id,
-                "question": "q", "score": 1.0, "threshold": 1.0, "passed": True,
-            })
+            insert_eval_result(
+                conn,
+                "tool_usage",
+                {
+                    "response_id": response_id,
+                    "llm_name": "m",
+                    "question_id": response_id,
+                    "question": "q",
+                    "score": 1.0,
+                    "threshold": 1.0,
+                    "passed": True,
+                },
+            )
         conn.commit()
         conn.close()
 
@@ -444,14 +499,29 @@ class TestCleanIncompleteResponsesCascades:
         conn = get_connection(db)
         init_db(conn)
         init_eval_table(conn, "tool_usage")
-        insert_response(conn, {
-            "question_id": 1, "question": "q", "llm_name": "m", "timestamp": "t",
-            "actual_output": "Could you narrow this down?",
-        })
-        insert_eval_result(conn, "tool_usage", {
-            "response_id": 1, "llm_name": "m", "question_id": 1, "question": "q",
-            "score": 1.0, "threshold": 1.0, "passed": True,
-        })
+        insert_response(
+            conn,
+            {
+                "question_id": 1,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+                "actual_output": "Could you narrow this down?",
+            },
+        )
+        insert_eval_result(
+            conn,
+            "tool_usage",
+            {
+                "response_id": 1,
+                "llm_name": "m",
+                "question_id": 1,
+                "question": "q",
+                "score": 1.0,
+                "threshold": 1.0,
+                "passed": True,
+            },
+        )
         conn.commit()
         conn.close()
 
@@ -469,15 +539,26 @@ class TestMakeDeployDbPreservesIds:
     deleted response, or later eval rows point at the wrong response."""
 
     def test_ids_survive_a_gap(self, tmp_path):
-        from lex_eval.utils.db import get_connection, init_db, insert_response, make_deploy_db
+        from lex_eval.utils.db import (
+            get_connection,
+            init_db,
+            insert_response,
+            make_deploy_db,
+        )
 
         src = tmp_path / "responses.db"
         conn = get_connection(src)
         init_db(conn)
         for i in range(1, 4):
-            insert_response(conn, {
-                "question_id": i, "question": "q", "llm_name": "m", "timestamp": "t",
-            })
+            insert_response(
+                conn,
+                {
+                    "question_id": i,
+                    "question": "q",
+                    "llm_name": "m",
+                    "timestamp": "t",
+                },
+            )
         conn.commit()
         conn.execute("DELETE FROM responses WHERE id = 2")
         conn.commit()

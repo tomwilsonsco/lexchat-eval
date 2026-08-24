@@ -128,7 +128,10 @@ class ReportIntegrationMetric(BaseMetric):
             i: g["report"]
             for i, g in enumerate(groups, 1)
             if _retrieved_usable_content(g["tools"])
-            and (_retrieved_legislation_ids(g["tools"]) & _cited_legislation_ids(g["report"]))
+            and (
+                _retrieved_legislation_ids(g["tools"])
+                & _cited_legislation_ids(g["report"])
+            )
         }
 
         if not in_scope:

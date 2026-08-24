@@ -280,7 +280,9 @@ def run_evals(
         # matching nothing) is a genuine collection problem and still
         # surfaces.
         if rc == 5 and deselect:
-            print(f"ℹ️  {test_file}: nothing new to run, all requested responses already covered")
+            print(
+                f"ℹ️  {test_file}: nothing new to run, all requested responses already covered"
+            )
             rc = 0
 
         if rc > overall_rc:

@@ -140,7 +140,7 @@ class TestCitationGroundingParsesSearchResults:
             '{"results": [{"legislation_id": "asp/2021/3", '
             '"title": "An Act", "url": "http://www.legislation.gov.uk/asp/2021/3"}], '
             '"total": 1}\n\n'
-            '[NEXT STEP: Call search_legislation_sections with the relevant '
+            "[NEXT STEP: Call search_legislation_sections with the relevant "
             'legislation_id(s) below:\n  - legislation_id: "asp/2021/3"]'
         )
         report = f"See [the Act](http://www.legislation.gov.uk/id/{cited_id})."
@@ -153,9 +153,7 @@ class TestCitationGroundingParsesSearchResults:
                     input_parameters={},
                     output=search_output,
                 ),
-                ToolCall(
-                    name="delegate_research", input_parameters={}, output=report
-                ),
+                ToolCall(name="delegate_research", input_parameters={}, output=report),
             ],
         )
 
@@ -182,7 +180,9 @@ class TestCitationGroundingParsesSearchResults:
                     input_parameters={},
                     output='Error executing tool: {"detail": "Internal server error"}',
                 ),
-                ToolCall(name="delegate_research", input_parameters={}, output="No links."),
+                ToolCall(
+                    name="delegate_research", input_parameters={}, output="No links."
+                ),
             ],
         )
         metric = CitationGroundingMetric()
@@ -220,9 +220,7 @@ class TestRetrievedUsableContentRejectsToolErrors:
             input="q",
             actual_output="final answer",
             tools_called=[
-                ToolCall(
-                    name="delegate_research", input_parameters={}, output=report
-                ),
+                ToolCall(name="delegate_research", input_parameters={}, output=report),
                 ToolCall(
                     name="Worker: search_legislation_sections",
                     input_parameters={},

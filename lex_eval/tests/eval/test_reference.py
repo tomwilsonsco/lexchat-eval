@@ -354,6 +354,6 @@ def test_plan_coverage(request, record):
         judge_tokens=_judge.total_usage_tokens,
     )
 
-    assert metric.is_successful(), (
-        f"Plan Coverage score {metric.score:.2f} < {metric.threshold}: {metric.reason}"
-    )
+    assert (
+        metric.is_successful()
+    ), f"Plan Coverage score {metric.score:.2f} < {metric.threshold}: {metric.reason}"

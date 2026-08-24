@@ -800,7 +800,9 @@ class GenuineGapMetric(BaseMetric):
                 )
         else:
             worst = step_scores.index(min(step_scores)) + 1
-            where = f"Step {worst} of {len(groups)}" if len(groups) > 1 else "The report"
+            where = (
+                f"Step {worst} of {len(groups)}" if len(groups) > 1 else "The report"
+            )
             if self.score == 0.5:
                 self.reason = (
                     f"{where} had empty retrieval and disclosed the gap, but "
