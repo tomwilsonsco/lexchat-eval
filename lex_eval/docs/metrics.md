@@ -74,6 +74,31 @@ fetched sections for, so an Act found in a search and cited without a follow-up 
 fabricated. Only the JSON at the start of the output is parsed now. Tool outputs that are not JSON at
 all (a LEX API error, or a model replying in prose) are still skipped.
 
+## Citation Read
+
+**Aim.** Checks that the Worker actually read every Act it cites. An Act whose text was pulled counts
+as read; one that only appeared as a title in a `search_legislation` results list does not. Catches a
+report making claims about a real, correctly linked source it never opened, for example saying an Act
+"was commenced by" an SI whose text nobody retrieved.
+
+**How.** Deterministic. Collects every legislation.gov.uk Act cited in the Worker's report, and the
+set of Acts whose text was retrieved (the `legislation_id` argument of a `search_legislation_sections`
+or `get_legislation_text` call that returned usable output, not an error). Score is the fraction of
+cited Acts that were read; threshold is 1.0, so a single unread cited Act fails. Case law citations
+are ignored, since there is no legislation retrieval to check them against.
+
+**Why.** Citation Grounding accepts an Act that merely turned up in a search results list, so an
+answer can invent a relationship ("made under", "inserted by", "commenced by") for a source nobody
+opened and still score 1.0. Measured over the 99 stored responses with a Worker report, 23 fail, and
+12 of those are cases no other metric catches: every one passes Citation Grounding, and of the five
+that also have a Claim Support score, three pass it. Reading all 12 by hand, 10 assert something real
+about an unread source and 2 are bare entries in a References list. That false-positive rate, about
+1 in 6, is accepted rather than fixed: telling a References-list entry from a claim needs heading
+parsing, and the machinery would cost more than the noise.
+
+**Reading it.** Like Citation Grounding, this measures "asserted without reading", not "wrong". Most
+flagged claims are probably true. Treat a fail as a claim the run cannot show its working for.
+
 ## Citation Domain
 
 **Aim.** Checks that every citation URL in the Worker's report points to legislation.gov.uk, the only

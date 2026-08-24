@@ -22,6 +22,7 @@ from lex_eval.metrics.structure import (
     CitationDomainMetric,
     CitationGroundingMetric,
     CitationPassthroughMetric,
+    CitationReadMetric,
     GenuineGapMetric,
     MandatoryStructureMetric,
     StepCompletionMetric,
@@ -134,6 +135,39 @@ def test_citation_grounding(request, record):
         request,
         record=record,
         test_name="citation_grounding",
+        metric_name=metric.__name__,
+        score=metric.score,
+        threshold=metric.threshold,
+        passed=metric.is_successful(),
+        reason=metric.reason,
+    )
+
+    assert metric.is_successful(), metric.reason
+
+
+@pytest.mark.parametrize(
+    "record",
+    records,
+    ids=[record_id(r) for r in records],
+)
+def test_citation_read(request, record):
+    """
+    Every legislation.gov.uk Act cited in the Worker output must have had its
+    text retrieved by search_legislation_sections or get_legislation_text.
+    An Act that only appeared as a title in a search_legislation results list
+    does not count as read.
+
+    Records with no delegate_research call automatically score 0.0.
+    Records with no legislation.gov.uk citations score 1.0 (nothing to check).
+    """
+    test_case = record_to_test_case(record)
+    metric = CitationReadMetric(threshold=1.0)
+    metric.measure(test_case)
+
+    attach_metric(
+        request,
+        record=record,
+        test_name="citation_read",
         metric_name=metric.__name__,
         score=metric.score,
         threshold=metric.threshold,

@@ -146,7 +146,7 @@ clearing (useful for testing a metric's determinism).
 | Metric | Speed | Requires |
 |---|---|---|
 | `tool_usage` | Fast | Nothing extra |
-| `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_domain`, `genuine_gap`, `step_completion` | Fast | Nothing extra |
+| `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_read`, `citation_domain`, `genuine_gap`, `step_completion` | Fast | Nothing extra |
 | `citation_agreement` | Fast | Hand written reference answers |
 | `consistency` | Fast | ≥2 responses per question/LLM/chat mode |
 | `response_groundedness`, `claim_support` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
@@ -356,6 +356,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. |
 | Reference Links | Are all reference links found by the researcher included in the final answer given to the user. |
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |
+| Citation Read | Did the researcher actually read every Act it cites? An Act whose text was pulled counts as read, one that only appeared as a title in a search results list does not. Catches a report making claims about a real, correctly linked source it never opened. |
 | Citation Domain | Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite. |
 | Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
 | Step Completion | Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step). |

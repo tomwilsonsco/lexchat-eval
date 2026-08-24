@@ -119,6 +119,11 @@ METRICS: list[tuple[str, str, str]] = [
         "Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model.",
     ),
     (
+        "citation_read",
+        "Citation Read",
+        "Did the researcher actually read every Act it cites? An Act whose text was pulled counts as read, one that only appeared as a title in a search results list does not. Catches a report making claims about a real, correctly linked source it never opened.",
+    ),
+    (
         "citation_domain",
         "Citation Domain",
         "Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite.",
