@@ -8,9 +8,6 @@ is written up in `docs/reference-answers.md`, including the important caveat tha
 five `Research Output Structure` family metrics score 0.0 on a reference-answer record, since there is
 no `delegate_research` call to inspect there.
 
-Which of these metrics give a valid verdict on a **conversational** run, and which measure the wrong
-thing there, is written up separately in `docs/conversational-mode-evals.md`.
-
 Metrics are listed in the same order as the README table. Each name matches its dashboard display name
 in `METRIC_DISPLAY_ORDER` in `lex_eval/reports/streamlit_report.py`, so it can be cross-referenced
 against the Streamlit app directly.
@@ -226,6 +223,12 @@ reference answer and the response, then checks whether the response cites *somet
 the reference cites (section-level matching, not just Act-level). Score is the fraction of the
 reference's cited Acts covered.
 
+**It reads the final answer, not the Worker's report.** Citations are extracted from `actual_output`,
+so an answer that names the right Act in prose without a link scores nothing for it. That matters most
+in conversational mode, where the Manager routinely drops the Worker's URLs, and it is why this metric
+separates by chat mode more sharply than any other. Read a low score alongside Reference Links before
+concluding the response missed the law.
+
 **Why.** The threshold is set low, 0.3, deliberately: a reference answer cites everything its author
 consulted while researching, including background provisions a good response doesn't need to repeat.
 Measured over 24 responses, scores ranged 0.00-0.65. This metric, along with Reference Answer Agreement
@@ -331,6 +334,12 @@ For a deep research run, the judge is also given the approved plan's scope note.
 something like "case law was excluded under the approved research plan", which is true but is stated
 nowhere in the research output, so without the scope note the judge read it as an unsupported claim and
 failed the whole answer. Runs without a plan pass no scope note and the prompt is unchanged.
+
+**The `<suggestions>` block never reaches this metric.** In conversational mode the Manager is told to
+end every reply with a `<suggestions>` block of follow-up questions. LexChat strips it from the answer
+before sending, so it is absent from `actual_output` and no metric sees it. Worth knowing before
+investigating whether those suggested questions read as ungrounded claims: they cannot, they are not
+there.
 
 **A halted run is not scored here either**, for consistency with Claim Support and with the
 already-existing empty-research case, though the trade-off differs: with no research output, an answer
