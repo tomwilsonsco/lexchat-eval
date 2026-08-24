@@ -1,0 +1,47 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Shops Act 1950 definition of shop"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "statutory definition of shop Scotland"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Licensing (Scotland) Act shop premises definition"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Shops Act 1950"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2005/16",
+      "query": "meaning of shop shop premises definition"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2007/13",
+      "query": "definition of shop large shop retail"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/1964/50",
+      "query": "meaning of shop definition tenancy"
+    }
+  }
+]

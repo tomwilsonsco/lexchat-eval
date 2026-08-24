@@ -1,0 +1,34 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Water Industry (Scotland) Act 2002 Scottish Water accounts"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Public Finance and Accountability (Scotland) Act 2000 accounts audit"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scottish Water annual report accounts"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2002/3",
+      "query": "Scottish Water accounts annual report auditor laid before Parliament"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2000/1",
+      "query": "accounts preparation audit Auditor General laying before Parliament time limit"
+    }
+  }
+]

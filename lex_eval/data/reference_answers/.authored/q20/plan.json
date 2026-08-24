@@ -1,0 +1,17 @@
+{
+  "scope_note": "Covers whether the procedural requirements in sections 35A and 35ZA of the Climate Change (Scotland) Act 2009 can operate concurrently, and what each requires. Limited to the text of the two sections and their relationship to section 35.",
+  "steps": [
+    {
+      "title": "Retrieve both provisions in full",
+      "detail": "Retrieve sections 35ZA and 35A of the Climate Change (Scotland) Act 2009 and set out what each requires, of whom, and at what stage."
+    },
+    {
+      "title": "Identify the event each is a precondition of",
+      "detail": "Establish, from the text, what act each section must be completed before, and whether either is expressed as a precondition of the other."
+    },
+    {
+      "title": "Check for displacement or sequencing language",
+      "detail": "Check whether either section contains words requiring one procedure to conclude before the other begins."
+    }
+  ]
+}

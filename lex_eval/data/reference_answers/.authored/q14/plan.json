@@ -1,0 +1,17 @@
+{
+  "scope_note": "Covers the vitamin content requirements for margarine sold by retail in each UK jurisdiction, and the current in-force position in each. Limited to legislation; enforcement practice and EU marketing standards beyond their domestic implementation are out of scope.",
+  "steps": [
+    {
+      "title": "Retrieve the vitamin content provision for each UK jurisdiction",
+      "detail": "Find the regulation imposing minimum and maximum vitamin A and vitamin D levels in margarine for England, Scotland, Wales and Northern Ireland, and retrieve its text."
+    },
+    {
+      "title": "Establish the in-force status of each",
+      "detail": "Check whether each jurisdiction's vitamin content provision remains in force, identifying any instrument that amended or omitted it and what exactly that instrument did."
+    },
+    {
+      "title": "State the position jurisdiction by jurisdiction",
+      "detail": "Set out where the requirement still applies and where it has been removed, rather than answering for one jurisdiction as if it were the United Kingdom."
+    }
+  ]
+}

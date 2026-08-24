@@ -1,0 +1,21 @@
+{
+  "scope_note": "Covers which interpretation regime supplies the meaning of \"month\" for the Climate Change (Scotland) Act 2009, and what that meaning is. Limited to legislation; the operation of any particular time limit in the 2009 Act is out of scope.",
+  "steps": [
+    {
+      "title": "Check whether the 2009 Act defines the term itself",
+      "detail": "Retrieve the interpretation section of the Climate Change (Scotland) Act 2009 and establish whether it defines \"month\" or any period of time."
+    },
+    {
+      "title": "Establish which general interpretation regime applies",
+      "detail": "Retrieve the application provision of the Interpretation and Legislative Reform (Scotland) Act 2010 and determine, from the date the 2009 Act received Royal Assent, whether that Act's Part 1 applies to it."
+    },
+    {
+      "title": "Retrieve the definition from the applicable regime",
+      "detail": "Retrieve the general definitions in the Scotland Act 1998 interpretation order and identify the meaning it gives to \"month\"."
+    },
+    {
+      "title": "Test the effect of later amendment",
+      "detail": "Establish whether a provision inserted into the 2009 Act by a later Act changes which interpretation regime governs the 2009 Act."
+    }
+  ]
+}

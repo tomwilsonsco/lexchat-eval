@@ -1,0 +1,21 @@
+{
+  "scope_note": "Covers what constitutes the Scottish Administration as defined by section 126 of the Scotland Act 1998, and how the list of non-ministerial offices within it is completed by subordinate legislation. Limited to legislation.",
+  "steps": [
+    {
+      "title": "Retrieve the definition itself",
+      "detail": "Retrieve section 126 of the Scotland Act 1998 and set out what the Scottish Administration consists of and how office-holders and staff are defined."
+    },
+    {
+      "title": "Identify the offices named on the face of the Act",
+      "detail": "Identify the non-ministerial offices listed expressly in section 126(8)(a)."
+    },
+    {
+      "title": "Establish how the remaining offices are added",
+      "detail": "Establish the mechanism by which further non-ministerial offices are brought within the Scottish Administration, and retrieve examples of instruments exercising it."
+    },
+    {
+      "title": "Assess whether a complete list is obtainable",
+      "detail": "Determine whether a complete enumeration can be produced from primary legislation alone, and say so plainly if it cannot."
+    }
+  ]
+}
