@@ -17,6 +17,8 @@ Whether the response actually answers the question is measured by the
 `reference` suite, against the hand written reference answers.
 """
 
+import re
+
 import pytest
 from deepeval.test_case import LLMTestCase
 
@@ -38,6 +40,14 @@ from lex_eval.utils.test_helpers import (
 # ---------------------------------------------------------------------------
 
 _MIN_OUTPUT_CHARS: int = 50
+
+# LexChat returns this in place of a report when its agent loop hits the ReAct
+# turn cap (server_py/src/agent/ollama_client.py and openrouter_client.py),
+# so the field is populated but holds no research. A report that is nothing
+# but this sentinel is treated as no research output at all. One that merely
+# contains it had a single step halt among several and is still scored on the
+# rest, which is why this matches the sentence rather than the halted flag.
+_HALTED_RESEARCH_RE = re.compile(r"\[Research halted:[^\]]*\]", re.IGNORECASE)
 # Response Groundedness is a pass/fail verdict, so its score is 0.0 or 1.0 and
 # nothing between the two is reachable.
 _RESPONSE_GROUNDEDNESS_THRESHOLD: float = 1.0
@@ -124,8 +134,13 @@ def _gate_research_output(
     metric_name,
     threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
 ):
-    """Fail fast if no research output was captured."""
-    if not record.get("research_output", "").strip():
+    """Fail fast if no research output was captured.
+
+    "No research output" covers both an empty field and one holding only
+    LexChat's halted-research sentinel: neither gives the judge anything to
+    score, and asking it to find claims in the sentinel makes it invent them.
+    """
+    if not _HALTED_RESEARCH_RE.sub("", record.get("research_output") or "").strip():
         reason = f"No research output captured; {metric_name} scored 0"
         attach_metric(
             request,

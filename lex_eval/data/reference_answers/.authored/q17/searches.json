@@ -1,0 +1,67 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Transport (Scotland) Act 2001"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "concessionary travel scheme Scotland bus fares"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Transport (Scotland) Act 2005 national concessionary travel"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2001/2",
+      "query": "concessionary travel scheme national fares Scottish Ministers grants bus services"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2001/2",
+      "query": "power to make grants to operators of bus services financial assistance"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2005/12",
+      "query": "national concessionary travel scheme Scottish Ministers establish"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2021/175",
+      "query": "national bus travel concession scheme young persons establishment reimbursement"
+    }
+  },
+  {
+    "tool": "get_legislation_text",
+    "args": {
+      "legislation_id": "ssi/2021/175"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2001/2",
+      "query": "bus services improvement partnership fares maximum standard of service"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Transport (Scotland) Act 2019 franchising bus services"
+    }
+  }
+]

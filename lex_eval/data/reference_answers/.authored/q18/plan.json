@@ -1,0 +1,21 @@
+{
+  "scope_note": "Covers the statutory power under which the £3 bus fare cap in England was established, and the mechanism by which a cap is imposed on operators. Limited to legislation (Acts and SIs); the policy history, funding amounts and administrative announcements of the scheme are out of scope in this mode, as is Scotland, Wales and Northern Ireland.",
+  "steps": [
+    {
+      "title": "Identify the Secretary of State's power to fund bus operators in England",
+      "detail": "Find the provision of the Transport Act 2000 that allows the Secretary of State to make grants to operators of bus services in England, and establish whether those grants may be made subject to conditions determined by the Secretary of State."
+    },
+    {
+      "title": "Establish whether any provision confers an express fare-capping power",
+      "detail": "Check the Transport Act 2000 and the Transport Act 1985 for any provision empowering the Secretary of State to set or cap the fares charged to bus passengers directly, as distinct from funding operators."
+    },
+    {
+      "title": "Distinguish the concessionary travel regime",
+      "detail": "Retrieve the national concession provisions of the Concessionary Bus Travel Act 2007 and the Transport Act 2000 and identify what an entitlement to a concession does that a fare cap does not."
+    },
+    {
+      "title": "Identify parallel local powers",
+      "detail": "Establish whether local transport authorities in England hold their own grant-making power over bus operators, and on what conditions, so that a nationally funded cap can be told apart from a locally funded one."
+    }
+  ]
+}

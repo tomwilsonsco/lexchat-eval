@@ -303,6 +303,12 @@ own evidence. Score is supported claims divided by scorable claims. Absence clai
 reported but excluded from the denominator entirely, since nothing can be quoted to prove a law's
 silence on something.
 
+**A halted run is not scored.** When LexChat's agent loop hits its ReAct turn cap it returns
+`[Research halted: exceeded N tool-call steps]` in place of a report. Asked to find up to 8 claims in
+that one sentence, the judge either invents them or errors, so a report holding nothing but the
+sentinel is treated as no research output at all. A longer report that merely contains it had one
+step halt among several and is still scored on the rest.
+
 **Why.** Read this metric at the aggregate, not per record: across repeated sweeps of the same 22
 stored responses, the mean moved by only 0.023, but individual records moved by 0.124 on average and
 7 of 22 changed pass or fail. The judge re-selects which claims a report even contains on every run, and
@@ -325,6 +331,12 @@ For a deep research run, the judge is also given the approved plan's scope note.
 something like "case law was excluded under the approved research plan", which is true but is stated
 nowhere in the research output, so without the scope note the judge read it as an unsupported claim and
 failed the whole answer. Runs without a plan pass no scope note and the prompt is unchanged.
+
+**A halted run is not scored here either**, for consistency with Claim Support and with the
+already-existing empty-research case, though the trade-off differs: with no research output, an answer
+making claims genuinely is ungrounded, so the judge's verdict was right. What is lost is that verdict;
+what is gained is that the two metrics agree on what "no research" means. A halted run is still caught
+by Tool Usage and Reference Links, which score it normally.
 
 **Why.** The 0.95 near-verbatim threshold sits in an observed gap: one model that follows a "do not
 condense" instruction literally measured 0.983-1.000 similarity, while one that habitually paraphrases

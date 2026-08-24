@@ -1,0 +1,55 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Transport Act 2000 grants to bus service operators"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "bus fare cap England grant scheme"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Transport Act 1985 bus services grants"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/2000/38",
+      "query": "grants to bus service operators conditions fares Secretary of State"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/1985/67",
+      "query": "grants to bus service operators fuel duty rebate conditions"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/2007/13",
+      "query": "concessionary bus travel England national scheme entitlement"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/2000/38",
+      "query": "franchising scheme fares maximum specify services franchising authority"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/2000/38",
+      "query": "advanced quality partnership scheme maximum fares frequencies timings requirements"
+    }
+  }
+]
