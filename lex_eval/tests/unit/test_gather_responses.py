@@ -389,8 +389,11 @@ class TestTurnCapHaltReachesTheRecord:
 
     def test_halt_counts_reach_the_record(self):
         audit = copy.deepcopy(AUDIT_SUCCESS)
-        audit["timings"] = {**audit["timings"],
-                            "max_turns_halted": 1, "react_turns_max": 20}
+        audit["timings"] = {
+            **audit["timings"],
+            "max_turns_halted": 1,
+            "react_turns_max": 20,
+        }
 
         with patch(
             "lex_eval.gather_responses.get_authenticated_client",
@@ -410,8 +413,11 @@ class TestTurnCapHaltReachesTheRecord:
 
     def test_zero_halts_reaches_the_record_as_zero(self):
         audit = copy.deepcopy(AUDIT_SUCCESS)
-        audit["timings"] = {**audit["timings"],
-                            "max_turns_halted": 0, "react_turns_max": 7}
+        audit["timings"] = {
+            **audit["timings"],
+            "max_turns_halted": 0,
+            "react_turns_max": 7,
+        }
 
         with patch(
             "lex_eval.gather_responses.get_authenticated_client",

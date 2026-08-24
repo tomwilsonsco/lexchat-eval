@@ -8,6 +8,7 @@ from deepeval.test_case import LLMTestCase, ToolCall
 
 from lex_eval.metrics.structure import (
     CitationGroundingMetric,
+    CitationReadMetric,
     GenuineGapMetric,
     MandatoryStructureMetric,
     _retrieved_usable_content,
@@ -139,7 +140,7 @@ class TestCitationGroundingParsesSearchResults:
             '{"results": [{"legislation_id": "asp/2021/3", '
             '"title": "An Act", "url": "http://www.legislation.gov.uk/asp/2021/3"}], '
             '"total": 1}\n\n'
-            '[NEXT STEP: Call search_legislation_sections with the relevant '
+            "[NEXT STEP: Call search_legislation_sections with the relevant "
             'legislation_id(s) below:\n  - legislation_id: "asp/2021/3"]'
         )
         report = f"See [the Act](http://www.legislation.gov.uk/id/{cited_id})."
@@ -152,9 +153,7 @@ class TestCitationGroundingParsesSearchResults:
                     input_parameters={},
                     output=search_output,
                 ),
-                ToolCall(
-                    name="delegate_research", input_parameters={}, output=report
-                ),
+                ToolCall(name="delegate_research", input_parameters={}, output=report),
             ],
         )
 
@@ -181,7 +180,9 @@ class TestCitationGroundingParsesSearchResults:
                     input_parameters={},
                     output='Error executing tool: {"detail": "Internal server error"}',
                 ),
-                ToolCall(name="delegate_research", input_parameters={}, output="No links."),
+                ToolCall(
+                    name="delegate_research", input_parameters={}, output="No links."
+                ),
             ],
         )
         metric = CitationGroundingMetric()
@@ -219,9 +220,7 @@ class TestRetrievedUsableContentRejectsToolErrors:
             input="q",
             actual_output="final answer",
             tools_called=[
-                ToolCall(
-                    name="delegate_research", input_parameters={}, output=report
-                ),
+                ToolCall(name="delegate_research", input_parameters={}, output=report),
                 ToolCall(
                     name="Worker: search_legislation_sections",
                     input_parameters={},
@@ -232,3 +231,214 @@ class TestRetrievedUsableContentRejectsToolErrors:
         metric = GenuineGapMetric(research_mode="legislation_only")
         metric.measure(case)
         assert not metric.is_successful(), metric.reason
+
+
+class TestCitationReadRequiresTextNotJustATitle:
+    """Citation Grounding accepts an Act that merely turned up in a
+    ``search_legislation`` results list, which returns titles and links but no
+    legal text. Citation Read is the check that the Worker actually opened it."""
+
+    _SEARCH_OUTPUT = (
+        '{"results": [{"legislation_id": "ssi/2015/99", '
+        '"title": "Commencement Order", '
+        '"url": "http://www.legislation.gov.uk/ssi/2015/99"}], "total": 1}\n\n'
+        "[NEXT STEP: Call search_legislation_sections]"
+    )
+
+    @staticmethod
+    def _case(report: str, *tools: ToolCall) -> LLMTestCase:
+        return LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                *tools,
+                ToolCall(name="delegate_research", input_parameters={}, output=report),
+            ],
+        )
+
+    @staticmethod
+    def _cite(*legislation_ids: str) -> str:
+        return " ".join(
+            f"See [it](http://www.legislation.gov.uk/id/{lid})."
+            for lid in legislation_ids
+        )
+
+    def test_act_whose_sections_were_read_passes(self):
+        tool = ToolCall(
+            name="Worker: search_legislation_sections",
+            input_parameters={"legislation_id": "ssi/2015/99"},
+            output='[{"text": "Section 1) This Order comes into force..."}]',
+        )
+        metric = CitationReadMetric()
+        metric.measure(self._case(self._cite("ssi/2015/99"), tool))
+        assert metric.score == 1.0
+        assert metric.is_successful()
+
+    def test_act_seen_only_in_a_search_result_fails(self):
+        tool = ToolCall(
+            name="Worker: search_legislation",
+            input_parameters={},
+            output=self._SEARCH_OUTPUT,
+        )
+        metric = CitationReadMetric()
+        metric.measure(self._case(self._cite("ssi/2015/99"), tool))
+        assert metric.score == 0.0
+        assert "ssi/2015/99" in metric.reason
+        # ...where Citation Grounding, seeing the same run, is satisfied.
+        grounding = CitationGroundingMetric()
+        grounding.measure(self._case(self._cite("ssi/2015/99"), tool))
+        assert grounding.score == 1.0
+
+    def test_failed_text_retrieval_does_not_count_as_read(self):
+        tool = ToolCall(
+            name="Worker: get_legislation_text",
+            input_parameters={"legislation_id": "ssi/2015/99"},
+            output='Error executing tool: {"detail": "Internal server error"}',
+        )
+        metric = CitationReadMetric()
+        metric.measure(self._case(self._cite("ssi/2015/99"), tool))
+        assert metric.score == 0.0
+
+    def test_score_is_the_fraction_of_cited_acts_read(self):
+        tools = [
+            ToolCall(
+                name="Worker: search_legislation_sections",
+                input_parameters={"legislation_id": lid},
+                output='[{"text": "Section 1) ..."}]',
+            )
+            for lid in ("asp/2015/1", "asp/2014/9", "ukpga/1978/29")
+        ]
+        report = self._cite("asp/2015/1", "asp/2014/9", "ukpga/1978/29", "ssi/2015/99")
+        metric = CitationReadMetric()
+        metric.measure(self._case(report, *tools))
+        assert metric.score == 0.75
+        assert not metric.is_successful()
+
+    def test_case_law_citations_are_ignored(self):
+        """Case law links have no legislation retrieval to check them against."""
+        report = (
+            "See [the case]"
+            "(https://caselaw.nationalarchives.gov.uk/ewca/civ/2010/123)."
+        )
+        metric = CitationReadMetric()
+        metric.measure(self._case(report))
+        assert metric.score == 1.0
+        assert "nothing to check" in metric.reason
+
+    def test_no_citations_at_all_scores_one(self):
+        metric = CitationReadMetric()
+        metric.measure(self._case("No links in this report."))
+        assert metric.score == 1.0
+
+    def test_no_delegate_research_call_is_not_a_quality_verdict(self):
+        """The reason must carry the prefix streamlit_report.py's
+        _NON_SCORED_PREFIXES uses to keep the row out of the mean."""
+        case = LLMTestCase(input="q", actual_output="final answer", tools_called=[])
+        metric = CitationReadMetric()
+        metric.measure(case)
+        assert metric.score == 0.0
+        assert metric.reason.startswith("No 'delegate_research' tool call found;")
+
+
+class TestCitationReadSiblingStepDiagnostic:
+    """In a deep research run a step can cite an Act a *sibling* step read but
+    it did not, i.e. assert ahead of its own evidence. Reported in the reason,
+    never scored, since a step's References section lists Acts it did not
+    read."""
+
+    @staticmethod
+    def _two_step_case() -> LLMTestCase:
+        """Step 1 reads only asp/2015/1 but cites ssi/2015/99; step 2 reads
+        ssi/2015/99."""
+
+        def _read(lid):
+            return ToolCall(
+                name="Worker: search_legislation_sections",
+                input_parameters={"legislation_id": lid},
+                output='[{"text": "Section 1) ..."}]',
+            )
+
+        def _cite(*lids):
+            return " ".join(
+                f"[x](http://www.legislation.gov.uk/id/{lid})" for lid in lids
+            )
+
+        return LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output=_cite("asp/2015/1", "ssi/2015/99"),
+                ),
+                _read("asp/2015/1"),
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output=_cite("ssi/2015/99"),
+                ),
+                _read("ssi/2015/99"),
+            ],
+        )
+
+    def test_sibling_read_is_reported(self):
+        metric = CitationReadMetric()
+        metric.measure(self._two_step_case())
+        assert "Diagnostic, not scored" in metric.reason
+        assert "step 1" in metric.reason
+        assert "ssi/2015/99" in metric.reason
+
+    def test_sibling_read_does_not_affect_the_score(self):
+        """The run as a whole read both Acts, so the score stays 1.0 and the
+        record still passes. This is the behaviour the diagnostic replaces."""
+        metric = CitationReadMetric()
+        metric.measure(self._two_step_case())
+        assert metric.score == 1.0
+        assert metric.is_successful()
+
+    def test_single_step_run_gets_no_diagnostic(self):
+        case = LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output="[x](http://www.legislation.gov.uk/id/asp/2015/1)",
+                ),
+                ToolCall(
+                    name="Worker: search_legislation_sections",
+                    input_parameters={"legislation_id": "asp/2015/1"},
+                    output='[{"text": "Section 1) ..."}]',
+                ),
+            ],
+        )
+        metric = CitationReadMetric()
+        metric.measure(case)
+        assert "Diagnostic" not in metric.reason
+
+    def test_act_no_step_read_still_fails_and_is_not_a_diagnostic(self):
+        """An Act nobody read is the scored failure, not the diagnostic."""
+        case = LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output="[x](http://www.legislation.gov.uk/id/ssi/2015/99)",
+                ),
+                ToolCall(
+                    name="Worker: search_legislation_sections",
+                    input_parameters={"legislation_id": "asp/2015/1"},
+                    output='[{"text": "Section 1) ..."}]',
+                ),
+                ToolCall(name="delegate_research", input_parameters={}, output="none"),
+            ],
+        )
+        metric = CitationReadMetric()
+        metric.measure(case)
+        assert metric.score == 0.0
+        assert "Cited without reading" in metric.reason
+        assert "Diagnostic" not in metric.reason

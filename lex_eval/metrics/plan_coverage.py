@@ -188,7 +188,9 @@ class PlanCoverageMetric(BaseMetric):
         self.score = len(addressed) / len(ordered)
         self.success = self.score >= self.threshold
 
-        self.reason = f"Plan addresses {len(addressed)} of {len(ordered)} reference point(s)."
+        self.reason = (
+            f"Plan addresses {len(addressed)} of {len(ordered)} reference point(s)."
+        )
         if invalid_step:
             self.reason += (
                 f" {invalid_step} further 'addressed' label(s) counted as not "

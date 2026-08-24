@@ -70,6 +70,7 @@ METRIC_FILES = {
     "mandatory_structure": "test_structure.py",
     "citation_passthrough": "test_structure.py",
     "citation_grounding": "test_structure.py",
+    "citation_read": "test_structure.py",
     "citation_domain": "test_structure.py",
     "genuine_gap": "test_structure.py",
     "step_completion": "test_structure.py",
@@ -279,7 +280,9 @@ def run_evals(
         # matching nothing) is a genuine collection problem and still
         # surfaces.
         if rc == 5 and deselect:
-            print(f"ℹ️  {test_file}: nothing new to run, all requested responses already covered")
+            print(
+                f"ℹ️  {test_file}: nothing new to run, all requested responses already covered"
+            )
             rc = 0
 
         if rc > overall_rc:
@@ -307,6 +310,7 @@ Metrics:
   mandatory_structure          Worker output has required headings (fast, offline)
   citation_passthrough         Worker citations reach the final response (fast, offline)
   citation_grounding           Cited Acts were actually retrieved (fast, offline)
+  citation_read                Cited Acts had their text read, not just their title seen (fast, offline)
   citation_domain               Citations point to legislation.gov.uk (fast, offline)
   genuine_gap                  Failed retrieval is disclosed, not glossed over (fast, offline)
   step_completion               Every step's own retrieval reached its own report, deep research only (fast, offline)

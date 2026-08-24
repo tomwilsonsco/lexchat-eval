@@ -119,6 +119,11 @@ METRICS: list[tuple[str, str, str]] = [
         "Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model.",
     ),
     (
+        "citation_read",
+        "Citation Read",
+        "Did the researcher actually read every Act it cites? An Act whose text was pulled counts as read, one that only appeared as a title in a search results list does not. Catches a report making claims about a real, correctly linked source it never opened.",
+    ),
+    (
         "citation_domain",
         "Citation Domain",
         "Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite.",
@@ -577,7 +582,7 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         f'<span style="color:{colour};font-size:0.85em;font-weight:600;">{label}</span>'
         f"&nbsp;&nbsp;score: <code>{score_text}</code>"
         f'<div style="color:#8b949e;font-size:0.85em;margin-top:6px;">'
-        f'{reason_html}</div>'
+        f"{reason_html}</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -957,9 +962,9 @@ def _render_mode_filter(container, modes_present: list[str]) -> str:
         "Research type",
         [_ALL_MODES, *modes_present],
         index=0,
-        format_func=lambda m: m
-        if m == _ALL_MODES
-        else _chat_mode_badge(m).replace("_", " "),
+        format_func=lambda m: (
+            m if m == _ALL_MODES else _chat_mode_badge(m).replace("_", " ")
+        ),
         help="Deep research and single-shot runs are scored and averaged "
         "separately, never blended into one number.",
     )
@@ -972,9 +977,7 @@ def _render_model_selector(container, llms: list[str]) -> str:
     contents on every rerun, so tabs made the page cost grow with the number of
     models evaluated even though only one is ever on screen.
     """
-    return container.selectbox(
-        "Model", llms, index=0, help="Worst pass rate first."
-    )
+    return container.selectbox("Model", llms, index=0, help="Worst pass rate first.")
 
 
 _ALL_RESULTS = "All results"

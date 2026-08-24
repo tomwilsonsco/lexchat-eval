@@ -6,12 +6,16 @@ SSE endpoint and writes the structured results to responses.db.
 
 This is Step 2 of the eval pipeline.
 
+A question may carry its own "chat_mode", in which case it wins over the
+--chat-mode flag, so a file mixing modes can be gathered in a single run.
+
 Usage:
     python -m lex_eval.gather_responses
     python -m lex_eval.gather_responses --overwrite
     python -m lex_eval.gather_responses --debug-events
     python -m lex_eval.gather_responses --verbose-capture
     python -m lex_eval.gather_responses --chat-mode deep_research
+    python -m lex_eval.gather_responses --questions data/questions_new.json --question-id 7 8 9
 """
 
 from __future__ import annotations
@@ -71,6 +75,7 @@ def process_question(
                 json={
                     "messages": [{"role": "user", "content": question}],
                     "model": model_name,
+                    "research_mode": research_mode,
                 },
             )
             plan_response.raise_for_status()
@@ -286,14 +291,25 @@ def main() -> None:
     parser.add_argument(
         "--question-id",
         type=int,
+        nargs="+",
         default=None,
-        help="Run only the question with this ID (default: all questions)",
+        metavar="ID",
+        help="Run only the question(s) with these IDs, e.g. --question-id 1 2 4 "
+        "(default: all questions)",
     )
     parser.add_argument(
         "--chat-mode",
         default="research",
         choices=["research", "conversational", "deep_research"],
-        help="Chat mode to pass to /api/system/chat (default: research)",
+        help="Chat mode to pass to /api/system/chat, for questions that do not "
+        "set their own chat_mode (default: research)",
+    )
+    parser.add_argument(
+        "--questions",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="Path to the questions JSON file (default: lex_eval/data/questions.json)",
     )
     args = parser.parse_args()
 
@@ -307,13 +323,13 @@ def main() -> None:
     # Paths
     # ------------------------------------------------------------------
     base = Path(__file__).parent
-    questions_path = base / "data" / "questions.json"
+    questions_path = args.questions or (base / "data" / "questions.json")
     db_path = base / "data" / "responses.db"
     debug_events_path = base / "data" / "debug_events.jsonl"
     verbose_logs_dir = base / "data" / "verbose_logs"
 
     if not questions_path.exists():
-        logger.error("questions.json not found at %s", questions_path)
+        logger.error("Questions file not found at %s", questions_path)
         sys.exit(1)
 
     # ------------------------------------------------------------------
@@ -353,11 +369,14 @@ def main() -> None:
     logger.info("Loaded %d questions", len(questions))
 
     if args.question_id is not None:
-        questions = [q for q in questions if q["id"] == args.question_id]
-        if not questions:
-            logger.error("No question found with id=%d", args.question_id)
+        wanted = set(args.question_id)
+        questions = [q for q in questions if q["id"] in wanted]
+        found = {q["id"] for q in questions}
+        missing = wanted - found
+        if missing:
+            logger.error("No question found with id(s)=%s", sorted(missing))
             sys.exit(1)
-        logger.info("Filtered to question ID %d", args.question_id)
+        logger.info("Filtered to question ID(s) %s", sorted(found))
 
     # No per-question skip check exists, every question is (re-)gathered on each
     # run. --overwrite clears prior responses first; otherwise runs are appended.
@@ -402,7 +421,7 @@ def main() -> None:
                         model_name,
                         summ_model_name,
                         args.retries,
-                        args.chat_mode,
+                        q.get("chat_mode", args.chat_mode),
                         debug_fh,
                         verbose_log_path,
                     )
@@ -450,7 +469,7 @@ def main() -> None:
                             "summarisation_output": [],
                             "summarisation_used": False,
                             "summarisation_llm": summ_model_name,
-                            "chat_mode": args.chat_mode,
+                            "chat_mode": q.get("chat_mode", args.chat_mode),
                             "research_plan": None,
                             "provider": None,
                             "total_cost_usd": None,

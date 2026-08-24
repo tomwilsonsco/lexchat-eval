@@ -74,6 +74,38 @@ fetched sections for, so an Act found in a search and cited without a follow-up 
 fabricated. Only the JSON at the start of the output is parsed now. Tool outputs that are not JSON at
 all (a LEX API error, or a model replying in prose) are still skipped.
 
+## Citation Read
+
+**Aim.** Checks that the Worker actually read every Act it cites. An Act whose text was pulled counts
+as read; one that only appeared as a title in a `search_legislation` results list does not. Catches a
+report making claims about a real, correctly linked source it never opened, for example saying an Act
+"was commenced by" an SI whose text nobody retrieved.
+
+**How.** Deterministic. Collects every legislation.gov.uk Act cited in the Worker's report, and the
+set of Acts whose text was retrieved (the `legislation_id` argument of a `search_legislation_sections`
+or `get_legislation_text` call that returned usable output, not an error). Score is the fraction of
+cited Acts that were read; threshold is 1.0, so a single unread cited Act fails. Case law citations
+are ignored, since there is no legislation retrieval to check them against.
+
+**Why.** Citation Grounding accepts an Act that merely turned up in a search results list, so an
+answer can invent a relationship ("made under", "inserted by", "commenced by") for a source nobody
+opened and still score 1.0. Most of what this catches is invisible to every other metric, including
+Claim Support. A minority of what it flags is a bare entry in a References list rather than a claim.
+That is accepted rather than fixed: telling the two apart needs heading parsing, and the machinery
+would cost more than the noise.
+
+**Scored over the run, with a per-step diagnostic.** The score pools every step's report against every
+tool call in the run, the same way Citation Grounding does. A deep research run can therefore have one
+step cite an Act a sibling step read, which the reason reports as "Diagnostic, not scored" without
+affecting the score. Scoping the score per step was considered and rejected: every step writes its own
+References section, so most such steps are References-list entries, and where the citation is a real
+claim the run has usually read the Act at another step. What that would detect is a step asserting
+ahead of its own evidence, not a source nobody opened. Consistency reports citation drift the same way,
+visible in the reason and out of the score.
+
+**Reading it.** Like Citation Grounding, this measures "asserted without reading", not "wrong". Most
+flagged claims are probably true. Treat a fail as a claim the run cannot show its working for.
+
 ## Citation Domain
 
 **Aim.** Checks that every citation URL in the Worker's report points to legislation.gov.uk, the only
@@ -129,6 +161,12 @@ change, it scored 0.75, 0.5, 0.75, 1.0, 0.5, flagging a different step each time
 per record. Splitting into one narrower call per step, the same fix already used by Response Groundedness
 (a direct verdict instead of a multi-item grade), scored the same three previously unstable responses
 identically across five repeats each.
+
+**Reading it.** Splitting the call reduced the noise but did not remove it. A single flagged step in
+an otherwise represented run still occasionally flips between runs with no input change, and one such
+flag was confirmed by hand to be wrong: the finding's exact figures and section number were present in
+the final answer verbatim. Treat one flagged step as a prompt to re-run rather than a finding. A fully
+dropped run, score 0.0 with several steps flagged, is not this kind of noise.
 
 ## Consistency (Cosine)
 

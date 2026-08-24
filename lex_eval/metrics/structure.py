@@ -4,15 +4,25 @@ Metrics that validate Worker Agent output quality.
 MandatoryStructureMetric:  checks the 4-part Markdown heading structure.
 CitationPassthroughMetric: checks that Worker references reach the final response.
 CitationGroundingMetric:   checks that Worker citations were actually retrieved.
+CitationReadMetric:        checks that cited Acts had their text read, not just
+                            their title seen in a search result.
 CitationDomainMetric:      checks that Worker citation URLs are on legislation.gov.uk.
 GenuineGapMetric:          checks that an empty retrieval is disclosed, not papered over.
 StepCompletionMetric:      checks that a step's own retrieval reached that step's own
                             report (deep research only).
 
-All six metrics inspect every ``delegate_research`` tool-call output, which is where
+All seven metrics inspect every ``delegate_research`` tool-call output, which is where
 the Worker Agent's response is surfaced, one per delegation, so a deep-research run
-with several approved plan steps produces several outputs, and each must independently
-satisfy the check, not just the first.
+with several approved plan steps produces several outputs, and none is skipped.
+
+They differ in how they then score, and the distinction matters when reading a
+deep-research result:
+
+* Scoped per step, so one step cannot be excused by a sibling: MandatoryStructure,
+  GenuineGap, StepCompletion.
+* Scored over the run as a whole, pooling every report against every tool call:
+  CitationGrounding, CitationRead, CitationDomain. CitationRead additionally reports
+  a per-step observation in its reason, without scoring it (see ``_sibling_read_note``).
 """
 
 import json
@@ -109,26 +119,34 @@ def _get_delegate_outputs(test_case: LLMTestCase) -> list[str]:
     return [g["report"] for g in _group_tools_by_delegation(test_case)]
 
 
-def _retrieved_usable_content(tools: list) -> bool:
-    """True if any ``search_legislation_sections``/``get_legislation_text``
-    call among *tools* returned non-empty output, i.e. retrieval wasn't empty.
+# The two tools that return legal text, as opposed to search hits that
+# return only titles and links.
+_TEXT_TOOLS = (
+    "Worker: search_legislation_sections",
+    "Worker: get_legislation_text",
+)
+
+
+def _usable_output(output) -> bool:
+    """True if a tool call's *output* is real content rather than a failure.
 
     A LEX tool failure comes back as non-empty prose starting "Error
     executing tool: " (``LexChat/server_py/src/agent/tools/executor.py``),
     not an empty string, so that's excluded explicitly rather than counted
     as usable content.
     """
-    def _usable(output) -> bool:
-        if not output:
-            return False
-        text = output if isinstance(output, str) else str(output)
-        return not text.startswith("Error executing tool:")
+    if not output:
+        return False
+    text = output if isinstance(output, str) else str(output)
+    return not text.startswith("Error executing tool:")
 
+
+def _retrieved_usable_content(tools: list) -> bool:
+    """True if any ``search_legislation_sections``/``get_legislation_text``
+    call among *tools* returned non-empty output, i.e. retrieval wasn't empty.
+    """
     return any(
-        tool.name
-        in ("Worker: search_legislation_sections", "Worker: get_legislation_text")
-        and _usable(tool.output)
-        for tool in tools
+        tool.name in _TEXT_TOOLS and _usable_output(tool.output) for tool in tools
     )
 
 
@@ -333,6 +351,18 @@ def _legislation_id_from_url(url: str) -> str:
     return "/".join(_url_path(url).split("/")[:3])
 
 
+_ALLOWED_CITATION_DOMAIN = "legislation.gov.uk"
+
+
+def _on_allowed_domain(url: str) -> bool:
+    """True if *url* is on legislation.gov.uk, the only domain the Worker's
+    system prompt permits it to cite."""
+    netloc = urlparse(url).netloc.lower()
+    return netloc == _ALLOWED_CITATION_DOMAIN or netloc.endswith(
+        f".{_ALLOWED_CITATION_DOMAIN}"
+    )
+
+
 def _leading_json(raw: str) -> dict:
     """
     Parse the JSON object at the start of *raw*, ignoring anything after it.
@@ -377,6 +407,67 @@ def _retrieved_legislation_ids(tools: list) -> set:
             if lid:
                 ids.add(lid)
 
+    return ids
+
+
+def _cited_gov_uk_ids(report: str) -> set:
+    """Act-level ids cited by legislation.gov.uk URL in *report*.
+
+    Case law links are skipped: there is no legislation retrieval to check
+    them against.
+    """
+    return {
+        lid
+        for lid in (
+            _legislation_id_from_url(u)
+            for u in _URL_RE.findall(report or "")
+            if _on_allowed_domain(u)
+        )
+        if lid
+    }
+
+
+def _sibling_read_note(groups: list) -> str:
+    """Steps citing an Act a *sibling* step read but they did not, i.e. a step
+    asserting ahead of its own evidence.
+
+    Reported in the reason, never scored, since a step's References section
+    lists Acts it did not read. See docs/metrics.md.
+    """
+    if len(groups) < 2:
+        return ""
+    read_per = [_read_legislation_ids(g["tools"]) for g in groups]
+    all_read: set = set().union(*read_per)
+    notes = []
+    for i, g in enumerate(groups, 1):
+        sibling = (_cited_gov_uk_ids(g["report"]) - read_per[i - 1]) & all_read
+        if sibling:
+            notes.append(f"step {i} cites {sorted(sibling)}")
+    if not notes:
+        return ""
+    return (
+        " Diagnostic, not scored: "
+        + "; ".join(notes)
+        + ", which another step read but that step did not."
+    )
+
+
+def _read_legislation_ids(tools: list) -> set:
+    """
+    Return the set of legislation_ids whose *text* was actually read: the
+    legislation_id argument of every ``search_legislation_sections`` /
+    ``get_legislation_text`` call among *tools* that returned usable output.
+
+    Narrower than ``_retrieved_legislation_ids`` on purpose. That function
+    also counts an Act that merely turned up in a ``search_legislation``
+    results list, which returns titles and links but no legal text.
+    """
+    ids: set = set()
+    for tool in tools or []:
+        if tool.name in _TEXT_TOOLS and _usable_output(tool.output):
+            lid = (tool.input_parameters or {}).get("legislation_id")
+            if lid:
+                ids.add(lid)
     return ids
 
 
@@ -478,7 +569,90 @@ class CitationGroundingMetric(BaseMetric):
         return "Citation Grounding"
 
 
-_ALLOWED_CITATION_DOMAIN = "legislation.gov.uk"
+class CitationReadMetric(BaseMetric):
+    """
+    Checks that the Worker actually read every Act it cites: an Act whose text
+    was pulled counts as read, one that only appeared as a title in a
+    search_legislation results list does not.
+
+    Catches a report making claims about a real, correctly linked source it
+    never opened, e.g. saying an Act "was commenced by" an SI whose text
+    nobody retrieved. Citation Grounding passes those, because it accepts a
+    search hit as grounding.
+
+    Only legislation.gov.uk citations are counted; case law links have no
+    legislation retrieval to check them against.
+
+    Score:
+        0.0: no delegate_research call found; cannot be verified.
+        1.0: no legislation.gov.uk citations in Worker output; nothing to check.
+        else: the fraction of cited Acts whose text was read. Threshold is 1.0,
+              so a single unread cited Act fails.
+    """
+
+    def __init__(self, threshold: float = 1.0) -> None:
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.reason = ""
+
+    def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        groups = _group_tools_by_delegation(test_case)
+
+        if not groups:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"No '{_DELEGATE_TOOL_NAME}' tool call found; "
+                "citation reading cannot be verified."
+            )
+            return self.score
+
+        cited_ids: set = set()
+        for g in groups:
+            cited_ids |= _cited_gov_uk_ids(g["report"])
+
+        if not cited_ids:
+            self.score = 1.0
+            self.success = True
+            self.reason = (
+                f"No {_ALLOWED_CITATION_DOMAIN} citations found in Worker "
+                "output; nothing to check."
+            )
+            return self.score
+
+        read_ids = _read_legislation_ids(test_case.tools_called)
+        unread = cited_ids - read_ids
+
+        self.score = (len(cited_ids) - len(unread)) / len(cited_ids)
+        self.success = self.score >= self.threshold
+
+        if unread:
+            self.reason = (
+                f"Cited without reading: {sorted(unread)}. "
+                f"{len(cited_ids) - len(unread)} of {len(cited_ids)} cited Act(s) "
+                "had their text retrieved; the rest were cited on the strength of "
+                "a search result title, or were never looked up at all."
+            )
+        else:
+            self.reason = (
+                f"All {len(cited_ids)} cited Act(s) had their text retrieved by "
+                "this run."
+            )
+
+        self.reason += _sibling_read_note(groups)
+
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+    @property
+    def __name__(self) -> str:  # type: ignore[override]
+        return "Citation Read"
 
 
 class CitationDomainMetric(BaseMetric):
@@ -524,12 +698,6 @@ class CitationDomainMetric(BaseMetric):
             self.success = True
             self.reason = "No citation URLs found in Worker output; nothing to check."
             return self.score
-
-        def _on_allowed_domain(url: str) -> bool:
-            netloc = urlparse(url).netloc.lower()
-            return netloc == _ALLOWED_CITATION_DOMAIN or netloc.endswith(
-                f".{_ALLOWED_CITATION_DOMAIN}"
-            )
 
         off_domain = {u for u in cited_urls if not _on_allowed_domain(u)}
 
@@ -679,7 +847,9 @@ class GenuineGapMetric(BaseMetric):
                 )
         else:
             worst = step_scores.index(min(step_scores)) + 1
-            where = f"Step {worst} of {len(groups)}" if len(groups) > 1 else "The report"
+            where = (
+                f"Step {worst} of {len(groups)}" if len(groups) > 1 else "The report"
+            )
             if self.score == 0.5:
                 self.reason = (
                     f"{where} had empty retrieval and disclosed the gap, but "

@@ -217,6 +217,8 @@ lex_eval/data/responses.db
 lex_eval/data/debug_events.jsonl
 lex_eval/data/verbose_logs/
 
+lex_eval/data/session-transcripts-*.csv
+
 # Python build
 dist/
 *.egg-info/
@@ -229,3 +231,7 @@ lexchat/
 
 # Local-only project instructions, not published to GitHub
 /CLAUDE.md
+
+# Personal Claude Code settings (hooks, permissions). Project-wide settings
+# would go in .claude/settings.json, which is not ignored.
+.claude/settings.local.json
