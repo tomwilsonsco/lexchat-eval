@@ -43,6 +43,13 @@ records = load_records(read_only=True)
 _NOT_DEEP_RESEARCH = "Not deep_research; Step Completion not measured"
 _NOT_DEEP_RESEARCH_INTEGRATION = "Not deep_research; Report Integration not measured"
 
+# Same idea for conversational runs, where the Worker system prompt tells the
+# agent NOT to use the report headings this metric looks for, so a score here
+# would measure obedience to an instruction LexChat never gave.
+_NOT_CONVERSATIONAL_STRUCTURE = (
+    "Not applicable in conversational mode; Research Output Structure not measured"
+)
+
 _skip_no_api_key = pytest.mark.skipif(
     _judge is None,
     reason="Configured judge API key not set (check lex_eval/.env)",
@@ -60,7 +67,23 @@ def test_mandatory_structure(request, record):
     all mandatory Markdown headings based on the research mode.
 
     Records without a ``delegate_research`` tool call automatically score 0.0.
+
+    Conversational records are not measured: their Worker prompt forbids these
+    headings (excluded from the dashboard mean, not scored as a failure).
     """
+    if record.get("chat_mode") == "conversational":
+        attach_metric(
+            request,
+            record=record,
+            test_name="mandatory_structure",
+            metric_name="Research Output Structure",
+            score=0.0,
+            threshold=1.0,
+            passed=False,
+            reason=_NOT_CONVERSATIONAL_STRUCTURE,
+        )
+        pytest.skip(_NOT_CONVERSATIONAL_STRUCTURE)
+
     test_case = record_to_test_case(record)
     research_mode = record.get("research_mode", "legislation_only")
     metric = MandatoryStructureMetric(threshold=1.0, research_mode=research_mode)
@@ -222,10 +245,16 @@ def test_genuine_gap(request, record):
     Records with no delegate_research call automatically score 0.0.
     Records outside legislation_only mode score 1.0 (not applicable).
     Records where retrieval succeeded score 1.0 (nothing to disclose).
+    Conversational records accept a plain-English disclosure in full, since
+    their Worker prompt mandates no exact wording.
     """
     test_case = record_to_test_case(record)
     research_mode = record.get("research_mode", "legislation_only")
-    metric = GenuineGapMetric(threshold=1.0, research_mode=research_mode)
+    metric = GenuineGapMetric(
+        threshold=1.0,
+        research_mode=research_mode,
+        chat_mode=record.get("chat_mode", "research"),
+    )
     metric.measure(test_case)
 
     attach_metric(

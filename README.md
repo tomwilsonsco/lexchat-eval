@@ -353,7 +353,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Metric | Description |
 |--------|-------------|
 | Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed), and does the Worker stick to that order rather than looping back to an earlier step later in the same run? |
-| Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. |
+| Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. Not measured in conversational mode, where the worker is told not to use those headers. |
 | Reference Links | Are all reference links found by the researcher included in the final answer given to the user. |
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |
 | Citation Read | Did the researcher actually read every Act it cites? An Act whose text was pulled counts as read, one that only appeared as a title in a search results list does not. Catches a report making claims about a real, correctly linked source it never opened. |

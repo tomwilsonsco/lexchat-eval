@@ -8,6 +8,9 @@ is written up in `docs/reference-answers.md`, including the important caveat tha
 five `Research Output Structure` family metrics score 0.0 on a reference-answer record, since there is
 no `delegate_research` call to inspect there.
 
+Which of these metrics give a valid verdict on a **conversational** run, and which measure the wrong
+thing there, is written up separately in `docs/conversational-mode-evals.md`.
+
 Metrics are listed in the same order as the README table. Each name matches its dashboard display name
 in `METRIC_DISPLAY_ORDER` in `lex_eval/reports/streamlit_report.py`, so it can be cross-referenced
 against the Streamlit app directly.
@@ -42,6 +45,10 @@ structure a downstream reader (or another metric) expects.
 numbering, and minor wording variants like "Jurisdiction & Status" vs "Jurisdiction and Status") inside
 the `delegate_research` tool output, matched at the start of a line so a heading can't be confused with
 the word appearing mid-sentence. Scores 1.0 if every required heading is present, 0.0 otherwise.
+
+**Not measured in conversational mode.** That mode's Worker prompt tells the agent not to use these
+headings at all, so a score would be measuring obedience to an instruction LexChat never gave. The
+row is still written, carrying a reason that keeps it out of the dashboard mean.
 
 ## Reference Links
 
@@ -126,6 +133,10 @@ retrieval was genuinely empty scores 1.0 if its own report contains the exact ma
 sentence, 0.5 if a looser paraphrase is present (e.g. "no relevant", "could not find"), and 0.0 if
 nothing discloses the gap at all. The run's score is the worst step's score, so one step disclosing
 honestly can't be credited to a sibling step that didn't.
+
+**Conversational mode scores a paraphrase in full.** The mandated sentence belongs to the research
+Worker prompt. The conversational one asks only that the agent "say so plainly", so there is no
+wording to copy and a paraphrase is the required behaviour, not a partial one.
 
 ## Step Completion
 

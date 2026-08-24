@@ -759,6 +759,10 @@ class GenuineGapMetric(BaseMetric):
     the tools this check inspects (search_legislation_sections, get_legislation_text)
     are specific to legislation retrieval.
 
+    In conversational mode the Worker prompt asks for a plain statement of the
+    gap and mandates no exact sentence, so a paraphrase scores full marks there
+    rather than the 0.5 partial credit it gets in research mode.
+
     Scoped per step (a single-shot run has exactly one): a step whose own
     retrieval succeeded is judged on its own report, not excused because a
     sibling step elsewhere in the run happened to retrieve something.
@@ -769,15 +773,19 @@ class GenuineGapMetric(BaseMetric):
         1.0: every step either retrieved usable content itself (nothing to
                disclose) or, having retrieved nothing, disclosed that plainly.
         0.5: the worst such step disclosed the gap only as a paraphrase of
-               the mandated sentence.
+               the mandated sentence (research mode only).
         0.0: the worst such step didn't disclose the gap at all.
     """
 
     def __init__(
-        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+        self,
+        threshold: float = 1.0,
+        research_mode: str = "legislation_only",
+        chat_mode: str = "research",
     ) -> None:
         self.threshold = threshold
         self.research_mode = research_mode
+        self.chat_mode = chat_mode
         self.score = 0.0
         self.success = False
         self.reason = ""
@@ -808,6 +816,10 @@ class GenuineGapMetric(BaseMetric):
         # whether a sibling step's retrieval was empty.
         step_scores = []
         n_retrieved = 0
+        # The conversational Worker prompt says "say so plainly" and gives no
+        # sentence to copy, so a paraphrase is the required behaviour there,
+        # not a partial one.
+        paraphrase_score = 1.0 if self.chat_mode == "conversational" else 0.5
         for g in groups:
             if _retrieved_usable_content(g["tools"]):
                 step_scores.append(1.0)
@@ -817,7 +829,7 @@ class GenuineGapMetric(BaseMetric):
             if _GENUINE_GAP_PHRASE.lower() in lowered:
                 step_scores.append(1.0)
             elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
-                step_scores.append(0.5)
+                step_scores.append(paraphrase_score)
             else:
                 step_scores.append(0.0)
 

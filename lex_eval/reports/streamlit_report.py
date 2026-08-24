@@ -106,7 +106,7 @@ METRICS: list[tuple[str, str, str]] = [
     (
         "mandatory_structure",
         "Research Output Structure",
-        "Does the worker agent return the findings to the manager with the requested headers.",
+        "Does the worker agent return the findings to the manager with the requested headers. Not measured in conversational mode, where the worker is told not to use those headers.",
     ),
     (
         "citation_passthrough",
@@ -131,7 +131,7 @@ METRICS: list[tuple[str, str, str]] = [
     (
         "genuine_gap",
         "Genuine Gap",
-        "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence.",
+        "When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. In research mode the wording is set by the prompt, so a paraphrase scores half. In conversational mode no wording is mandated, so a plain statement of the gap scores full.",
     ),
     (
         "consistency",
@@ -205,6 +205,7 @@ _NON_SCORED_PREFIXES = (
     "No reference answer citations to compare against;",
     "No research plan for this record;",
     "Not deep_research;",
+    "Not applicable in conversational mode;",
 )
 
 
