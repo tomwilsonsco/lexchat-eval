@@ -118,12 +118,11 @@ class ClaimSupportMetric(BaseMetric):
     retrieval_context. research_output is passed via the constructor as it is
     not a standard LLMTestCase field.
 
-    Read this metric at the aggregate, not per record. Measured over three
-    sweeps of the same 22 stored responses, the mean moved 0.829 / 0.806 /
-    0.825, a spread of 0.023, but individual records moved by 0.124 on average
-    and 7 of the 22 changed pass or fail. The judge re-chooses which claims the
-    report makes on every run, and no stored list can prevent that here because
-    the claims come from the report, which is new text on every gather run.
+    Read this metric at the aggregate, not per record: the mean holds steady
+    across sweeps while individual records move, because the judge re-chooses
+    which claims the report makes on every run. No stored list can prevent that
+    here, since the claims come from the report, which is new text on every
+    gather run. See docs/metrics.md.
 
     Args:
         research_output: The research agent's synthesised output.

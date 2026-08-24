@@ -338,3 +338,107 @@ class TestCitationReadRequiresTextNotJustATitle:
         metric.measure(case)
         assert metric.score == 0.0
         assert metric.reason.startswith("No 'delegate_research' tool call found;")
+
+
+class TestCitationReadSiblingStepDiagnostic:
+    """In a deep research run a step can cite an Act a *sibling* step read but
+    it did not, i.e. assert ahead of its own evidence. Reported in the reason,
+    never scored, since a step's References section lists Acts it did not
+    read."""
+
+    @staticmethod
+    def _two_step_case() -> LLMTestCase:
+        """Step 1 reads only asp/2015/1 but cites ssi/2015/99; step 2 reads
+        ssi/2015/99."""
+
+        def _read(lid):
+            return ToolCall(
+                name="Worker: search_legislation_sections",
+                input_parameters={"legislation_id": lid},
+                output='[{"text": "Section 1) ..."}]',
+            )
+
+        def _cite(*lids):
+            return " ".join(
+                f"[x](http://www.legislation.gov.uk/id/{lid})" for lid in lids
+            )
+
+        return LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output=_cite("asp/2015/1", "ssi/2015/99"),
+                ),
+                _read("asp/2015/1"),
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output=_cite("ssi/2015/99"),
+                ),
+                _read("ssi/2015/99"),
+            ],
+        )
+
+    def test_sibling_read_is_reported(self):
+        metric = CitationReadMetric()
+        metric.measure(self._two_step_case())
+        assert "Diagnostic, not scored" in metric.reason
+        assert "step 1" in metric.reason
+        assert "ssi/2015/99" in metric.reason
+
+    def test_sibling_read_does_not_affect_the_score(self):
+        """The run as a whole read both Acts, so the score stays 1.0 and the
+        record still passes. This is the behaviour the diagnostic replaces."""
+        metric = CitationReadMetric()
+        metric.measure(self._two_step_case())
+        assert metric.score == 1.0
+        assert metric.is_successful()
+
+    def test_single_step_run_gets_no_diagnostic(self):
+        case = LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output="[x](http://www.legislation.gov.uk/id/asp/2015/1)",
+                ),
+                ToolCall(
+                    name="Worker: search_legislation_sections",
+                    input_parameters={"legislation_id": "asp/2015/1"},
+                    output='[{"text": "Section 1) ..."}]',
+                ),
+            ],
+        )
+        metric = CitationReadMetric()
+        metric.measure(case)
+        assert "Diagnostic" not in metric.reason
+
+    def test_act_no_step_read_still_fails_and_is_not_a_diagnostic(self):
+        """An Act nobody read is the scored failure, not the diagnostic."""
+        case = LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output="[x](http://www.legislation.gov.uk/id/ssi/2015/99)",
+                ),
+                ToolCall(
+                    name="Worker: search_legislation_sections",
+                    input_parameters={"legislation_id": "asp/2015/1"},
+                    output='[{"text": "Section 1) ..."}]',
+                ),
+                ToolCall(name="delegate_research", input_parameters={}, output="none"),
+            ],
+        )
+        metric = CitationReadMetric()
+        metric.measure(case)
+        assert metric.score == 0.0
+        assert "Cited without reading" in metric.reason
+        assert "Diagnostic" not in metric.reason

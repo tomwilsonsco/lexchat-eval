@@ -72,19 +72,13 @@ class ReportIntegrationMetric(BaseMetric):
 
     One judge call per in-scope step, asking only about that step's own
     finding, rather than one batched call listing every step alongside the
-    full final answer. The batched version was measured unstable: re-run five
-    times on the same stored response with no input change, it scored 0.75,
-    0.5, 0.75, 1.0, 0.5, flagging a different step each time. Asking one
-    narrower question per call is the same fix ResponseGroundednessMetric
-    already uses (a direct pass/fail per response rather than a multi-item
-    grade), applied per step instead of per response. This fixed the wild
-    swings, but not perfectly: on stored data, a single step out of many
-    still occasionally flips "dropped" on one run and back on the next with
-    no input change (one confirmed by hand: the flagged finding's exact
-    figures and section number were present in the final answer verbatim).
-    Treat a single flagged step with some scepticism and re-run before
-    treating it as a real finding; a fully dropped run (score 0.0, multiple
-    steps flagged) is not this kind of noise.
+    full final answer, which was measured unstable. Asking one narrower
+    question per call is the same fix ResponseGroundednessMetric already uses
+    (a direct pass/fail per response rather than a multi-item grade), applied
+    per step instead of per response. It reduced the noise without removing
+    it: treat a single flagged step as a prompt to re-run rather than a
+    finding, while a fully dropped run (score 0.0, several steps flagged) is
+    not this kind of noise. See docs/metrics.md.
 
     The judge must quote the FINAL ANSWER to justify a "represented" label.
     A quote that isn't really there is downgraded to dropped, so the judge

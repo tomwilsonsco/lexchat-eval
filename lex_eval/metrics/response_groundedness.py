@@ -85,9 +85,8 @@ class ResponseGroundednessMetric(BaseMetric):
     for a fail.
 
     The verdict is asked for directly rather than as a 1-5 grade because the grade
-    was unstable. Re-run on the same stored responses, the 1-5 version moved on 6
-    of the 10 records that reach the judge, and one grade step was enough to flip a
-    verdict. See docs/metrics.md.
+    was unstable: a single grade step was enough to flip a verdict. See
+    docs/metrics.md.
 
     research_output is not a standard LLMTestCase field so it is passed
     via the constructor, following the same pattern as ClaimSupportMetric.

@@ -62,10 +62,8 @@ class CitationAgreementMetric(BaseMetric):
 
     The threshold is deliberately low because a reference answer cites
     everything its author consulted, including background provisions a good
-    response need not repeat. Measured over the first 24 responses the scores
-    ran 0.00 to 0.65, and the runs that cite nothing at all score 0.00.
-    Replace this with the lawyer's `required_citations` once the reference
-    answers are signed off.
+    response need not repeat. See docs/metrics.md. Replace this with the
+    lawyer's `required_citations` once the reference answers are signed off.
     """
 
     def __init__(self, reference_answer: str, threshold: float = 0.3) -> None:

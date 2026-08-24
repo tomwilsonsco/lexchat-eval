@@ -13,8 +13,16 @@ StepCompletionMetric:      checks that a step's own retrieval reached that step'
 
 All seven metrics inspect every ``delegate_research`` tool-call output, which is where
 the Worker Agent's response is surfaced, one per delegation, so a deep-research run
-with several approved plan steps produces several outputs, and each must independently
-satisfy the check, not just the first.
+with several approved plan steps produces several outputs, and none is skipped.
+
+They differ in how they then score, and the distinction matters when reading a
+deep-research result:
+
+* Scoped per step, so one step cannot be excused by a sibling: MandatoryStructure,
+  GenuineGap, StepCompletion.
+* Scored over the run as a whole, pooling every report against every tool call:
+  CitationGrounding, CitationRead, CitationDomain. CitationRead additionally reports
+  a per-step observation in its reason, without scoring it (see ``_sibling_read_note``).
 """
 
 import json
@@ -402,6 +410,48 @@ def _retrieved_legislation_ids(tools: list) -> set:
     return ids
 
 
+def _cited_gov_uk_ids(report: str) -> set:
+    """Act-level ids cited by legislation.gov.uk URL in *report*.
+
+    Case law links are skipped: there is no legislation retrieval to check
+    them against.
+    """
+    return {
+        lid
+        for lid in (
+            _legislation_id_from_url(u)
+            for u in _URL_RE.findall(report or "")
+            if _on_allowed_domain(u)
+        )
+        if lid
+    }
+
+
+def _sibling_read_note(groups: list) -> str:
+    """Steps citing an Act a *sibling* step read but they did not, i.e. a step
+    asserting ahead of its own evidence.
+
+    Reported in the reason, never scored, since a step's References section
+    lists Acts it did not read. See docs/metrics.md.
+    """
+    if len(groups) < 2:
+        return ""
+    read_per = [_read_legislation_ids(g["tools"]) for g in groups]
+    all_read: set = set().union(*read_per)
+    notes = []
+    for i, g in enumerate(groups, 1):
+        sibling = (_cited_gov_uk_ids(g["report"]) - read_per[i - 1]) & all_read
+        if sibling:
+            notes.append(f"step {i} cites {sorted(sibling)}")
+    if not notes:
+        return ""
+    return (
+        " Diagnostic, not scored: "
+        + "; ".join(notes)
+        + ", which another step read but that step did not."
+    )
+
+
 def _read_legislation_ids(tools: list) -> set:
     """
     Return the set of legislation_ids whose *text* was actually read: the
@@ -547,9 +597,9 @@ class CitationReadMetric(BaseMetric):
         self.reason = ""
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        dr_outputs = _get_delegate_outputs(test_case)
+        groups = _group_tools_by_delegation(test_case)
 
-        if not dr_outputs:
+        if not groups:
             self.score = 0.0
             self.success = False
             self.reason = (
@@ -559,13 +609,8 @@ class CitationReadMetric(BaseMetric):
             return self.score
 
         cited_ids: set = set()
-        for dr_output in dr_outputs:
-            for url in _URL_RE.findall(dr_output):
-                if not _on_allowed_domain(url):
-                    continue
-                lid = _legislation_id_from_url(url)
-                if lid:
-                    cited_ids.add(lid)
+        for g in groups:
+            cited_ids |= _cited_gov_uk_ids(g["report"])
 
         if not cited_ids:
             self.score = 1.0
@@ -594,6 +639,8 @@ class CitationReadMetric(BaseMetric):
                 f"All {len(cited_ids)} cited Act(s) had their text retrieved by "
                 "this run."
             )
+
+        self.reason += _sibling_read_note(groups)
 
         return self.score
 
