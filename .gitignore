@@ -217,6 +217,8 @@ lex_eval/data/responses.db
 lex_eval/data/debug_events.jsonl
 lex_eval/data/verbose_logs/
 
+lex_eval/data/session-transcripts-*.csv
+
 # Python build
 dist/
 *.egg-info/
