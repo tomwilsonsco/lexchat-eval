@@ -353,11 +353,11 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Metric | Description |
 |--------|-------------|
 | Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed), and does the Worker stick to that order rather than looping back to an earlier step later in the same run? |
-| Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. |
+| Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. Not measured in conversational mode, where the worker is told not to use those headers. |
 | Reference Links | Are all reference links found by the researcher included in the final answer given to the user. |
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |
 | Citation Read | Did the researcher actually read every Act it cites? An Act whose text was pulled counts as read, one that only appeared as a title in a search results list does not. Catches a report making claims about a real, correctly linked source it never opened. |
-| Citation Domain | Does every citation link in the researcher's report point to legislation.gov.uk, the only domain the Worker is permitted to cite. |
+| Citation Domain | Does every citation link in the researcher's report point to a domain the Worker is permitted to cite. That is legislation.gov.uk for legislation only, caselaw.nationalarchives.gov.uk for case law only, and both for the hybrid mode, matching what each Worker prompt asks for. |
 | Genuine Gap | When retrieval found no usable legislation text, does the researcher's report say so plainly instead of answering with unsupported confidence. |
 | Step Completion | Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step). |
 | Report Integration | Deep research only, AI as a judge metric: For every step that reported a real, cited finding of its own, does the final answer reflect it, rather than dropping it when the Manager condenses several step reports into one response. |

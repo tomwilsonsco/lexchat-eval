@@ -1,0 +1,41 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Water Industry (Scotland) Act 2002"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Public Finance and Accountability (Scotland) Act 2000"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Water Industry Commission for Scotland reports accounts"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2002/3",
+      "query": "Water Industry Commission reports accounts annual report laid before Parliament"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2005/3",
+      "query": "Water Industry Commission for Scotland establishment annual report accounts"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2000/1",
+      "query": "accounts of bodies preparation audit sending to Auditor General laying before Parliament deadline"
+    }
+  }
+]

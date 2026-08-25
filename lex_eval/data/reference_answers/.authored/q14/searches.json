@@ -1,0 +1,48 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Spreadable Fats Milk and Milk Products Regulations 2008 margarine vitamins"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "margarine vitamin A vitamin D regulations"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Spreadable Fats (England) Regulations margarine"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2008/1287",
+      "query": "margarine vitamin A vitamin D content requirements"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2008/216",
+      "query": "margarine vitamin A vitamin D content requirements"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2013/2854",
+      "query": "revocation spreadable fats regulations"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "wsi/2001/1361",
+      "query": "margarine vitamins marketing standards"
+    }
+  }
+]

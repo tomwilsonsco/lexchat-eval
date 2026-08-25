@@ -1,0 +1,35 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scotland Act 1998 Scottish Administration section 126"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scottish Administration office holders Order in Council"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/1998/46",
+      "query": "Scottish Administration meaning office holders section 126 interpretation"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2015/200",
+      "query": "Scottish Administration offices non ministerial office holder"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2012/3073",
+      "query": "Scottish Administration offices non ministerial office holder"
+    }
+  }
+]

@@ -1,0 +1,28 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Climate Change (Scotland) Act 2009 climate change plan"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Climate Change (Emissions Reduction Targets) (Scotland) Act 2019"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2009/12",
+      "query": "section 35A climate change plan laid before Parliament requirements"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2009/12",
+      "query": "section 35ZA consultation draft plan publication requirements"
+    }
+  }
+]

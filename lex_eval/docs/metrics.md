@@ -43,6 +43,10 @@ numbering, and minor wording variants like "Jurisdiction & Status" vs "Jurisdict
 the `delegate_research` tool output, matched at the start of a line so a heading can't be confused with
 the word appearing mid-sentence. Scores 1.0 if every required heading is present, 0.0 otherwise.
 
+**Not measured in conversational mode.** That mode's Worker prompt tells the agent not to use these
+headings at all, so a score would be measuring obedience to an instruction LexChat never gave. The
+row is still written, carrying a reason that keeps it out of the dashboard mean.
+
 ## Reference Links
 
 **Aim.** Checks that reference links the Worker found survive into the final answer the user actually
@@ -66,6 +70,11 @@ every cited Act id against that set. No citation URLs at all scores 1.0 (nothing
 Act missing from the retrieved set scores 0.0, with no partial credit: unlike Reference Links, where
 "some links survived" is meaningfully better than "none did", one fabricated citation is a full failure
 regardless of how many others were genuine.
+
+**Only legislation.gov.uk URLs are read as Act ids.** A judgment link such as
+`caselaw.nationalarchives.gov.uk/uksc/2025/13` would otherwise become Act id `uksc/2025`, which no
+legislation tool call can ever have retrieved, so every case law citation was reported as fabricated.
+See `docs/case-law-issues.md` issue 3.
 
 **Why the parsing is fussy.** `search_legislation` returns its JSON results with a plain-text
 "[NEXT STEP: ...]" hint appended for the Worker, so reading the whole string as JSON fails. That went
@@ -108,11 +117,19 @@ flagged claims are probably true. Treat a fail as a claim the run cannot show it
 
 ## Citation Domain
 
-**Aim.** Checks that every citation URL in the Worker's report points to legislation.gov.uk, the only
-domain its system prompt permits it to cite.
+**Aim.** Checks that every citation URL in the Worker's report points to a domain its system prompt
+told it to cite.
 
 **How.** Deterministic, same no-partial-credit reasoning as Citation Grounding. No citation URLs scores
-1.0; any URL on a different domain scores 0.0; all on legislation.gov.uk scores 1.0.
+1.0; any URL on a domain outside the permitted set scores 0.0; all inside it scores 1.0. The permitted
+set follows the research mode: legislation.gov.uk for `legislation_only`, and
+caselaw.nationalarchives.gov.uk alone for `case_law_only`, and both for `legislation_and_case_law`.
+Each set is exactly what that mode's Worker prompt permits: the case law prompt requires findings to
+be grounded "EXCLUSIVELY in case law" and never mentions legislation.gov.uk, while the hybrid prompt's
+citation protocol names both.
+
+**Why it is mode-dependent.** A single legislation-only rule failed every case law response outright,
+for citing judgments in exactly the format it was told to use. See `docs/case-law-issues.md` issue 3.
 
 ## Genuine Gap
 
@@ -126,6 +143,10 @@ retrieval was genuinely empty scores 1.0 if its own report contains the exact ma
 sentence, 0.5 if a looser paraphrase is present (e.g. "no relevant", "could not find"), and 0.0 if
 nothing discloses the gap at all. The run's score is the worst step's score, so one step disclosing
 honestly can't be credited to a sibling step that didn't.
+
+**Conversational mode scores a paraphrase in full.** The mandated sentence belongs to the research
+Worker prompt. The conversational one asks only that the agent "say so plainly", so there is no
+wording to copy and a paraphrase is the required behaviour, not a partial one.
 
 ## Step Completion
 
@@ -204,6 +225,12 @@ reference answer and the response, then checks whether the response cites *somet
 the reference cites (section-level matching, not just Act-level). Score is the fraction of the
 reference's cited Acts covered.
 
+**It reads the final answer, not the Worker's report.** Citations are extracted from `actual_output`,
+so an answer that names the right Act in prose without a link scores nothing for it. That matters most
+in conversational mode, where the Manager routinely drops the Worker's URLs, and it is why this metric
+separates by chat mode more sharply than any other. Read a low score alongside Reference Links before
+concluding the response missed the law.
+
 **Why.** The threshold is set low, 0.3, deliberately: a reference answer cites everything its author
 consulted while researching, including background provisions a good response doesn't need to repeat.
 Measured over 24 responses, scores ranged 0.00-0.65. This metric, along with Reference Answer Agreement
@@ -281,6 +308,12 @@ own evidence. Score is supported claims divided by scorable claims. Absence clai
 reported but excluded from the denominator entirely, since nothing can be quoted to prove a law's
 silence on something.
 
+**A halted run is not scored.** When LexChat's agent loop hits its ReAct turn cap it returns
+`[Research halted: exceeded N tool-call steps]` in place of a report. Asked to find up to 8 claims in
+that one sentence, the judge either invents them or errors, so a report holding nothing but the
+sentinel is treated as no research output at all. A longer report that merely contains it had one
+step halt among several and is still scored on the rest.
+
 **Why.** Read this metric at the aggregate, not per record: across repeated sweeps of the same 22
 stored responses, the mean moved by only 0.023, but individual records moved by 0.124 on average and
 7 of 22 changed pass or fail. The judge re-selects which claims a report even contains on every run, and
@@ -303,6 +336,18 @@ For a deep research run, the judge is also given the approved plan's scope note.
 something like "case law was excluded under the approved research plan", which is true but is stated
 nowhere in the research output, so without the scope note the judge read it as an unsupported claim and
 failed the whole answer. Runs without a plan pass no scope note and the prompt is unchanged.
+
+**The `<suggestions>` block never reaches this metric.** In conversational mode the Manager is told to
+end every reply with a `<suggestions>` block of follow-up questions. LexChat strips it from the answer
+before sending, so it is absent from `actual_output` and no metric sees it. Worth knowing before
+investigating whether those suggested questions read as ungrounded claims: they cannot, they are not
+there.
+
+**A halted run is not scored here either**, for consistency with Claim Support and with the
+already-existing empty-research case, though the trade-off differs: with no research output, an answer
+making claims genuinely is ungrounded, so the judge's verdict was right. What is lost is that verdict;
+what is gained is that the two metrics agree on what "no research" means. A halted run is still caught
+by Tool Usage and Reference Links, which score it normally.
 
 **Why.** The 0.95 near-verbatim threshold sits in an observed gap: one model that follows a "do not
 condense" instruction literally measured 0.983-1.000 similarity, while one that habitually paraphrases

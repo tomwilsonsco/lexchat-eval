@@ -1,0 +1,28 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Spreadable Fats, Milk and Milk Products (Scotland) Regulations 2008"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "margarine Scotland vitamins regulations"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2008/216",
+      "query": "margarine vitamin A vitamin D content requirements offence enforcement"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/1999/34",
+      "query": "spreadable fats marketing standards Scotland margarine"
+    }
+  }
+]

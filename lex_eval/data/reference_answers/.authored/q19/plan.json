@@ -1,0 +1,17 @@
+{
+  "scope_note": "Covers the vitamin content requirements for margarine sold by retail in Scotland, the instrument that imposes them, and the offence and enforcement provisions attached. Limited to Scotland and to legislation.",
+  "steps": [
+    {
+      "title": "Identify the current Scottish instrument",
+      "detail": "Find the instrument currently governing the composition of margarine sold by retail in Scotland and confirm it is the one in force rather than a predecessor."
+    },
+    {
+      "title": "Retrieve the vitamin content requirement",
+      "detail": "Retrieve the regulation setting minimum and maximum vitamin A and vitamin D levels, with the exact figures and the unit they are expressed in."
+    },
+    {
+      "title": "Retrieve the offence, enforcement and exemption provisions",
+      "detail": "Identify what contravention amounts to, who enforces, the penalty, and which products are exempt."
+    }
+  ]
+}

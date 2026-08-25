@@ -351,16 +351,48 @@ def _legislation_id_from_url(url: str) -> str:
     return "/".join(_url_path(url).split("/")[:3])
 
 
-_ALLOWED_CITATION_DOMAIN = "legislation.gov.uk"
+_LEGISLATION_DOMAIN = "legislation.gov.uk"
+_CASE_LAW_DOMAIN = "caselaw.nationalarchives.gov.uk"
+
+# The domains each research mode's Worker system prompt tells it to cite
+# (LexChat/server_py/src/prompts.py, CITATION PROTOCOL in each Worker prompt).
+# One entry per mode, and each is exactly what that prompt allows:
+#   legislation_only         legislation.gov.uk and nothing else.
+#   case_law_only            case law only. That prompt requires findings to be
+#                            grounded "EXCLUSIVELY in case law retrieved via the
+#                            search_case_law tool", with every legal proposition
+#                            citing a specific case, and never mentions
+#                            legislation.gov.uk. Allowing it here would let a run
+#                            score 1.0 for citing a source its brief excluded.
+#   legislation_and_case_law both, since that prompt's protocol names both.
+_PERMITTED_DOMAINS = {
+    "legislation_only": (_LEGISLATION_DOMAIN,),
+    "case_law_only": (_CASE_LAW_DOMAIN,),
+    "legislation_and_case_law": (_LEGISLATION_DOMAIN, _CASE_LAW_DOMAIN),
+}
 
 
-def _on_allowed_domain(url: str) -> bool:
-    """True if *url* is on legislation.gov.uk, the only domain the Worker's
-    system prompt permits it to cite."""
+def _on_domain(url: str, domain: str) -> bool:
+    """True if *url*'s host is *domain* or a subdomain of it."""
     netloc = urlparse(url).netloc.lower()
-    return netloc == _ALLOWED_CITATION_DOMAIN or netloc.endswith(
-        f".{_ALLOWED_CITATION_DOMAIN}"
-    )
+    return netloc == domain or netloc.endswith(f".{domain}")
+
+
+def _is_legislation_url(url: str) -> bool:
+    """True if *url* points at legislation.gov.uk.
+
+    This is what separates an Act citation from a judgment citation, so it
+    gates every place a URL is turned into a legislation_id. A case law link
+    such as caselaw.nationalarchives.gov.uk/uksc/2025/13 would otherwise
+    become Act id "uksc/2025", which no legislation tool call can ever have
+    retrieved.
+    """
+    return _on_domain(url, _LEGISLATION_DOMAIN)
+
+
+def _permitted_domains(research_mode: str) -> tuple:
+    """The citation domains this research mode's Worker prompt permits."""
+    return _PERMITTED_DOMAINS.get(research_mode, (_LEGISLATION_DOMAIN,))
 
 
 def _leading_json(raw: str) -> dict:
@@ -410,7 +442,7 @@ def _retrieved_legislation_ids(tools: list) -> set:
     return ids
 
 
-def _cited_gov_uk_ids(report: str) -> set:
+def _cited_legislation_ids(report: str) -> set:
     """Act-level ids cited by legislation.gov.uk URL in *report*.
 
     Case law links are skipped: there is no legislation retrieval to check
@@ -421,7 +453,7 @@ def _cited_gov_uk_ids(report: str) -> set:
         for lid in (
             _legislation_id_from_url(u)
             for u in _URL_RE.findall(report or "")
-            if _on_allowed_domain(u)
+            if _is_legislation_url(u)
         )
         if lid
     }
@@ -440,7 +472,7 @@ def _sibling_read_note(groups: list) -> str:
     all_read: set = set().union(*read_per)
     notes = []
     for i, g in enumerate(groups, 1):
-        sibling = (_cited_gov_uk_ids(g["report"]) - read_per[i - 1]) & all_read
+        sibling = (_cited_legislation_ids(g["report"]) - read_per[i - 1]) & all_read
         if sibling:
             notes.append(f"step {i} cites {sorted(sibling)}")
     if not notes:
@@ -469,15 +501,6 @@ def _read_legislation_ids(tools: list) -> set:
             if lid:
                 ids.add(lid)
     return ids
-
-
-def _cited_legislation_ids(report: str) -> set:
-    """Return the set of Act-level legislation_ids cited by URL in *report*."""
-    return {
-        lid
-        for lid in (_legislation_id_from_url(u) for u in _URL_RE.findall(report or ""))
-        if lid
-    }
 
 
 class CitationGroundingMetric(BaseMetric):
@@ -521,12 +544,9 @@ class CitationGroundingMetric(BaseMetric):
             )
             return self.score
 
-        cited_urls: set[str] = set()
+        cited_ids: set[str] = set()
         for dr_output in dr_outputs:
-            cited_urls.update(_URL_RE.findall(dr_output))
-        cited_ids = {
-            lid for lid in (_legislation_id_from_url(u) for u in cited_urls) if lid
-        }
+            cited_ids |= _cited_legislation_ids(dr_output)
 
         if not cited_ids:
             self.score = 1.0
@@ -610,13 +630,13 @@ class CitationReadMetric(BaseMetric):
 
         cited_ids: set = set()
         for g in groups:
-            cited_ids |= _cited_gov_uk_ids(g["report"])
+            cited_ids |= _cited_legislation_ids(g["report"])
 
         if not cited_ids:
             self.score = 1.0
             self.success = True
             self.reason = (
-                f"No {_ALLOWED_CITATION_DOMAIN} citations found in Worker "
+                f"No {_LEGISLATION_DOMAIN} citations found in Worker "
                 "output; nothing to check."
             )
             return self.score
@@ -657,22 +677,33 @@ class CitationReadMetric(BaseMetric):
 
 class CitationDomainMetric(BaseMetric):
     """
-    Checks that every citation URL in the Worker's report points to
-    legislation.gov.uk, the only domain the Worker's system prompt permits
-    ("Do not invent URLs for domains other than legislation.gov.uk").
+    Checks that every citation URL in the Worker's report points to a domain
+    its system prompt told it to cite.
+
+    Which domains those are follows the research mode: legislation.gov.uk for
+    legislation_only, and caselaw.nationalarchives.gov.uk as well for the two
+    case law modes, whose prompts mandate that format for judgments.
 
     Score:
         0.0: no delegate_research call found; domains cannot be verified.
         1.0: no citation URLs in Worker output (nothing to check).
-        0.0: one or more citation URLs point to a different domain.
-        1.0: every citation URL is on legislation.gov.uk.
+        0.0: one or more citation URLs point to some other domain.
+        1.0: every citation URL is on a permitted domain.
 
     No partial credit, same reasoning as Citation Grounding: one invented
     domain is a full failure regardless of how many other citations are fine.
+
+    Args:
+        threshold:     Minimum score to pass (default 1.0).
+        research_mode: ``legislation_only`` (default), ``case_law_only``, or
+            ``legislation_and_case_law``. Decides the permitted domain set.
     """
 
-    def __init__(self, threshold: float = 1.0) -> None:
+    def __init__(
+        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+    ) -> None:
         self.threshold = threshold
+        self.research_mode = research_mode
         self.score = 0.0
         self.success = False
         self.reason = ""
@@ -699,22 +730,25 @@ class CitationDomainMetric(BaseMetric):
             self.reason = "No citation URLs found in Worker output; nothing to check."
             return self.score
 
-        off_domain = {u for u in cited_urls if not _on_allowed_domain(u)}
+        permitted = _permitted_domains(self.research_mode)
+        off_domain = {
+            u for u in cited_urls if not any(_on_domain(u, d) for d in permitted)
+        }
+        permitted_str = " or ".join(permitted)
 
         if off_domain:
             self.score = 0.0
             self.success = False
             self.reason = (
                 f"Off-domain citation(s): {sorted(off_domain)} do not point to "
-                f"{_ALLOWED_CITATION_DOMAIN}, the only domain the Worker's "
-                "system prompt permits."
+                f"{permitted_str}, the domain(s) the Worker's system prompt "
+                f"permits in {self.research_mode} mode."
             )
         else:
             self.score = 1.0
             self.success = True
             self.reason = (
-                f"All {len(cited_urls)} citation URL(s) are on "
-                f"{_ALLOWED_CITATION_DOMAIN}."
+                f"All {len(cited_urls)} citation URL(s) are on {permitted_str}."
             )
 
         return self.score
@@ -738,14 +772,26 @@ _GENUINE_GAP_PHRASE = (
     "The available database does not contain information on this specific issue."
 )
 
-# Paraphrases of the mandated sentence that still count as disclosing the gap,
-# just not in the exact required wording (0.5 partial credit).
+# Wordings that disclose the gap without using the research prompt's mandated
+# sentence. Two groups, and both are needed:
+#   - paraphrases of the mandated sentence, worth 0.5 in research mode because
+#     the wording there is prescribed and was not used;
+#   - the phrasing the conversational Worker prompt asks for in its own words,
+#     "If the retrieved text does not answer the question, say so plainly and
+#     suggest the user switch to Research mode". A conversational report that
+#     follows that instruction literally matches none of the paraphrases above,
+#     so without these entries it scored 0.0 for doing exactly what it was told.
+# "not answer" also covers "do not answer" and "cannot answer"; "n't answer"
+# covers the contracted forms.
 _GENUINE_GAP_KEYWORDS = (
     "does not contain information",
     "no relevant",
     "could not find",
     "no information",
     "unable to find",
+    "not answer",
+    "n't answer",
+    "switch to research mode",
 )
 
 
@@ -759,6 +805,10 @@ class GenuineGapMetric(BaseMetric):
     the tools this check inspects (search_legislation_sections, get_legislation_text)
     are specific to legislation retrieval.
 
+    In conversational mode the Worker prompt asks for a plain statement of the
+    gap and mandates no exact sentence, so a paraphrase scores full marks there
+    rather than the 0.5 partial credit it gets in research mode.
+
     Scoped per step (a single-shot run has exactly one): a step whose own
     retrieval succeeded is judged on its own report, not excused because a
     sibling step elsewhere in the run happened to retrieve something.
@@ -769,15 +819,19 @@ class GenuineGapMetric(BaseMetric):
         1.0: every step either retrieved usable content itself (nothing to
                disclose) or, having retrieved nothing, disclosed that plainly.
         0.5: the worst such step disclosed the gap only as a paraphrase of
-               the mandated sentence.
+               the mandated sentence (research mode only).
         0.0: the worst such step didn't disclose the gap at all.
     """
 
     def __init__(
-        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+        self,
+        threshold: float = 1.0,
+        research_mode: str = "legislation_only",
+        chat_mode: str = "research",
     ) -> None:
         self.threshold = threshold
         self.research_mode = research_mode
+        self.chat_mode = chat_mode
         self.score = 0.0
         self.success = False
         self.reason = ""
@@ -808,6 +862,10 @@ class GenuineGapMetric(BaseMetric):
         # whether a sibling step's retrieval was empty.
         step_scores = []
         n_retrieved = 0
+        # The conversational Worker prompt says "say so plainly" and gives no
+        # sentence to copy, so a paraphrase is the required behaviour there,
+        # not a partial one.
+        paraphrase_score = 1.0 if self.chat_mode == "conversational" else 0.5
         for g in groups:
             if _retrieved_usable_content(g["tools"]):
                 step_scores.append(1.0)
@@ -817,7 +875,7 @@ class GenuineGapMetric(BaseMetric):
             if _GENUINE_GAP_PHRASE.lower() in lowered:
                 step_scores.append(1.0)
             elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
-                step_scores.append(0.5)
+                step_scores.append(paraphrase_score)
             else:
                 step_scores.append(0.0)
 

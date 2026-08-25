@@ -1,0 +1,54 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Climate Change (Scotland) Act 2009"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Interpretation and Legislative Reform (Scotland) Act 2010"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scotland Act 1998 interpretation order transitory"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Interpretation and Legislative Reform (Scotland) Act 2010"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2009/12",
+      "query": "interpretation meaning of month period of time"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/1999/1379",
+      "query": "interpretation of Acts of the Scottish Parliament month meaning"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2010/10",
+      "query": "application of Part 1 to Acts of the Scottish Parliament and instruments month meaning"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2011/88",
+      "query": "savings transitional application to Acts passed before commencement"
+    }
+  }
+]

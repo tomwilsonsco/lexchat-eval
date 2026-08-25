@@ -1,0 +1,26 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Education (Scotland) Act 1962"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Education (Scotland) Act 1962 section 117 regulations"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Education (Scotland) Act 1962 consolidation"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Education (Scotland) Act 1962 section 117 expenses regulations"
+    }
+  }
+]

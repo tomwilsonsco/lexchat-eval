@@ -1,0 +1,17 @@
+{
+  "scope_note": "Covers the process for reporting and publishing Scottish Water's accounts, cited to the subsection that carries each requirement. Limited to legislation. The diagnostic twin of question 7, where the same general public finance Act must be discovered rather than named.",
+  "steps": [
+    {
+      "title": "Retrieve Scottish Water's accounts duty at subsection level",
+      "detail": "Retrieve section 45 of the Water Industry (Scotland) Act 2002 and identify separately what each paragraph of subsections (1) and (2) requires."
+    },
+    {
+      "title": "Find the deadline for sending accounts to the Auditor General",
+      "detail": "Where the 2002 Act leaves timing to ministerial direction, identify the general enactment that imposes a backstop deadline and the subsection carrying it."
+    },
+    {
+      "title": "Establish the auditor's obligations",
+      "detail": "Identify the provisions governing who audits the account and what the auditor's report must set out."
+    }
+  ]
+}
