@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run LexChat evaluations using pytest + DeepEval.
+Run LexChat evaluations using pytest.
 
 This script wraps pytest so individual metrics (or all of them) can be
 launched from the command line with sensible defaults and optional filters.
@@ -299,7 +299,7 @@ def run_evals(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run LexChat evaluations (pytest + DeepEval)",
+        description="Run LexChat evaluations (pytest)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Metrics:

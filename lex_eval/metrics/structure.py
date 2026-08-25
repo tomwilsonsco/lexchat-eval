@@ -29,8 +29,8 @@ import json
 import re
 from urllib.parse import urlparse
 
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
+from .base import BaseMetric
+from ..testcase import LLMTestCase
 
 _DELEGATE_TOOL_NAME = "delegate_research"
 
@@ -226,9 +226,6 @@ class MandatoryStructureMetric(BaseMetric):
 
         return self.score
 
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
-
     def is_successful(self) -> bool:
         return self.success
 
@@ -299,9 +296,6 @@ class CitationPassthroughMetric(BaseMetric):
             )
 
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success
@@ -578,9 +572,6 @@ class CitationGroundingMetric(BaseMetric):
 
         return self.score
 
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
-
     def is_successful(self) -> bool:
         return self.success
 
@@ -663,9 +654,6 @@ class CitationReadMetric(BaseMetric):
         self.reason += _sibling_read_note(groups)
 
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success
@@ -752,9 +740,6 @@ class CitationDomainMetric(BaseMetric):
             )
 
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success
@@ -921,9 +906,6 @@ class GenuineGapMetric(BaseMetric):
 
         return self.score
 
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
-
     def is_successful(self) -> bool:
         return self.success
 
@@ -1001,9 +983,6 @@ class StepCompletionMetric(BaseMetric):
             )
 
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success

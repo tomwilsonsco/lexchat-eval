@@ -11,8 +11,8 @@ import json
 import re
 from typing import List, Literal
 
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
+from .base import BaseMetric
+from ..testcase import LLMTestCase
 from pydantic import BaseModel
 
 # Budgeted for a judge with a roughly 1M-token context window (see
@@ -126,7 +126,7 @@ class ClaimSupportMetric(BaseMetric):
 
     Args:
         research_output: The research agent's synthesised output.
-        model:           A DeepEval-compatible judge model.
+        model:           A judge model, see utils/judge.py.
         threshold:       Minimum share of claims that must be supported
                          (default 0.8).
     """
@@ -233,9 +233,6 @@ class ClaimSupportMetric(BaseMetric):
             )
 
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success

@@ -209,8 +209,6 @@ __marimo__/
 *.html
 *.db
 
-# DeepEval telemetry
-.deepeval/
 
 # Local databases (deploy copy is intentionally committed; responses.db is not)
 lex_eval/data/responses.db

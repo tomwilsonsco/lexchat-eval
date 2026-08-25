@@ -4,7 +4,7 @@ stub judge model, no API key or DB needed.
 """
 
 import pytest
-from deepeval.test_case import LLMTestCase
+from lex_eval.testcase import LLMTestCase
 
 from lex_eval.metrics.plan_coverage import PlanCoverageMetric, _CoverageJudgement
 

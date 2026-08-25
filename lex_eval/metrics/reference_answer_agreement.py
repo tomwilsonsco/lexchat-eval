@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 from typing import List, Literal
 
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
+from .base import BaseMetric
+from ..testcase import LLMTestCase
 from pydantic import BaseModel
 
 from .claim_support import _quote_found
@@ -140,7 +140,7 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
         statements: The reference statements for this question, in order. With
                     the usual 5, the score can only be 0.0, 0.2, 0.4, 0.6, 0.8
                     or 1.0, and the default threshold means at least 3 of the 5.
-        model:      A DeepEval-compatible judge model.
+        model:      A judge model, see utils/judge.py.
         threshold:  Minimum share of the statements the response must state
                     (default 0.6).
     """
@@ -259,9 +259,6 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
             self.reason = f"States {len(stated)} of {len(ordered)} reference points."
 
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success

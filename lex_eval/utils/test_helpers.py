@@ -1,12 +1,12 @@
 """
 Helpers for loading captured responses (from DuckDB) and converting them into
-DeepEval LLMTestCase objects for evaluation.
+LLMTestCase objects for evaluation.
 """
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from deepeval.test_case import LLMTestCase, ToolCall
+from ..testcase import LLMTestCase, ToolCall
 
 from .db import load_records as _db_load_records
 from .db import DEFAULT_DB, consistency_group_key
@@ -36,7 +36,7 @@ def load_records(
 
 def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
     """
-    Convert a flat record dict into a DeepEval LLMTestCase.
+    Convert a flat record dict into an LLMTestCase.
 
     Handles the serialisation format produced by
     ``gather_responses.serialize_test_case`` (Pydantic model_dump).

@@ -11,8 +11,8 @@ import difflib
 import json
 from typing import Literal
 
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
+from .base import BaseMetric
+from ..testcase import LLMTestCase
 from pydantic import BaseModel
 
 # Above this similarity, the final response is a near-verbatim relay of the
@@ -93,7 +93,7 @@ class ResponseGroundednessMetric(BaseMetric):
 
     Args:
         research_output: The research agent's synthesised output for this question.
-        model:           A DeepEval-compatible judge model.
+        model:           A judge model, see utils/judge.py.
         threshold:       Minimum score to pass. The score is binary, so this is
                          1.0 by default and there is no middle ground.
         scope_note:      The approved research plan's scope note, if the run had
@@ -167,9 +167,6 @@ class ResponseGroundednessMetric(BaseMetric):
 
         self.success = self.score >= self.threshold
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success

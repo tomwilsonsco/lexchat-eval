@@ -7,7 +7,7 @@ tests assert on ``metric.reason`` while ``is_successful()`` follows the score.
 """
 
 import pytest
-from deepeval.test_case import LLMTestCase
+from lex_eval.testcase import LLMTestCase
 
 from lex_eval.metrics.consistency import ConsistencyMetric, _preprocess
 

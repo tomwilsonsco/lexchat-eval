@@ -20,7 +20,7 @@ Whether the response actually answers the question is measured by the
 import re
 
 import pytest
-from deepeval.test_case import LLMTestCase
+from lex_eval.testcase import LLMTestCase
 
 from lex_eval.metrics import (
     ClaimSupportMetric,

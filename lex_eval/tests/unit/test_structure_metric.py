@@ -4,7 +4,7 @@ heading matching, synthetic Worker output, no DB or LexChat instance needed.
 """
 
 import pytest
-from deepeval.test_case import LLMTestCase, ToolCall
+from lex_eval.testcase import LLMTestCase, ToolCall
 
 from lex_eval.metrics.structure import (
     CitationGroundingMetric,

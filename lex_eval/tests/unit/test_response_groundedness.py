@@ -5,7 +5,7 @@ judge, or LexChat instance needed.
 """
 
 import pytest
-from deepeval.test_case import LLMTestCase
+from lex_eval.testcase import LLMTestCase
 
 from lex_eval.metrics.response_groundedness import (
     ResponseGroundednessMetric,

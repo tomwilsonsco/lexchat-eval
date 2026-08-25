@@ -1,4 +1,4 @@
-"""Custom DeepEval metrics for LexChat evaluation."""
+"""Custom metrics for LexChat evaluation."""
 
 from .citation_agreement import CitationAgreementMetric
 from .claim_support import ClaimSupportMetric

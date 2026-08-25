@@ -8,7 +8,7 @@ never invoked for an out-of-scope step).
 """
 
 import pytest
-from deepeval.test_case import LLMTestCase, ToolCall
+from lex_eval.testcase import LLMTestCase, ToolCall
 
 from lex_eval.metrics.report_integration import ReportIntegrationMetric
 from lex_eval.metrics.structure import StepCompletionMetric
