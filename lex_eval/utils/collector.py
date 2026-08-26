@@ -9,6 +9,8 @@ shared DuckDB database (data/responses.db) at the end of the run.
 
 from typing import Any, Dict, List, Optional
 
+from .db import reason_is_not_measured
+
 
 def attach_metric(
     request,
@@ -24,6 +26,7 @@ def attach_metric(
     tools_used: List[str] | None = None,
     judge_llm: Optional[str] = None,
     judge_tokens: Optional[int] = None,
+    measured: Optional[bool] = None,
 ) -> None:
     """
     Attach metric result data to the pytest test item.
@@ -41,6 +44,14 @@ def attach_metric(
         Only set by AI-judge metrics, e.g. from ``_judge.last_model`` /
         ``_judge.total_usage_tokens`` after calling ``.generate()``. Left
         ``None`` for deterministic metrics.
+    measured
+        Whether ``score`` is a real verdict about the response. Left ``None``,
+        it is derived from *reason*: a metric that could not score at all, for
+        example a deep-research-only metric handed a conversational one, says so
+        in its reason and the row is marked unmeasured. Deriving it here rather
+        than at each call site is deliberate, so that a metric cannot forget and
+        silently put a placeholder 0.0 into a mean. Pass it explicitly only to
+        override that.
     """
     request.node._metric_data = {
         "response_id": record.get("response_id"),
@@ -57,4 +68,7 @@ def attach_metric(
         "tools_used": tools_used,
         "judge_llm": judge_llm,
         "judge_tokens": judge_tokens,
+        "measured": (
+            (not reason_is_not_measured(reason)) if measured is None else measured
+        ),
     }

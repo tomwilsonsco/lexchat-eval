@@ -737,6 +737,73 @@ def backfill_halt_columns(path: Optional[Path] = None) -> int:
     return filled
 
 
+def backfill_measured_column(path: Optional[Path] = None) -> int:
+    """Set measured = FALSE on eval rows written before the column existed.
+
+    A metric that cannot score a response, e.g. a deep-research-only metric
+    handed a conversational one, still writes a row so the gap is visible, with
+    score 0.0 because the column is NOT NULL. That 0.0 is not a verdict. Before
+    `measured` existed the only marker was the wording of `reason`, which just
+    one consumer knew to check, so any other query averaged those zeros in.
+
+    Matches on the same reason prefixes and is safe to run repeatedly.
+
+    Returns the number of rows updated.
+    """
+    path = path or DEFAULT_DB
+    if not path.exists():
+        print("Database not found:", path)
+        return 0
+
+    conn = get_connection(path)
+    try:
+        tables = [
+            r[0]
+            for r in conn.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_name LIKE 'eval\\_%' ESCAPE '\\'"
+            ).fetchall()
+        ]
+        clause = " OR ".join(["reason LIKE ?"] * len(_NOT_MEASURED_PREFIXES))
+        params = [p + "%" for p in _NOT_MEASURED_PREFIXES]
+        total = 0
+        for table in tables:
+            cols = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = ?",
+                    [table],
+                ).fetchall()
+            ]
+            if "reason" not in cols:
+                continue
+            if "measured" not in cols:
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                    "measured BOOLEAN DEFAULT TRUE"
+                )
+                conn.execute(
+                    f"UPDATE {table} SET measured = TRUE WHERE measured IS NULL"
+                )
+            n = conn.execute(
+                f"SELECT COUNT(*) FROM {table} WHERE measured AND ({clause})", params
+            ).fetchone()[0]
+            if n:
+                conn.execute(
+                    f"UPDATE {table} SET measured = FALSE WHERE measured AND ({clause})",
+                    params,
+                )
+                print(f"  {table}: {n} row(s) marked not measured")
+                total += n
+        conn.commit()
+    finally:
+        conn.close()
+
+    print(f"Marked {total} row(s) as not measured.")
+    return total
+
+
 def _print_halt_summary(path: Path) -> None:
     """Print which runs had a research step cut short at the ReAct turn cap.
 
@@ -774,8 +841,34 @@ _METRIC_NAME_RE = re.compile(r"^[a-z_]+$")
 
 _EVAL_COLUMNS = (
     "response_id, llm_name, question_id, question, score, threshold, "
-    "passed, reason, error, tools_used, run_at, judge_llm, judge_tokens"
+    "passed, reason, error, tools_used, run_at, judge_llm, judge_tokens, measured"
 )
+
+# Reasons a metric writes when it could not measure a response at all, e.g. a
+# deep-research-only metric handed a conversational one. Rows like these carry
+# score 0.0 because the column is NOT NULL, and that 0.0 is not a verdict: it
+# must never reach a mean. `measured` is the column that says so. This tuple is
+# only used to set it on rows written before the column existed, via
+# backfill_measured_column; new rows are told directly by the metric.
+_NOT_MEASURED_PREFIXES = (
+    "Judge error:",
+    "Output too short",
+    "No retrieval context captured",
+    "No research output captured",
+    "No reference outputs provided.",
+    "No 'delegate_research' tool call found;",
+    "No reference answer for this question;",
+    "No reference statements for this question;",
+    "No reference answer citations to compare against;",
+    "No research plan for this record;",
+    "Not deep_research;",
+    "Not applicable in conversational mode;",
+)
+
+
+def reason_is_not_measured(reason: Optional[str]) -> bool:
+    """Whether *reason* is one a metric writes when it could not score at all."""
+    return bool(reason) and reason.startswith(_NOT_MEASURED_PREFIXES)
 
 
 def _eval_table_name(metric: str) -> str:
@@ -825,9 +918,16 @@ def init_eval_table(conn: duckdb.DuckDBPyConnection, metric: str) -> None:
             tools_used   JSON,
             run_at       TEXT    NOT NULL,
             judge_llm    TEXT,
-            judge_tokens INTEGER
+            judge_tokens INTEGER,
+            measured     BOOLEAN NOT NULL DEFAULT TRUE
         );
     """)
+    # Tables created before `measured` existed. DuckDB does not allow a NOT NULL
+    # constraint on ADD COLUMN, so the default carries it for existing rows and
+    # every insert supplies the value explicitly.
+    conn.execute(
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS measured BOOLEAN DEFAULT TRUE"
+    )
 
 
 def insert_eval_result(
@@ -836,8 +936,9 @@ def insert_eval_result(
     """Insert one eval result record into the eval_<metric> table."""
     table = _eval_table_name(metric)
     conn.execute(
-        f"INSERT INTO {table} ({_EVAL_COLUMNS}) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        f"INSERT INTO {table} ({_EVAL_COLUMNS}) VALUES ("
+        + ", ".join(["?"] * len(_EVAL_COLUMNS.split(", ")))
+        + ")",
         [
             record["response_id"],
             record["llm_name"],
@@ -852,6 +953,7 @@ def insert_eval_result(
             datetime.now(timezone.utc).isoformat(),
             record.get("judge_llm") or None,
             record.get("judge_tokens"),
+            bool(record.get("measured", True)),
         ],
     )
 
@@ -937,6 +1039,7 @@ def load_eval_results(
         run_at,
         judge_llm,
         judge_tokens,
+        measured,
     ) in rows:
         results.append(
             {
@@ -957,6 +1060,7 @@ def load_eval_results(
                 "run_at": run_at,
                 "judge_llm": judge_llm,
                 "judge_tokens": judge_tokens,
+                "measured": True if measured is None else bool(measured),
             }
         )
     return results
@@ -1176,10 +1280,10 @@ def make_deploy_db(
             eval_rows = src.execute(
                 f"SELECT {_EVAL_COLUMNS} FROM {table} ORDER BY id"
             ).fetchall()
+            placeholders = ", ".join(["?"] * len(_EVAL_COLUMNS.split(", ")))
             for er in eval_rows:
                 dst.execute(
-                    f"INSERT INTO {table} ({_EVAL_COLUMNS}) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    f"INSERT INTO {table} ({_EVAL_COLUMNS}) VALUES ({placeholders})",
                     list(er),
                 )
             eval_row_count += len(eval_rows)
@@ -1230,6 +1334,12 @@ if __name__ == "__main__":
         help="Fill max_turns_halted/react_turns_max from stored audit_json",
     )
     _parser.add_argument(
+        "--backfill-measured",
+        action="store_true",
+        help="Mark pre-existing eval rows that carry a 'not measured' reason, so "
+        "their placeholder score of 0.0 is kept out of every mean",
+    )
+    _parser.add_argument(
         "--delete-response",
         metavar="ID",
         type=int,
@@ -1252,6 +1362,8 @@ if __name__ == "__main__":
     elif _args.backfill_halts:
         backfill_halt_columns()
         completeness_report()
+    elif _args.backfill_measured:
+        backfill_measured_column()
     elif _args.delete_response is not None:
         delete_response(_args.delete_response)
     elif _args.clean or _args.dry_run:

@@ -571,3 +571,129 @@ class TestMakeDeployDbPreservesIds:
         ids = {r[0] for r in conn.execute("SELECT id FROM responses").fetchall()}
         conn.close()
         assert ids == {1, 3}
+
+
+class TestMeasuredColumn:
+    """A row a metric could not score must never reach a mean.
+
+    Such a row is still written, so the gap stays visible, and carries score
+    0.0 because the column is NOT NULL. `measured` is what marks it as a
+    placeholder rather than a verdict.
+    """
+
+    @staticmethod
+    def _row(**over):
+        row = {
+            "response_id": 1,
+            "llm_name": "test-llm",
+            "question_id": 1,
+            "question": "q?",
+            "score": 0.0,
+            "threshold": 1.0,
+            "passed": False,
+            "reason": "",
+            "error": "",
+            "tools_used": None,
+            "judge_llm": None,
+            "judge_tokens": None,
+        }
+        row.update(over)
+        return row
+
+    def test_measured_defaults_true_and_round_trips_false(self, tmp_path):
+        from lex_eval.utils.db import (
+            get_connection,
+            init_eval_table,
+            insert_eval_result,
+            load_eval_results,
+        )
+
+        db_path = tmp_path / "scratch.db"
+        conn = get_connection(db_path)
+        init_eval_table(conn, "tool_usage")
+        insert_eval_result(conn, "tool_usage", self._row(score=0.8))
+        insert_eval_result(
+            conn,
+            "tool_usage",
+            self._row(
+                response_id=2,
+                reason="Not deep_research; Step Completion not measured",
+                measured=False,
+            ),
+        )
+        conn.commit()
+        conn.close()
+
+        rows = load_eval_results(db_path, metric="tool_usage", read_only=True)
+        assert [r["measured"] for r in rows] == [True, False]
+        scored = [r["score"] for r in rows if r["measured"]]
+        assert scored == [0.8], "the placeholder 0.0 must not reach the mean"
+
+    def test_attach_metric_derives_measured_from_reason(self):
+        """A metric cannot forget: the reason wording decides, at one place."""
+        from lex_eval.utils.collector import attach_metric
+
+        class _Node:
+            pass
+
+        class _Req:
+            node = _Node()
+
+        record = {"response_id": 1, "llm_name": "l", "question_id": 1, "question": "q"}
+
+        req = _Req()
+        attach_metric(
+            request=req,
+            record=record,
+            test_name="step_completion",
+            metric_name="Step Completion",
+            score=0.0,
+            threshold=1.0,
+            passed=False,
+            reason="Not deep_research; Step Completion not measured",
+        )
+        assert req.node._metric_data["measured"] is False
+
+        req = _Req()
+        attach_metric(
+            request=req,
+            record=record,
+            test_name="step_completion",
+            metric_name="Step Completion",
+            score=0.0,
+            threshold=1.0,
+            passed=False,
+            reason="Step 2 retrieved text but carried no citation into its report",
+        )
+        assert (
+            req.node._metric_data["measured"] is True
+        ), "a real zero is a verdict and must stay in the mean"
+
+    def test_backfill_marks_pre_existing_rows(self, tmp_path):
+        from lex_eval.utils.db import (
+            backfill_measured_column,
+            get_connection,
+            init_eval_table,
+            insert_eval_result,
+            load_eval_results,
+        )
+
+        db_path = tmp_path / "scratch.db"
+        conn = get_connection(db_path)
+        init_eval_table(conn, "plan_coverage")
+        # Written the old way: no `measured` argument, so it lands as True.
+        insert_eval_result(
+            conn,
+            "plan_coverage",
+            self._row(
+                reason="No research plan for this record; Plan Coverage not measured"
+            ),
+        )
+        insert_eval_result(conn, "plan_coverage", self._row(response_id=2, score=0.5))
+        conn.commit()
+        conn.close()
+
+        assert backfill_measured_column(db_path) == 1
+        rows = load_eval_results(db_path, metric="plan_coverage", read_only=True)
+        assert [r["measured"] for r in rows] == [False, True]
+        assert backfill_measured_column(db_path) == 0, "must be safe to re-run"

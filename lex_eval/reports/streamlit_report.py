@@ -16,6 +16,7 @@ if _REPO_ROOT not in sys.path:
 from lex_eval.utils.db import (
     DEFAULT_DB,
     load_eval_results as db_load_eval_results,
+    reason_is_not_measured,
     load_records as db_load_records,
 )
 
@@ -188,30 +189,25 @@ METRIC_TOOLTIPS: dict[str, str] = {name: tip for _key, name, tip in METRICS}
 # comparing multiple
 _AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)"}
 
+
 # Reason prefixes written by judge exceptions and harness capture gates (see
 # metrics/*.py except blocks, tests/eval/test_groundedness.py gate functions,
 # and structure.py's delegate_research precondition). Rows carrying one of
 # these are not a genuine quality verdict, excluded from the mean, reported
 # separately instead of averaged in as 0.0.
-_NON_SCORED_PREFIXES = (
-    "Judge error:",
-    "Output too short",
-    "No retrieval context captured",
-    "No research output captured",
-    "No reference outputs provided.",
-    "No 'delegate_research' tool call found;",
-    "No reference answer for this question;",
-    "No reference statements for this question;",
-    "No reference answer citations to compare against;",
-    "No research plan for this record;",
-    "Not deep_research;",
-    "Not applicable in conversational mode;",
-)
-
-
 def _is_scored(result: dict) -> bool:
-    reason = result.get("reason") or ""
-    return not reason.startswith(_NON_SCORED_PREFIXES)
+    """Whether this row's score is a verdict, and so belongs in a mean.
+
+    A metric that could not score a response still writes a row, so the gap
+    stays visible, carrying score 0.0 because the column is NOT NULL. The
+    `measured` column is what marks those. Rows written before that column
+    existed fall back to the reason wording, which is the rule the column was
+    filled from (see db.backfill_measured_column), so a stale deploy.db still
+    aggregates correctly.
+    """
+    if "measured" in result:
+        return bool(result["measured"])
+    return not reason_is_not_measured(result.get("reason") or "")
 
 
 def _metric_sort_key(metric: dict) -> int:

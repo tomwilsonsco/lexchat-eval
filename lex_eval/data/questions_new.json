@@ -252,8 +252,8 @@
     "question_provenance": "verbatim",
     "source_mode_verified": true,
     "user_confidence": 2,
-    "known_gap": "The answer to this question identified the provisions section 39 commences the day after Royal Assent and stopped there, without checking whether commencement regulations had been made. Asked directly at message 3, it said none had been made, although the Care Reform (Scotland) Act 2025 (Commencement No. 1) Regulations 2025 existed. Only the first half of that is expected from a single-turn gather of this question: the false statement came on explicit follow-up, so what to look for here is the omission, not the assertion.",
-    "eval_observation": null
+    "known_gap": "The answer to this question identified the provisions section 39 commences the day after Royal Assent and stopped there, without checking whether commencement regulations had been made. Asked directly at message 3, it said none had been made, although the Care Reform (Scotland) Act 2025 (Commencement No. 1) Regulations 2025 existed.",
+    "eval_observation": "Gathered twice on glm-5.2:cloud, 26 Aug 2026. Both runs volunteered the false negative in the first answer, unprompted: the substantive provisions are not in force and no commencement regulations have been identified. An earlier note here predicted the opposite, that a single-turn gather would show only the omission because the source session's false statement came on follow-up. On this model the assertion is in turn one."
   },
   {
     "id": 23,
@@ -349,7 +349,7 @@
     "source_mode_verified": true,
     "user_confidence": 3,
     "known_gap": "Named the right enactment, the Cattle Identification (Scotland) Regulations 2007, then declined to give the timeframe and asked the user to switch to Research mode. The reviewer's point is that the answer is in that enactment: it told them it could not answer when it could. The inverse of question 10, the positive control for declining honestly. Nothing in the set currently penalises declining when the answer was within reach.",
-    "eval_observation": "The correct timeframe has not been verified. Until the reference answer supplies it, this question separates only declining from not declining, and not the four outcomes that matter: an appropriate refusal, an unnecessary refusal, a confidently wrong timeframe, and the right answer."
+    "eval_observation": "The correct timeframe has not been verified. Until the reference answer supplies it, this question separates only declining from not declining, and not the four outcomes that matter: an appropriate refusal, an unnecessary refusal, a confidently wrong timeframe, and the right answer. Gathered twice on glm-5.2:cloud, 26 Aug 2026: it did not decline, and both runs gave the same figures, which are candidate ground truth for the author to verify. See TOM_TO_DO.md, \"First gather of questions 22-30\"."
   },
   {
     "id": 29,
