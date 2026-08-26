@@ -178,5 +178,113 @@
     "source_mode_verified": true,
     "user_confidence": 4,
     "known_gap": "Found the correct sections once the question named the Public Finance and Accountability (Scotland) Act 2000, but cited whole sections throughout and never the relevant subsections, so the reviewer said there was not enough detail to write the note from. Diagnostic twin of question 7, where the system has to discover the same Act for itself and does not."
+  },
+  {
+    "id": 22,
+    "question": "is the care reform (Scotland) Act 2025 in force?",
+    "research_mode": "legislation_only",
+    "chat_mode": "conversational",
+    "source_session": 6410,
+    "source_messages": [1],
+    "question_provenance": "verbatim",
+    "source_mode_verified": true,
+    "user_confidence": 2,
+    "known_gap": "Read section 39 correctly and listed the provisions in force the day after Royal Assent, then said no commencement regulations have been made under the Act. The Care Reform (Scotland) Act 2025 (Commencement No. 1) Regulations 2025 had been made. A false negative stated as fact, not a failure to find."
+  },
+  {
+    "id": 23,
+    "question": "Is the Social Security (Amendment) (Scotland) Act 2025 in force?",
+    "research_mode": "legislation_only",
+    "chat_mode": "deep_research",
+    "source_session": 6409,
+    "source_messages": [1, 5, 7],
+    "question_provenance": "verbatim",
+    "source_mode_verified": false,
+    "user_confidence": 1,
+    "known_gap": "The same question three times in one session gave three different answers: the Act could not be found, then a connection error, then partially in force. Given the citation 2025 asp 2 it still returned nothing. It never found either commencement SSI by title, found SSI 2025/119 only when handed the bare number, and never found SSI 2025/377 at all. The inconsistency is within one session, which the Consistency metric compares across gather runs and so would not catch."
+  },
+  {
+    "id": 24,
+    "question": "Is the Scotland Act 1998 in force?",
+    "research_mode": "legislation_and_case_law",
+    "chat_mode": "conversational",
+    "source_session": 6411,
+    "source_messages": [1],
+    "question_provenance": "verbatim",
+    "source_mode_verified": true,
+    "user_confidence": 3,
+    "known_gap": "Right answer by the wrong route. Having failed to retrieve the legislation, it confirmed the Act is in force by citing a 2026 UK Supreme Court judgment that mentions it. The reviewer's point is that case law cannot establish in-force status, because most statutes have never been litigated. The answer is correct, so no metric scoring the output alone fails this; it needs the cited source checked against the proposition it is offered for."
+  },
+  {
+    "id": 25,
+    "question": "I am looking for scottish statutory instruments, made under the powers in section 95 of the Social Security (Scotland) act 2018, which feature a £ symbol within their text",
+    "research_mode": "legislation_only",
+    "chat_mode": "deep_research",
+    "source_session": 6383,
+    "source_messages": [1],
+    "question_provenance": "verbatim",
+    "source_mode_verified": false,
+    "user_confidence": 1,
+    "known_gap": "Found 1 of the 33 SSIs made under section 95, and only after the reviewer named one of them. The identical question run in session 6382 returned none and reported the run halted on the tool-call step limit. Diagnostic twin of question 13, the same enabling-power search inverted: there no instruments exist and it invented three, here 33 exist and it found one."
+  },
+  {
+    "id": 26,
+    "question": "can you find every bit of legislation that amends REGULATION (EU) No 1306/2013 on the financing, management and monitoring of the common agricultural policy and repealing Council Regulations (EEC) No 352/78, (EC) No 165/94, (EC) No 2799/98, (EC) No 814/2000, (EC) No 1290/2005 and (EC) No 485/2008 as it stands in Scotland.",
+    "research_mode": "legislation_only",
+    "chat_mode": "deep_research",
+    "source_session": 6408,
+    "source_messages": [1, 3],
+    "question_provenance": "verbatim",
+    "source_mode_verified": true,
+    "user_confidence": 1,
+    "known_gap": "Returned no amending legislation at all. Every research step halted on the maximum tool-call step limit, and the report filled the space with a summary of the baseline retained Regulation that nobody asked for. The reviewer of session 6406 diagnosed the same area independently: the Scotland jurisdiction filter appears not to treat assimilated UK-wide law as Scottish."
+  },
+  {
+    "id": 27,
+    "question": "Can you identify duties or functions conferred on procurator fiscals, prosecutors, or the Lord Advocate under the Victims and Witnesses (Scotland) Act 2014?",
+    "research_mode": "legislation_only",
+    "chat_mode": "conversational",
+    "source_session": 6381,
+    "source_messages": [1, 3],
+    "question_provenance": "verbatim",
+    "source_mode_verified": true,
+    "user_confidence": 3,
+    "known_gap": "Asked twice in a row, it gave two lists of sections that do not overlap and that contradict each other on what section 6 does: the first says a victim's right to review a decision not to prosecute, the second says a prosecutor's duty to disclose qualifying information. It never had the Act and only said so at the fifth turn, when asked about named sections. Its first answer also attributes to For Women Scotland Ltd v Scottish Ministers [2025] UKSC 16 a holding about section 9(2) of this Act, and cites X v Procurator Fiscal [2017] HCJAC with no case number; the reviewer marked the references accurate and did not raise the case law, so that part is an eval-side observation, not reviewer ground truth."
+  },
+  {
+    "id": 28,
+    "question": "How soon after birth must a bovine animal be officially identified in Scotland?",
+    "research_mode": "legislation_only",
+    "chat_mode": "conversational",
+    "source_session": 6396,
+    "source_messages": [1],
+    "question_provenance": "verbatim",
+    "source_mode_verified": true,
+    "user_confidence": 3,
+    "known_gap": "Named the right enactment, the Cattle Identification (Scotland) Regulations 2007, then declined to give the timeframe and asked the user to switch to Research mode. The reviewer's point is that the answer is in that enactment: it told them it could not answer when it could. The inverse of question 10, the positive control for declining honestly. Nothing in the set currently penalises declining when the answer was within reach."
+  },
+  {
+    "id": 29,
+    "question": "can scottish public authorities refuse a freedom of information request because it would cost too much to deal with, is there a cost limit and how is the cost worked out?",
+    "research_mode": "legislation_only",
+    "chat_mode": "deep_research",
+    "source_session": 6413,
+    "source_messages": [1],
+    "question_provenance": "verbatim",
+    "source_mode_verified": true,
+    "user_confidence": null,
+    "known_gap": "None. Positive control for following a dependency out of an Act into the instrument that carries the figure: section 12 of the Freedom of Information (Scotland) Act 2002 sets no amount, and the £600 limit and £15 per hour staff rate are in regulations 5 and 3 of SSI 2004/467. It kept the Scottish position separate from the UK limits. The reviewer answered every accuracy question yes but left the confidence score blank, so user_confidence is null."
+  },
+  {
+    "id": 30,
+    "question": "at what contract value do the duties under the Procurement Reform Scotland act 2014 apply . what are the minimun values for goods , services and work contracts to count as a \"regulated procurement\"",
+    "research_mode": "legislation_only",
+    "chat_mode": "deep_research",
+    "source_session": 6405,
+    "source_messages": [1],
+    "question_provenance": "verbatim",
+    "source_mode_verified": true,
+    "user_confidence": 4,
+    "known_gap": "None. Positive control for exact numeric thresholds with a layering trap the reviewer built in deliberately: £50,000 for goods and services and £2,000,000 for works under section 3 of the Procurement Reform (Scotland) Act 2014, kept apart from both the UK Procurement Act 2023 and the higher thresholds in the 2015 Regulations. Both figures are exact strings, so this scores by substring match without a judge."
   }
 ]
