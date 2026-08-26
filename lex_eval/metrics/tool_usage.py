@@ -41,8 +41,8 @@ Final score:
            for transparency but does not cap the score further)
 """
 
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
+from .base import BaseMetric
+from ..testcase import LLMTestCase
 from typing import List, Optional, Set
 
 # The three tools that must all be present for a full score
@@ -268,9 +268,6 @@ class ToolUsageMetric(BaseMetric):
         self.score = 0.0
         self.reason = ""
         self.success = False
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
         tools_used: Set[str] = set()

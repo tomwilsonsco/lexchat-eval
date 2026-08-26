@@ -43,5 +43,4 @@ dist/
 venv/
 .pytest_cache/
 .ruff_cache/
-.deepeval/
 .ipynb_checkpoints/

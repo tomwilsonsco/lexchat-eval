@@ -4,7 +4,7 @@ judge or LexChat instance needed.
 """
 
 import pytest
-from deepeval.test_case import LLMTestCase
+from lex_eval.testcase import LLMTestCase
 
 from lex_eval.metrics.citation_agreement import (
     NO_EXPECTED_CITATIONS_REASON,

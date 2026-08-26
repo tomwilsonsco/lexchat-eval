@@ -7,8 +7,8 @@ written reference ("gold") answer for the same question cites.
 
 from __future__ import annotations
 
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
+from .base import BaseMetric
+from ..testcase import LLMTestCase
 
 from .structure import _URL_RE, provision_id_from_url
 
@@ -102,9 +102,6 @@ class CitationAgreementMetric(BaseMetric):
             )
 
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success

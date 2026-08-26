@@ -13,8 +13,8 @@ diagnostic, because cosine similarity can't see a single flipped section
 number buried among hundreds of otherwise-identical tokens.
 """
 
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
+from .base import BaseMetric
+from ..testcase import LLMTestCase
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Optional, Set
@@ -97,9 +97,6 @@ class ConsistencyMetric(BaseMetric):
         self.score = 0.0
         self.reason = ""
         self.success = False
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
         actual = _preprocess(test_case.actual_output or "")

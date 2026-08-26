@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 from typing import Literal
 
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
+from .base import BaseMetric
+from ..testcase import LLMTestCase
 from pydantic import BaseModel
 
 from .claim_support import _quote_found
@@ -93,7 +93,7 @@ class ReportIntegrationMetric(BaseMetric):
                final answer; any fully dropped step drags the score down.
 
     Args:
-        model:      A DeepEval-compatible judge model.
+        model:      A judge model, see utils/judge.py.
         threshold:  Minimum share of in-scope steps that must survive
                     (default 1.0: a fully dropped step's finding is a defect
                     nothing else in the harness catches).
@@ -191,9 +191,6 @@ class ReportIntegrationMetric(BaseMetric):
             )
 
         return self.score
-
-    async def a_measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        return self.measure(test_case)
 
     def is_successful(self) -> bool:
         return self.success

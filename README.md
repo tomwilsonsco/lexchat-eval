@@ -327,7 +327,7 @@ lex_eval/
 │   ├── reference_answers/   # gold answers: q{id}.md + reference_answers.json
 │   └── verbose_logs/        # per-question capture audit logs (gitignored)
 ├── docs/                    # gap analysis, reference-answer notes
-├── metrics/                 # custom DeepEval metric classes
+├── metrics/                 # custom metric classes
 ├── reference/               # reference ("gold") answers
 │   ├── build.py             # the build script
 │   ├── lex_client.py        # the three LEX tools, as LexChat calls them

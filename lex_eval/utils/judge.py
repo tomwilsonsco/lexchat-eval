@@ -1,5 +1,5 @@
 """
-Unified judge factory for DeepEval metrics.
+Unified judge factory for the AI-as-judge metrics.
 
 Provides an OpenRouter-based judge that implements a `.generate(prompt, schema)`
 interface used by custom metrics.
