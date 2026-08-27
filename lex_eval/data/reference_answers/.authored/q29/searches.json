@@ -1,0 +1,29 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Freedom of Information (Scotland) Act 2002"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2002/13",
+      "query": "excessive cost of compliance projected costs prescribed amount section 12"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2002/13",
+      "query": "fees notice time for compliance refusal notice"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2004/467",
+      "query": "projected costs calculation prescribed amount rate per hour"
+    }
+  }
+]

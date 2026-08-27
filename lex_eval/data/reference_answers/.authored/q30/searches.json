@@ -1,0 +1,29 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Procurement Reform (Scotland) Act 2014"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2014/12",
+      "query": "regulated procurement regulated contract contract threshold estimated value"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2014/12",
+      "query": "excluded contracts higher value regulated procurement power to amend thresholds"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2023/300",
+      "query": "thresholds amendment public contracts Scotland"
+    }
+  }
+]

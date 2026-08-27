@@ -1,0 +1,14 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Care Reform (Scotland) Act 2025"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Care Reform (Scotland) Act 2025 Commencement No. 1 Regulations 2025"
+    }
+  }
+]

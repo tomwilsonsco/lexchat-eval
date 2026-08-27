@@ -1,0 +1,43 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Cattle Identification (Scotland) Regulations 2007"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2007/174",
+      "query": "time limit for identifying a bovine animal after birth ear tag"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2007/174",
+      "query": "dairy animal bison ear tags application of cattle passport"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2017/133",
+      "query": "amendment of the Cattle Identification (Scotland) Regulations 2007"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2011/412",
+      "query": "amendment of identification time limits"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2007/312",
+      "query": "amendment of identification time limits"
+    }
+  }
+]

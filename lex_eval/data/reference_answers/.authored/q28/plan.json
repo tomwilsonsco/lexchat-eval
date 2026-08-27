@@ -1,0 +1,21 @@
+{
+  "scope_note": "Covers the statutory deadline for officially identifying a bovine animal after birth in Scotland, by animal type. Covers the ear tag deadlines and, in outline, the related passport and holding register deadlines. Limited to legislation.",
+  "steps": [
+    {
+      "title": "Find the governing instrument",
+      "detail": "Identify the Scottish instrument that imposes cattle identification duties and check for amending instruments."
+    },
+    {
+      "title": "Retrieve the identification deadlines",
+      "detail": "Retrieve the provision setting the time limits for applying ear tags after birth, and note whether it differs by type of animal."
+    },
+    {
+      "title": "Check the deadlines are current",
+      "detail": "Check the amending instruments for any change to those time limits."
+    },
+    {
+      "title": "Note the neighbouring deadlines",
+      "detail": "Retrieve the related deadlines for applying for a cattle passport and for recording the birth in the holding register, so they are not confused with the identification deadline."
+    }
+  ]
+}

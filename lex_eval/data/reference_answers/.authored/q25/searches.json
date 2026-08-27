@@ -1,0 +1,14 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Social Security (Scotland) Act 2018"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Disability Assistance Scottish Adult Disability Living Allowance Consequential Amendment Revocation and Saving Provision Regulations 2024"
+    }
+  }
+]
