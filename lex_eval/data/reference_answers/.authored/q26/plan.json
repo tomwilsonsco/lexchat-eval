@@ -1,0 +1,21 @@
+{
+  "scope_note": "Covers instruments that amend Regulation (EU) No 1306/2013 as it has effect in Scotland, and the framework under which it was retained and can be modified. Deliberately NOT a complete list: see the note in the answer. Limited to legislation.",
+  "steps": [
+    {
+      "title": "Establish how the Regulation was retained",
+      "detail": "Identify the routes by which Regulation (EU) No 1306/2013 became domestic law as it applies in Scotland."
+    },
+    {
+      "title": "Identify instruments that amend the Regulation directly",
+      "detail": "Find UK statutory instruments whose operative provisions are headed as amending Regulation (EU) 1306/2013, and confirm from their text what each amends."
+    },
+    {
+      "title": "Identify the Scottish modification framework",
+      "detail": "Retrieve the Scottish primary legislation that defines the Regulation and confers power to modify it."
+    },
+    {
+      "title": "State the limits of the list",
+      "detail": "Record what could not be established, so the answer does not present a partial list as exhaustive."
+    }
+  ]
+}

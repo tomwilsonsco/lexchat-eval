@@ -1,0 +1,43 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Victims and Witnesses (Scotland) Act 2014"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2014/1",
+      "query": "duties of the Lord Advocate general principles standards of service"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2014/1",
+      "query": "victims code referral to support services interpretation translation"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2014/1",
+      "query": "review of decision not to prosecute disclosure of qualifying information"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2014/1",
+      "query": "prosecutor procurator fiscal definition interpretation competent authority"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2014/1",
+      "query": "avoid contact with the accused privacy of victims sections 9D 9E"
+    }
+  }
+]

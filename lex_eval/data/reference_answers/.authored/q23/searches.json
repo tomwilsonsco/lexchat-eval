@@ -1,0 +1,20 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Social Security (Amendment) (Scotland) Act 2025"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Social Security (Amendment) (Scotland) Act 2025 Commencement No. 1 and Saving and Transitional Provisions Regulations 2025"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Social Security (Amendment) (Scotland) Act 2025 Commencement No. 2 Regulations 2025"
+    }
+  }
+]

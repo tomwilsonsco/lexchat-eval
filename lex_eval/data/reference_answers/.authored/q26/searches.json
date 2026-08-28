@@ -1,0 +1,55 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Regulation (EU) No 1306/2013 financing management and monitoring of the common agricultural policy"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Agriculture (Retained EU Law and Data) (Scotland) Act 2020"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Common Agricultural Policy and Market Measures (Miscellaneous Amendments) (EU Exit) Regulations"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2019/763",
+      "query": "amendment of Regulation (EU) No 1306/2013"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2020/90",
+      "query": "amendment of Regulation (EU) No 1306/2013"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2019/748",
+      "query": "amendment of Regulation (EU) No 1306/2013 legislative functions"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2020/17",
+      "query": "Horizontal Regulation meaning modification power Scottish Ministers"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2024/11",
+      "query": "amendment of the Agriculture (Retained EU Law and Data) (Scotland) Act 2020"
+    }
+  }
+]

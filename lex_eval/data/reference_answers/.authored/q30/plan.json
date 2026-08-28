@@ -1,0 +1,21 @@
+{
+  "scope_note": "Covers the contract values at which the duties in the Procurement Reform (Scotland) Act 2014 apply, and the minimum values for goods, services and works to be a regulated procurement. Deliberately excludes the separate, higher thresholds of the Public Contracts (Scotland) Regulations 2015 and the Procurement Act 2023, except to distinguish them.",
+  "steps": [
+    {
+      "title": "Establish what a regulated procurement is",
+      "detail": "Retrieve the definitions of regulated procurement and regulated contract, and the conditions a contract must meet."
+    },
+    {
+      "title": "Retrieve the threshold figures",
+      "detail": "Retrieve the contract threshold table and the figures for public contracts other than works, and for public works contracts."
+    },
+    {
+      "title": "Check whether the figures have been amended",
+      "detail": "Establish whether any order under the power to amend the table has changed them."
+    },
+    {
+      "title": "Separate the neighbouring regimes",
+      "detail": "Establish what a higher value regulated procurement is, so the 2014 Act thresholds are not confused with those of the 2015 Regulations or the Procurement Act 2023."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "scope_note": "Covers a Scottish public authority's power to refuse a request on grounds of excessive cost under FOISA, the money limit, and how the cost is calculated. Limited to legislation; Scottish Information Commissioner decisions are out of scope.",
+  "steps": [
+    {
+      "title": "Find the power to refuse for excessive cost",
+      "detail": "Retrieve section 12 of the Freedom of Information (Scotland) Act 2002 and establish whether it sets an amount itself or leaves it to regulations."
+    },
+    {
+      "title": "Find the prescribed amount",
+      "detail": "Follow section 12(1) into the regulations made under it and retrieve the provision that sets the figure."
+    },
+    {
+      "title": "Establish how the cost is calculated",
+      "detail": "Retrieve the provision defining projected costs, what may be counted, and any cap on staff time."
+    },
+    {
+      "title": "Note the procedural duty",
+      "detail": "Establish what the authority must do, and by when, when it relies on the excessive cost provision."
+    }
+  ]
+}
