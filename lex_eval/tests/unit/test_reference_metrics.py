@@ -206,13 +206,20 @@ def test_attribution_does_not_move_the_score():
     assert without.score == with_tools.score
 
 
-def test_the_relied_on_acts_come_from_sources_retrieved():
+def test_the_relied_on_acts_are_retrieved_and_cited_both():
+    """Retrieved but never cited is law the author ruled out. Cited but never
+    retrieved is something they only looked at. Neither counts."""
     reference = {
+        "final_answer": (
+            "See https://www.legislation.gov.uk/ukpga/2018/12/section/6 and "
+            "https://www.legislation.gov.uk/ssi/2015/99."
+        ),
         "sources_retrieved": [
-            {"legislation_id": "ukpga/2018/12", "uri": "u"},
+            {"legislation_id": "ukpga/2018/12", "uri": "u"},  # retrieved and cited
+            {"legislation_id": "ukpga/1985/67", "uri": "u"},  # retrieved, ruled out
             {"uri": "no legislation_id"},
         ],
-        "sources_discovered": [{"legislation_id": "ukpga/1998/46", "uri": "u"}],
+        "sources_discovered": [{"legislation_id": "ssi/2015/99", "uri": "u"}],
     }
 
     assert reference_acts(reference) == {"ukpga/2018/12"}

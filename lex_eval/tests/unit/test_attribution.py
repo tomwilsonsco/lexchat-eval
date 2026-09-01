@@ -69,6 +69,30 @@ def test_a_halted_run_is_a_tech_problem():
     assert "tool call limit" in verdict["detail"]
 
 
+def test_a_stored_error_run_is_a_tech_problem():
+    """A run that errored outright. load_records excludes these by default, so
+    the dashboard has to ask for them, or the clearest terminal failure there
+    is becomes the one attribution cannot see."""
+    record = _record(is_error=True, error_message="timed out")
+    verdict = attribution_for_record(record, _REFERENCES)
+
+    assert verdict["stage"] == TECH
+    assert verdict["detail"] == "timed out"
+
+
+def test_an_error_run_outranks_a_clean_one_in_the_same_group():
+    clean = _record(
+        actual_output=(
+            "https://www.legislation.gov.uk/ukpga/2018/12/section/6 "
+            "https://www.legislation.gov.uk/ukpga/1998/46/section/53"
+        ),
+        tools_called=[_search("ukpga/2018/12", "ukpga/1998/46")],
+    )
+    errored = _record(is_error=True, error_message="timed out")
+
+    assert worst_attribution([clean, errored], _REFERENCES)["stage"] == TECH
+
+
 def test_a_tool_call_api_error_is_a_tech_problem():
     record = _record(
         tools_called=[

@@ -81,9 +81,13 @@ def load_responses(_mtime: float = 0.0) -> dict[tuple[str, str, int], list[dict]
 
     chat_mode is part of the key so the Chat Interaction tab shows the same runs
     the metrics above it were scored on, rather than every run of the question.
+
+    Error rows are included. They carry no metric rows, so they add nothing to
+    the scores, but reports/attribution.py cannot report a run that timed out
+    if the run is never loaded.
     """
     idx: dict[tuple[str, str, int], list[dict]] = defaultdict(list)
-    for rec in db_load_records(RESPONSES_DB):
+    for rec in db_load_records(RESPONSES_DB, include_errors=True):
         key = (
             rec["llm_name"],
             rec.get("chat_mode") or DEFAULT_CHAT_MODE,

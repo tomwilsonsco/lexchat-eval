@@ -306,9 +306,11 @@ def load_records(
     Load responses from the database and return them as flat record dicts::
 
         {question_id, question, llm_name, timestamp,
-         actual_output, retrieval_context, tools_called}
+         actual_output, retrieval_context, tools_called, is_error, ...}
 
-    Error rows are excluded unless *include_errors* is True.
+    Error rows are excluded unless *include_errors* is True. ``is_error`` and
+    ``error_message`` are returned either way, so a caller that opts in can
+    tell them apart.
 
     Pass ``read_only=True`` when this may run concurrently with other readers
     of the same file (e.g. pytest-xdist workers collecting tests in
@@ -335,7 +337,7 @@ def load_records(
                    max_turns_halted, react_turns_max, reformatted,
                    local_cache_hits, memo_hits, audit_schema_version, audit_json,
                    research_plan, needs_clarification, clarification_question,
-                   attempts
+                   attempts, is_error, error_message
             FROM responses
             {where}
             ORDER BY id
@@ -376,6 +378,8 @@ def load_records(
         needs_clarification,
         clarification_question,
         attempts,
+        is_error,
+        error_message,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -392,6 +396,11 @@ def load_records(
         records.append(
             {
                 "response_id": response_id,
+                # Always carried, even though error rows are excluded by
+                # default: reports/attribution.py cannot report a terminal
+                # failure it is never shown.
+                "is_error": bool(is_error),
+                "error_message": error_message or "",
                 "question_id": qid,
                 "question": question,
                 "llm_name": llm_name,

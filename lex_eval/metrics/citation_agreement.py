@@ -52,17 +52,28 @@ def act_of(provision: str) -> str:
 def reference_acts(reference: dict) -> set[str]:
     """The Acts a reference answer actually relied on, for attribution.
 
-    Read from the answer's own ``sources_retrieved``, not from the links in its
-    prose. A reference answer also links the sources its author looked at and
-    set aside, under an "Identified but not retrieved" heading, and blaming a
-    response for not citing those is blaming it for the author's reading list.
-    Those live in ``sources_discovered`` and are excluded here.
+    An Act qualifies only if its author both pulled the text (it is in
+    ``sources_retrieved``) and used it (the answer cites it). Either half alone
+    is wrong, and in opposite directions:
+
+    - Prose links alone include the sources the author looked at and set aside
+      under an "Identified but not retrieved" heading. Those are in
+      ``sources_discovered``, and holding a response to them is holding it to
+      the author's reading list.
+    - ``sources_retrieved`` alone includes law the author pulled and then chose
+      not to use, sometimes to rule it out. The Transport Act 1985 in q18's
+      answer is retrieved for exactly that reason.
+
+    Replace all of this with the lawyer's ``required_citations`` once the
+    reference answers are signed off.
     """
-    return {
+    retrieved = {
         s["legislation_id"]
         for s in (reference.get("sources_retrieved") or [])
         if s.get("legislation_id")
     }
+    cited = {act_of(p) for p in cited_provisions(reference.get("final_answer") or "")}
+    return retrieved & cited
 
 
 # A response shorter than this is a clarification request or a capture gap, not
