@@ -13,6 +13,12 @@ _REPO_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
+from lex_eval.reference.store import (
+    ANSWERS_DIR,
+    MANIFEST_NAME,
+    load_reference_answers,
+)
+from lex_eval.reports.attribution import caveat, worst_attribution
 from lex_eval.utils.db import (
     DEFAULT_DB,
     load_eval_results as db_load_eval_results,
@@ -142,7 +148,7 @@ METRICS: list[tuple[str, str, str]] = [
     (
         "citation_agreement",
         "Citation Agreement",
-        "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links.",
+        "Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links. For each Act the reference answer relied on that the response does not cite, the reason says whether any search turned it up, so a search that missed the law reads differently from an answer that had the law and left it out.",
     ),
     # 2. AI judge, research or deep research
     (
@@ -906,6 +912,68 @@ def _render_chat_interaction(records: list[dict]) -> None:
             )
 
 
+# Colour and wording for the attribution flag, one entry per verdict from
+# reports/attribution.py. Grey for "cannot say", which is a gap in the
+# reference answers rather than a finding about the response.
+_ATTRIBUTION_STYLE = {
+    "tech": ("#f85149", "Run did not finish"),
+    "search": ("#f0ad4e", "The search did not find the law"),
+    "model": ("#58a6ff", "Found the law, did not cite it"),
+    # Not the pass green used elsewhere: this says no step lost any law, which
+    # is narrower than the response being good, and the detail says so.
+    "no_law_lost": ("#56d364", "No law lost"),
+    "not_attributable": ("#8b949e", "Cannot say"),
+}
+
+
+@st.cache_data
+def _reference_answers(_mtime: float = 0.0) -> dict:
+    """Reference answers keyed by question_id.
+
+    Drafts included, matching tests/eval/test_reference.py: excluding them
+    would leave every question unattributable until sign off.
+
+    ``_mtime`` busts the cache when the manifest is rewritten, the same way
+    ``load_eval_results`` and ``load_responses`` do for the database.
+    """
+    return load_reference_answers(verified_only=False)
+
+
+def _reference_manifest_mtime() -> float:
+    path = ANSWERS_DIR / MANIFEST_NAME
+    return path.stat().st_mtime if path.exists() else 0.0
+
+
+def _render_attribution_flag(response_records: list[dict]) -> None:
+    """One line above the metric rows saying which stage is at fault.
+
+    Always rendered when there are records to judge. An absent flag used to
+    mean "no step lost any law" and was read as "nothing to report", so that
+    case now has its own label rather than being silence.
+    """
+    verdict = worst_attribution(
+        response_records, _reference_answers(_reference_manifest_mtime())
+    )
+    if verdict is None:
+        return
+
+    colour, label = _ATTRIBUTION_STYLE.get(verdict["stage"], ("#8b949e", "Unclear"))
+    ids = ", ".join(verdict["ids"][:4])
+    if len(verdict["ids"]) > 4:
+        ids += f" and {len(verdict['ids']) - 4} more"
+    detail = html.escape(verdict["detail"] + (f": {ids}" if ids else ""))
+    st.markdown(
+        f'<div style="border-left:3px solid {colour};padding:4px 10px;'
+        f'margin:0 0 10px 0;font-size:0.9em;">'
+        f'<span style="color:{colour};font-weight:600;">{label}</span>'
+        f'<span style="color:#8b949e;"> &nbsp; {detail}</span></div>',
+        unsafe_allow_html=True,
+    )
+    note = caveat(verdict["stage"])
+    if note:
+        st.caption(note)
+
+
 def _render_question_block(
     qid: int,
     question_text: str,
@@ -933,6 +1001,7 @@ def _render_question_block(
         f" &nbsp; {count}",
         expanded=failures_only and bool(n_fail),
     ):
+        _render_attribution_flag(response_records)
         _render_metric_rows(metrics, failures_only=failures_only)
 
         # Loaded on demand. Streamlit runs an expander's body whether or not it

@@ -225,6 +225,20 @@ reference answer and the response, then checks whether the response cites *somet
 the reference cites (section-level matching, not just Act-level). Score is the fraction of the
 reference's cited Acts covered.
 
+**The reason says where the blame lies**, in two plain sentences: "No search turned up: ..." and
+"Turned up by a search but not cited: ...". The first means no tool call in the run surfaced that Act.
+The second means one did, and the answer still does not cite it. Attribution is at Act level, the
+granularity the retrieval tools are called at, and it never moves the score. `reports/attribution.py`
+turns this into the flag above each question's metric rows, and carries the evidence for calling the
+first case a search failure rather than a corpus gap.
+
+**Attribution uses a narrower list than the score does.** The score counts every legislation link in
+the reference answer, which includes the sources its author looked at and set aside under "Identified
+but not retrieved". That noise is what the 0.3 threshold exists to absorb, and it is tolerable in a
+score. It is not tolerable in a blame flag, which reads as a verdict, so attribution uses the answer's
+own `sources_retrieved` instead. Without that field no attribution is produced at all: saying nothing
+beats blaming a response for not citing something the author only skimmed.
+
 **It reads the final answer, not the Worker's report.** Citations are extracted from `actual_output`,
 so an answer that names the right Act in prose without a link scores nothing for it. That matters most
 in conversational mode, where the Manager routinely drops the Worker's URLs, and it is why this metric

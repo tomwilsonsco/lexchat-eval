@@ -25,6 +25,7 @@ from lex_eval.metrics import (
     PlanCoverageMetric,
     ReferenceAnswerAgreementMetric,
 )
+from lex_eval.metrics.citation_agreement import MIN_OUTPUT_CHARS, reference_acts
 from lex_eval.reference.store import load_reference_answers
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.judge import _judge
@@ -47,8 +48,9 @@ _PLAN_COVERAGE_THRESHOLD: float = 0.6
 
 # Same threshold as test_groundedness.py's gate, so a non-answer like "Could
 # you narrow this down?" is recorded as a capture event here too, not scored
-# as a real verdict.
-_MIN_OUTPUT_CHARS: int = 50
+# as a real verdict. Imported rather than repeated because reports/attribution.py
+# gates on it too, and the two must not drift.
+_MIN_OUTPUT_CHARS: int = MIN_OUTPUT_CHARS
 
 _DRAFT_NOTE = "[DRAFT REFERENCE - unverified]"
 
@@ -201,6 +203,7 @@ def test_citation_agreement(request, record):
     metric = CitationAgreementMetric(
         reference_answer=reference["final_answer"],
         threshold=_COVERAGE_THRESHOLD,
+        expected_acts=reference_acts(reference),
     )
     metric.measure(test_case)
 
