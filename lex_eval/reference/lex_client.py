@@ -75,6 +75,36 @@ def slim_search_results(resp_json: dict) -> dict:
     return {"results": slimmed, "total": resp_json.get("total", len(slimmed))}
 
 
+def matches_jurisdiction(extent: List[str], jurisdiction: str) -> bool:
+    """Would LexChat's jurisdiction filter keep a result with this `extent`?
+
+    Ported from `LexChat/server_py/src/agent/tools/lex.py::_matches_jurisdiction`.
+    The filter is applied by LexChat to search results after the API returns them,
+    not by the API, so anything checking it has to apply the same rule here.
+
+    Nothing in the eval calls this. It is here as the executable reproduction of
+    TOM_TO_DO.md finding 41: LexChat expects extents like "E+W+S+NI", but the LEX
+    API sends words ("Scotland", "United Kingdom", ""), so with a jurisdiction
+    filter set every result is dropped. Do not "correct" it to match what the API
+    sends, reproducing the mismatch faithfully is the whole point.
+
+        >>> matches_jurisdiction(["Scotland"], "scotland")
+        False
+    """
+    if not extent:
+        return True
+    tokens = {t.strip() for e in extent for t in e.split("+")}
+    if jurisdiction == "uk_wide":
+        return tokens >= {"E", "W", "S", "NI"}
+    single = {
+        "england_and_wales": "E",
+        "scotland": "S",
+        "northern_ireland": "NI",
+        "wales": "W",
+    }.get(jurisdiction)
+    return single in tokens if single else True
+
+
 def _extract_ids(resp_json: dict) -> List[Tuple[str, str]]:
     return [
         (item["legislation_id"], item.get("title", ""))

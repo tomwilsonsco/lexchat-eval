@@ -42,6 +42,28 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+# LexChat sometimes returns a perfectly normal, non-empty message whose content is
+# an infrastructure failure rather than an answer, e.g. "I am currently experiencing
+# a connection error with the research database and cannot complete the search".
+# Retrying is the right response to those, and scoring them as legal research is
+# wrong, so they are treated exactly as an empty response is.
+TRANSPORT_FAILURE_PHRASES = (
+    "connection error",
+    "error connecting",
+    "unable to connect",
+    "service unavailable",
+    "temporarily unavailable",
+    "request timed out",
+    "please try again later",
+)
+
+
+def transport_failure_phrase(text: str) -> Optional[str]:
+    """Return the first transport failure phrase found in *text*, else None."""
+    lowered = (text or "").lower()
+    return next((p for p in TRANSPORT_FAILURE_PHRASES if p in lowered), None)
+
+
 def load_questions(path: Path) -> List[Dict[str, Any]]:
     """Load questions from the JSON file."""
     with open(path, "r", encoding="utf-8") as fh:
@@ -115,6 +137,7 @@ def process_question(
                     "reformatted": False,
                     "audit_schema_version": None,
                     "audit_json": None,
+                    "attempts": 0,
                     "needs_clarification": True,
                     "clarification_question": plan_data.get("question", ""),
                 }
@@ -163,8 +186,9 @@ def process_question(
             actual_output = capture_result.get("actual_output", "")
             capture_is_error = capture_result.get("is_error", False)
             capture_error_message = capture_result.get("error_message", "")
+            failure_phrase = transport_failure_phrase(actual_output)
 
-            if actual_output:
+            if actual_output and not failure_phrase:
                 result = {
                     "question_id": question_id,
                     "question": question,
@@ -199,6 +223,7 @@ def process_question(
                     "reformatted": capture_result.get("reformatted", False),
                     "audit_schema_version": capture_result.get("audit_schema_version"),
                     "audit_json": capture_result.get("audit_json"),
+                    "attempts": attempt,
                 }
                 # If the capture layer observed an error (e.g. the audit event
                 # carried an error), add the "error" key so insert_response
@@ -207,17 +232,35 @@ def process_question(
                     result["error"] = capture_error_message
                 return result
             else:
-                logger.warning(
-                    "Empty actual_output for Q%d on attempt %d", question_id, attempt
-                )
+                if failure_phrase:
+                    logger.warning(
+                        "Q%d attempt %d reported a transport failure (%r), retrying",
+                        question_id,
+                        attempt,
+                        failure_phrase,
+                    )
+                else:
+                    logger.warning(
+                        "Empty actual_output for Q%d on attempt %d",
+                        question_id,
+                        attempt,
+                    )
                 if attempt == max_retries:
                     # Preserve the specific error_message from the capture
                     # layer if available, falling back to the generic message.
-                    error_msg = (
-                        capture_error_message
-                        if capture_error_message
-                        else "Empty actual_output after retries"
-                    )
+                    # A transport failure names itself, since insert_response
+                    # blanks actual_output on an error row.
+                    if failure_phrase:
+                        error_msg = (
+                            f"Transport failure after {max_retries} attempts "
+                            f"({failure_phrase!r}): {actual_output[:300]}"
+                        )
+                    else:
+                        error_msg = (
+                            capture_error_message
+                            if capture_error_message
+                            else "Empty actual_output after retries"
+                        )
                     return {
                         "question_id": question_id,
                         "question": question,
@@ -246,6 +289,7 @@ def process_question(
                         "reformatted": False,
                         "audit_schema_version": None,
                         "audit_json": None,
+                        "attempts": attempt,
                         "error": error_msg,
                     }
     finally:
@@ -286,7 +330,8 @@ def main() -> None:
         "--retries",
         type=int,
         default=3,
-        help="Retries per question if actual_output is empty (default: 3)",
+        help="Retries per question when the response is empty or reports a "
+        "transport failure (default: 3)",
     )
     parser.add_argument(
         "--question-id",

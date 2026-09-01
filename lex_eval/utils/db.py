@@ -31,6 +31,8 @@ responses
     needs_clarification    BOOLEAN (True when POST /api/research/plan asked a clarifying question instead
                                     of proposing a plan; a valid outcome, distinct from is_error)
     clarification_question TEXT   (the clarifying question asked, NULL unless needs_clarification)
+    attempts          INTEGER     (capture attempts this row took; 1 means the first try was kept,
+                                   NULL for rows gathered before the column existed)
 
 eval_<metric>
     One table per metric (e.g. eval_tool_usage, eval_response_groundedness),
@@ -104,7 +106,8 @@ CREATE TABLE IF NOT EXISTS responses (
     audit_json        JSON,
     research_plan     JSON,
     needs_clarification BOOLEAN NOT NULL DEFAULT FALSE,
-    clarification_question TEXT
+    clarification_question TEXT,
+    attempts          INTEGER
 );
 """
 
@@ -146,6 +149,8 @@ _MIGRATE_RESPONSES = [
     # --- deep_research clarification path (distinct outcome, not an error) ---
     "ALTER TABLE responses ADD COLUMN needs_clarification BOOLEAN",
     "ALTER TABLE responses ADD COLUMN clarification_question TEXT",
+    # --- capture attempts, so a retried question is not read as a clean pass ---
+    "ALTER TABLE responses ADD COLUMN attempts INTEGER",
 ]
 
 _INSERT_RESPONSE = """
@@ -157,8 +162,8 @@ INSERT INTO responses (
     chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
     react_turns_max, reformatted,
     local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
-    needs_clarification, clarification_question
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    needs_clarification, clarification_question, attempts
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 # Same columns as _INSERT_RESPONSE plus an explicit id, for copying rows
@@ -173,8 +178,8 @@ INSERT INTO responses (
     chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
     react_turns_max, reformatted,
     local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
-    needs_clarification, clarification_question
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    needs_clarification, clarification_question, attempts
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -287,6 +292,7 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             ),
             bool(record.get("needs_clarification", False)),
             record.get("clarification_question") or None,
+            record.get("attempts"),
         ],
     )
 
@@ -300,9 +306,11 @@ def load_records(
     Load responses from the database and return them as flat record dicts::
 
         {question_id, question, llm_name, timestamp,
-         actual_output, retrieval_context, tools_called}
+         actual_output, retrieval_context, tools_called, is_error, ...}
 
-    Error rows are excluded unless *include_errors* is True.
+    Error rows are excluded unless *include_errors* is True. ``is_error`` and
+    ``error_message`` are returned either way, so a caller that opts in can
+    tell them apart.
 
     Pass ``read_only=True`` when this may run concurrently with other readers
     of the same file (e.g. pytest-xdist workers collecting tests in
@@ -328,7 +336,8 @@ def load_records(
                    chat_mode, provider, total_cost_usd, total_ms,
                    max_turns_halted, react_turns_max, reformatted,
                    local_cache_hits, memo_hits, audit_schema_version, audit_json,
-                   research_plan, needs_clarification, clarification_question
+                   research_plan, needs_clarification, clarification_question,
+                   attempts, is_error, error_message
             FROM responses
             {where}
             ORDER BY id
@@ -368,6 +377,9 @@ def load_records(
         research_plan_json,
         needs_clarification,
         clarification_question,
+        attempts,
+        is_error,
+        error_message,
     ) in rows:
         retrieval_context = (
             json.loads(retrieval_context_json) if retrieval_context_json else []
@@ -384,6 +396,11 @@ def load_records(
         records.append(
             {
                 "response_id": response_id,
+                # Always carried, even though error rows are excluded by
+                # default: reports/attribution.py cannot report a terminal
+                # failure it is never shown.
+                "is_error": bool(is_error),
+                "error_message": error_message or "",
                 "question_id": qid,
                 "question": question,
                 "llm_name": llm_name,
@@ -413,6 +430,7 @@ def load_records(
                 "research_plan": research_plan,
                 "needs_clarification": bool(needs_clarification),
                 "clarification_question": clarification_question,
+                "attempts": attempts,
             }
         )
     return records
@@ -1168,7 +1186,7 @@ def make_deploy_db(
             "chat_mode, provider, total_cost_usd, total_ms, "
             "max_turns_halted, react_turns_max, reformatted, "
             "local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan, "
-            "needs_clarification, clarification_question "
+            "needs_clarification, clarification_question, attempts "
             "FROM responses ORDER BY id"
         ).fetchall()
 
@@ -1208,6 +1226,7 @@ def make_deploy_db(
                 research_plan_json,
                 needs_clarification,
                 clarification_question,
+                attempts,
             ) = row
 
             ctx: list = json.loads(ctx_json) if ctx_json else []
@@ -1255,6 +1274,7 @@ def make_deploy_db(
                     research_plan_json,
                     bool(needs_clarification),
                     clarification_question,
+                    attempts,
                 ],
             )
 

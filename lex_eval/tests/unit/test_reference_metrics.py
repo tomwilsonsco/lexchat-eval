@@ -3,12 +3,16 @@ Unit tests for the two reference-answer metrics, synthetic answers only, no DB,
 judge or LexChat instance needed.
 """
 
+import json
+
 import pytest
-from lex_eval.testcase import LLMTestCase
+from lex_eval.testcase import LLMTestCase, ToolCall
 
 from lex_eval.metrics.citation_agreement import (
     NO_EXPECTED_CITATIONS_REASON,
     CitationAgreementMetric,
+    attribute_missing_acts,
+    reference_acts,
 )
 from lex_eval.metrics.reference_answer_agreement import (
     ReferenceAnswerAgreementMetric,
@@ -27,8 +31,24 @@ https://www.legislation.gov.uk/ukpga/2018/12/section/3.
 """
 
 
-def _test_case(actual_output: str) -> LLMTestCase:
-    return LLMTestCase(input="q", actual_output=actual_output)
+def _test_case(actual_output: str, tools_called: list | None = None) -> LLMTestCase:
+    return LLMTestCase(
+        input="q", actual_output=actual_output, tools_called=tools_called or []
+    )
+
+
+_RELIED_ON = {"ukpga/2018/12"}
+
+
+def _search(*legislation_ids: str) -> ToolCall:
+    """A ``search_legislation`` call whose results list *legislation_ids*."""
+    return ToolCall(
+        name="Worker: search_legislation",
+        input_parameters={"query": "q"},
+        output=json.dumps(
+            {"results": [{"legislation_id": i, "title": i} for i in legislation_ids]}
+        ),
+    )
 
 
 class _StubJudge:
@@ -92,6 +112,130 @@ def test_partial_coverage_is_scored_as_a_share():
 
     assert metric.score == 0.5
     assert metric.is_successful()
+
+
+def test_an_act_no_search_turned_up_is_attributed_to_the_search():
+    metric = CitationAgreementMetric(
+        reference_answer=_REFERENCE, expected_acts=_RELIED_ON
+    )
+    metric.measure(_test_case("No citations at all.", [_search("ukpga/1998/46")]))
+
+    assert metric.never_retrieved == ["ukpga/2018/12"]
+    assert metric.retrieved_not_cited == []
+    assert "No search turned up: ukpga/2018/12." in metric.reason
+
+
+def test_an_act_a_search_turned_up_is_attributed_to_the_model():
+    metric = CitationAgreementMetric(
+        reference_answer=_REFERENCE, expected_acts=_RELIED_ON
+    )
+    metric.measure(_test_case("No citations at all.", [_search("ukpga/2018/12")]))
+
+    assert metric.never_retrieved == []
+    assert metric.retrieved_not_cited == ["ukpga/2018/12"]
+    assert "Turned up by a search but not cited: ukpga/2018/12." in metric.reason
+
+
+def test_an_act_the_reference_only_looked_at_is_never_attributed():
+    """A source under "Identified but not retrieved" is the author's reading
+    list, not something the response has to cite."""
+    metric = CitationAgreementMetric(
+        reference_answer=_REFERENCE, expected_acts=_RELIED_ON
+    )
+    metric.measure(
+        _test_case(
+            "https://www.legislation.gov.uk/ukpga/2018/12/section/6",
+            [_search("ukpga/2018/12", "ukpga/1998/46")],
+        )
+    )
+
+    assert metric.score < 1.0, "the prose-linked Act still counts against the score"
+    assert metric.never_retrieved == []
+    assert metric.retrieved_not_cited == []
+    assert "turned up" not in metric.reason.lower()
+
+
+def test_an_act_cited_somewhere_is_not_attributed_at_all():
+    """Citing the wrong section of an Act is a miss, but not a retrieval one."""
+    metric = CitationAgreementMetric(
+        reference_answer=_REFERENCE, expected_acts=_RELIED_ON
+    )
+    metric.measure(
+        _test_case("See https://www.legislation.gov.uk/ukpga/2018/12/section/9")
+    )
+
+    assert metric.score == 0.0
+    assert metric.never_retrieved == []
+    assert metric.retrieved_not_cited == []
+    assert "turned up" not in metric.reason.lower()
+
+
+def test_without_the_relied_on_acts_nothing_is_attributed():
+    metric = CitationAgreementMetric(reference_answer=_REFERENCE)
+    metric.measure(_test_case("No citations at all."))
+
+    assert metric.never_retrieved == []
+    assert metric.retrieved_not_cited == []
+    assert "turned up" not in metric.reason.lower()
+
+
+def test_a_run_with_no_tool_calls_is_attributed_to_the_search():
+    metric = CitationAgreementMetric(
+        reference_answer=_REFERENCE, expected_acts=_RELIED_ON
+    )
+    metric.measure(_test_case("No citations at all."))
+
+    assert metric.never_retrieved == ["ukpga/2018/12"]
+
+
+def test_attribution_does_not_move_the_score():
+    without = CitationAgreementMetric(reference_answer=_REFERENCE)
+    without.measure(
+        _test_case("https://www.legislation.gov.uk/ukpga/2018/12/section/6")
+    )
+    with_tools = CitationAgreementMetric(
+        reference_answer=_REFERENCE, expected_acts=_RELIED_ON
+    )
+    with_tools.measure(
+        _test_case(
+            "https://www.legislation.gov.uk/ukpga/2018/12/section/6",
+            [_search("ukpga/2018/12")],
+        )
+    )
+
+    assert without.score == with_tools.score
+
+
+def test_the_relied_on_acts_are_retrieved_and_cited_both():
+    """Retrieved but never cited is law the author ruled out. Cited but never
+    retrieved is something they only looked at. Neither counts."""
+    reference = {
+        "final_answer": (
+            "See https://www.legislation.gov.uk/ukpga/2018/12/section/6 and "
+            "https://www.legislation.gov.uk/ssi/2015/99."
+        ),
+        "sources_retrieved": [
+            {"legislation_id": "ukpga/2018/12", "uri": "u"},  # retrieved and cited
+            {"legislation_id": "ukpga/1985/67", "uri": "u"},  # retrieved, ruled out
+            {"uri": "no legislation_id"},
+        ],
+        "sources_discovered": [{"legislation_id": "ssi/2015/99", "uri": "u"}],
+    }
+
+    assert reference_acts(reference) == {"ukpga/2018/12"}
+
+
+def test_sections_read_count_as_retrieving_the_act():
+    """``search_legislation_sections`` names the Act in its arguments."""
+    sections = ToolCall(
+        name="Worker: search_legislation_sections",
+        input_parameters={"legislation_id": "ukpga/2018/12", "query": "controller"},
+        output="{}",
+    )
+    never, retrieved = attribute_missing_acts({"ukpga/2018/12"}, set(), [sections])
+
+    assert never == []
+    assert retrieved == ["ukpga/2018/12"]
 
 
 def test_reference_citing_nothing_is_not_scored():
