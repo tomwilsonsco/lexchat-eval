@@ -64,14 +64,24 @@ unapproved draft as legal correctness is wrong in this repo, in the dashboard, a
 
 ## Fidelity to LexChat
 
-`lex_client.py` mirrors `LexChat/server_py/src/agent/tools/executor.py` and `.../tools/lex.py`: the
-same endpoints, the same request payloads (`limit: 5` on search, `limit: 10` on section search,
-`include_text: False`), the same response slimming, and the same `[NEXT STEP: ...]` Phase-2 nudge. The
-retrieved text is therefore byte-for-byte what LexChat would have received for the same queries.
+`lex_client.py` mirrors `LexChat/server_py/src/agent/tools/executor.py`, `.../tools/lex.py` and
+`.../tools/caselaw.py`: the same endpoints, the same request payloads (`limit: 5` on search,
+`limit: 10` on section search, `include_text: False`), the same response slimming and Atom/LegalDocML
+parsing, and the same Phase-2 nudges. The retrieved text is therefore byte-for-byte what LexChat would
+have received for the same queries. It is ported, not imported: `LexChat/` is in this repo for
+reference only.
 
-One deliberate departure: **tool results are recorded in full.** LexChat summarises anything over a
-size threshold, which is a lossy step in the system under test. A reference answer should rest on the
-primary text.
+Two deliberate departures:
+
+- **Tool results are recorded in full.** LexChat summarises anything over a size threshold, which is a
+  lossy step in the system under test. A reference answer should rest on the primary text.
+- **The appellate-decisions nudge is not ported.** It rests on a party-name matching routine, and
+  nothing here reads the note back: there is no agent loop to steer.
+
+Faithfulness cuts both ways. `search_case_law` forwards `date_from` and `date_to` exactly as LexChat
+does, and the Find Case Law Atom endpoint ignores both, so the results come back date-ordered and
+unfiltered by date. That is reproduced rather than corrected, for the same reason `matches_jurisdiction`
+is: the mirror is only useful while it shows what LexChat actually gets. See TOM_TO_DO.md finding 42.
 
 ## The tool trace is not a LexChat trace
 
@@ -212,8 +222,15 @@ attribution flag above it can never quietly come from different versions.
 Twenty questions across `questions.json` and `questions_new.json` have answers. **None is verified**:
 every one is an unapproved draft.
 
-Only `legislation_only` is supported. Case-law and hybrid modes would need the case-law tools wired
-into `lex_client.py`.
+All three research modes are supported. `TOOLS_BY_MODE` in `lex_client.py` sets which tools each mode
+may be researched with, and the scaffold, the retrieval dump, the record and the review document all
+follow the question's mode.
+
+One gap remains on the case law side: `Citation Agreement` reads legislation.gov.uk provisions only, so
+it measures nothing for a `case_law_only` question and ignores the judgments a
+`legislation_and_case_law` answer cites. The review document says so rather than asking a lawyer to
+mark up citations nothing will score. `Reference Answer Agreement` and `Plan Coverage` were never
+legislation-specific and work on case law answers as they stand.
 
 Two things are deliberately out of scope: parsing a returned Word document back into the record (a
 maintainer applies accepted changes to the authored files and re-renders), and any automatic setting of

@@ -30,7 +30,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .lex_client import TOOLS, LexTools, _section_text, _sections_of
+from .lex_client import (
+    TOOLS_BY_MODE,
+    LexTools,
+    _section_text,
+    _sections_of,
+    slim_search_results,
+)
 from .store import (
     ANSWERS_DIR,
     QUESTIONS_PATH,
@@ -48,12 +54,12 @@ from .store import (
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_MODES = {"legislation_only"}
+SUPPORTED_MODES = set(TOOLS_BY_MODE)
 
 # Written into a fresh answer.md; while it is still there the answer is unwritten.
 _TODO = "<!-- TODO: write the answer here, then re-run the build script. -->"
 
-_SEARCHES_TEMPLATE = [
+_LEGISLATION_SEARCHES = [
     {
         "_comment": (
             "Phase 1, discover. One entry per search. Delete this _comment key. "
@@ -75,6 +81,42 @@ _SEARCHES_TEMPLATE = [
         },
     },
 ]
+
+_CASE_LAW_SEARCHES = [
+    {
+        "_comment": (
+            "Phase 1, find judgments. One entry per search. Find Case Law matches "
+            "the full text of a judgment and returns the newest matches first, not "
+            "the most relevant, so keep queries narrow and add a court or a date "
+            "range where you can. Delete this _comment key, then re-run the build "
+            "script to fetch results into retrieved.md."
+        ),
+        "tool": "search_case_law",
+        "args": {
+            "query": "REPLACE ME, party names or the legal issue in a few words",
+            "court": "OPTIONAL, e.g. uksc, ewca/civ, ewhc/admin. Delete if not used.",
+            "date_from": "OPTIONAL, YYYY-MM-DD. Delete if not used.",
+            "date_to": "OPTIONAL, YYYY-MM-DD. Delete if not used.",
+        },
+    },
+    {
+        "_comment": (
+            "Phase 2, read the judgments. Add one entry per case you need, using "
+            "the exact url from a Phase 1 result. Only a judgment read here counts "
+            "as retrieval evidence for the answer."
+        ),
+        "tool": "get_case_law_text",
+        "args": {
+            "url": "REPLACE ME, e.g. https://caselaw.nationalarchives.gov.uk/uksc/2023/1"
+        },
+    },
+]
+
+_SEARCHES_BY_MODE = {
+    "legislation_only": _LEGISLATION_SEARCHES,
+    "case_law_only": _CASE_LAW_SEARCHES,
+    "legislation_and_case_law": _LEGISLATION_SEARCHES + _CASE_LAW_SEARCHES,
+}
 
 _PLAN_TEMPLATE = {
     "scope_note": "REPLACE ME, 1-2 sentences on what this answer covers and what it deliberately excludes.",
@@ -174,8 +216,9 @@ def write_review(src: Path, review: Dict[str, Any]) -> bool:
 def scaffold(src: Path, question: Dict[str, Any]) -> None:
     """Stage 1, create the files the author fills in."""
     src.mkdir(parents=True, exist_ok=True)
+    mode = question.get("research_mode", "legislation_only")
     (src / "searches.json").write_text(
-        json.dumps(_SEARCHES_TEMPLATE, indent=2) + "\n", encoding="utf-8"
+        json.dumps(_SEARCHES_BY_MODE[mode], indent=2) + "\n", encoding="utf-8"
     )
     (src / "plan.json").write_text(
         json.dumps(_PLAN_TEMPLATE, indent=2) + "\n", encoding="utf-8"
@@ -200,19 +243,33 @@ def scaffold(src: Path, question: Dict[str, Any]) -> None:
     )
 
 
-def retrieve(src: Path, searches: List[Dict[str, Any]]) -> int:
+def check_tools(searches: List[Dict[str, Any]], mode: str) -> None:
+    """Raise unless every search uses a tool this question's mode allows.
+
+    A `legislation_only` question researched with case law, or the reverse,
+    would produce a reference answer resting on a source its own brief excludes.
+    """
+    permitted = TOOLS_BY_MODE[mode]
+    for entry in searches:
+        tool = entry.get("tool")
+        if tool not in permitted:
+            raise ValueError(
+                f"tool {tool!r} is not allowed in research mode {mode!r}; "
+                f"expected one of {permitted}"
+            )
+
+
+def retrieve(src: Path, searches: List[Dict[str, Any]], mode: str) -> int:
     """Stage 2, run the searches and write everything retrieved to `retrieved.md`.
 
     The dump is the point: it is what the author reads to write the answer from, and
     keeping it on disk means the answer can be checked against exactly the text that
     informed it.
     """
+    check_tools(searches, mode)
     with LexTools() as tools:
         for entry in searches:
-            tool = entry.get("tool")
-            if tool not in TOOLS:
-                raise ValueError(f"unknown tool {tool!r}; expected one of {TOOLS}")
-            tools.execute(tool, entry.get("args") or {})
+            tools.execute(entry["tool"], entry.get("args") or {})
 
         lines = [
             "# Retrieved material",
@@ -231,8 +288,6 @@ def retrieve(src: Path, searches: List[Dict[str, Any]]) -> int:
                 "",
             ]
             if call.tool == "search_legislation":
-                from .lex_client import slim_search_results
-
                 for item in slim_search_results(call.response).get("results", []):
                     lines.append(
                         f"- `{item['legislation_id']}`, **{item['title']}** "
@@ -259,6 +314,27 @@ def retrieve(src: Path, searches: List[Dict[str, Any]]) -> int:
                     else ""
                 )
                 lines += [full, ""]
+            elif call.tool == "search_case_law":
+                results = (call.response or {}).get("results") or []
+                for case in results:
+                    lines.append(
+                        f"- **{case.get('title', '')}** {case.get('ncn', '')} "
+                        f"({case.get('court', '')}, {case.get('date', '')}) "
+                        f"<{case.get('url', '')}>"
+                    )
+                if not results:
+                    lines.append("_No judgments matched._")
+                lines.append("")
+            elif call.tool == "get_case_law_text":
+                judgment = call.response or {}
+                lines += [
+                    f"### {judgment.get('title', '(untitled)')} "
+                    f"{judgment.get('ncn', '')}",
+                    f"`{judgment.get('url', '')}`",
+                    "",
+                    judgment.get("text", "") or "_No judgment text returned._",
+                    "",
+                ]
 
         (src / "retrieved.md").write_text("\n".join(lines), encoding="utf-8")
         return len(tools.api_calls)
@@ -287,6 +363,9 @@ def build(
         ],
     }
 
+    mode = question.get("research_mode", "legislation_only")
+    check_tools(searches, mode)
+
     with LexTools() as tools:
         for entry in searches:
             tools.execute(entry["tool"], entry.get("args") or {})
@@ -294,7 +373,7 @@ def build(
         record = {
             "question_id": question["id"],
             "question": question["question"],
-            "research_mode": question.get("research_mode", "legislation_only"),
+            "research_mode": mode,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "author": author,
             "plan": plan,
@@ -312,6 +391,11 @@ def build(
             "retrieval_context": tools.retrieval_context(),
             "sources_retrieved": tools.sources_retrieved(),
             "sources_discovered": tools.sources_discovered(),
+            # Judgments are kept apart from legislation because a judgment has
+            # no legislation_id, and everything reading sources_retrieved treats
+            # its entries as legislation.gov.uk provisions.
+            "cases_retrieved": tools.cases_retrieved(),
+            "cases_discovered": tools.cases_discovered(),
             "fallback_used": tools.fallback_used(),
             "lex_api_calls": len(tools.api_calls),
         }
@@ -378,7 +462,7 @@ def process(
 
     retrieved = src / "retrieved.md"
     if refetch or not retrieved.is_file():
-        n = retrieve(src, searches)
+        n = retrieve(src, searches, question.get("research_mode", "legislation_only"))
         return (
             f"RETRIEVED   {n} call(s) -> {retrieved}; write plan.json and answer.md, then re-run",
             None,
@@ -394,6 +478,7 @@ def process(
     record = build(question, src, searches, author, previous)
     return (
         f"BUILT       q{qid}.md, {len(record['sources_retrieved'])} provisions, "
+        f"{len(record['cases_retrieved'])} judgments, "
         f"{len(record['tool_sequence'])} tool calls",
         record,
     )
@@ -553,7 +638,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if skipped:
         print(
             f"Skipping {len(skipped)} question(s) in unsupported research modes "
-            f"(only {', '.join(sorted(SUPPORTED_MODES))} is supported)."
+            f"(supported: {', '.join(sorted(SUPPORTED_MODES))})."
         )
         questions = [q for q in questions if q not in skipped]
 

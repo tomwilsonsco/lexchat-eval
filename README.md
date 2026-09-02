@@ -391,7 +391,7 @@ lex_eval/
 ├── metrics/                 # custom metric classes
 ├── reference/               # reference ("gold") answers
 │   ├── build.py             # the build script
-│   ├── lex_client.py        # the three LEX tools, as LexChat calls them
+│   ├── lex_client.py        # the LEX and Find Case Law tools, as LexChat calls them
 │   └── store.py             # manifest + Markdown for review
 ├── reports/
 │   └── streamlit_report.py  # Streamlit dashboard

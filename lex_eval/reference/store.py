@@ -157,8 +157,9 @@ def reference_fingerprint(record: Dict[str, Any]) -> str:
 
     Covers the question, the answer, the statements the judge is shown, the
     citations approved as required, and the retrieval evidence the answer was
-    written from. Anything else, timestamps, notes, the order tools are
-    displayed in, can change without invalidating the approval.
+    written from, legislation and judgments alike. Anything else, timestamps,
+    notes, the order tools are displayed in, can change without invalidating
+    the approval.
     """
     review = normalise_review(record.get("review"))
     material = {
@@ -172,6 +173,10 @@ def reference_fingerprint(record: Dict[str, Any]) -> str:
         "sources_retrieved": sorted(
             f"{s.get('legislation_id', '')} {s.get('uri', '')}"
             for s in record.get("sources_retrieved") or []
+        ),
+        "cases_retrieved": sorted(
+            f"{c.get('ncn', '')} {c.get('url', '')}"
+            for c in record.get("cases_retrieved") or []
         ),
         # One hash for all the retrieved text, because the record keeps the text
         # as a flat list and not per source.
@@ -406,6 +411,48 @@ def _fmt_statements(statements: Optional[List[str]], approved: bool) -> str:
     )
 
 
+def cited_judgments(text: str) -> List[str]:
+    """Find Case Law judgment links in *text*, deduplicated and sorted."""
+    from ..metrics.structure import _CASE_LAW_DOMAIN, _URL_RE
+
+    return sorted(
+        {
+            url.rstrip("/")
+            for url in _URL_RE.findall(text or "")
+            if _CASE_LAW_DOMAIN in url.lower()
+        }
+    )
+
+
+def _fmt_judgments(record: Dict[str, Any]) -> str:
+    """Every judgment link in the answer, for the lawyer to check.
+
+    Not marked up as Required or Background: `Citation Agreement` reads
+    legislation.gov.uk provisions only, so nothing scores a judgment citation
+    today. This table is here so a case the answer leans on can still be
+    checked against what the research actually read.
+    """
+    cited = cited_judgments(record.get("final_answer") or "")
+    if not cited:
+        return "_The answer cites no judgments._"
+
+    read = {
+        (c.get("url") or "").rstrip("/"): c for c in record.get("cases_retrieved") or []
+    }
+    lines = [
+        "| Judgment | Neutral citation | Read during research |",
+        "| --- | --- | --- |",
+    ]
+    for url in cited:
+        case = read.get(url) or {}
+        title = (case.get("title") or "").replace("|", "\\|")
+        lines.append(
+            f"| [{title or url}]({url}) | {case.get('ncn', '')} "
+            f"| {'yes' if case else 'no'} |"
+        )
+    return "\n".join(lines)
+
+
 def _fmt_citations(record: Dict[str, Any]) -> str:
     """Every legislation link in the answer, for the lawyer to mark up.
 
@@ -419,6 +466,11 @@ def _fmt_citations(record: Dict[str, Any]) -> str:
 
     cited = sorted(cited_provisions(record.get("final_answer") or ""))
     if not cited:
+        if record.get("research_mode") == "case_law_only":
+            return (
+                "_Case law only, so no legislation is expected. Citation Agreement "
+                "does not measure this question._"
+            )
         return (
             "_The answer contains no legislation.gov.uk links. Citation Agreement "
             "cannot measure this question until the provisions it relies on are "
@@ -478,6 +530,168 @@ def _fmt_discovered(sources: List[Dict[str, Any]]) -> str:
     )
 
 
+def _fmt_cases_retrieved(cases: List[Dict[str, Any]]) -> str:
+    if not cases:
+        return "_No judgment text was read._"
+    lines = [
+        "| Judgment | Neutral citation | Court | Date | URL |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for c in cases:
+        title = (c.get("title") or "").replace("|", "\\|")
+        lines.append(
+            f"| {title} | {c.get('ncn', '')} | {c.get('court', '')} "
+            f"| {c.get('date', '')} | {c.get('url', '')} |"
+        )
+    return "\n".join(lines)
+
+
+def _fmt_cases_discovered(cases: List[Dict[str, Any]]) -> str:
+    if not cases:
+        return "_Every judgment found in search was also read._"
+    return "\n".join(
+        f"- {c.get('ncn', '')}, {c.get('title', '')} ({c.get('url', '')})"
+        for c in cases
+    )
+
+
+# Which halves of the citation schedule and the research appendix a mode gets.
+# A section about a source the question excluded is noise the reviewer has to
+# read past, and its "nothing retrieved" placeholder reads as a gap in the
+# research rather than as a source that was never in scope.
+_SHOWS_LEGISLATION = {"legislation_only", "legislation_and_case_law"}
+_SHOWS_CASE_LAW = {"case_law_only", "legislation_and_case_law"}
+
+
+# Where the material in front of the reviewer came from. One complete sentence
+# per mode rather than a name and a service spliced together, so the grammar and
+# the line wrapping stay with the words they belong to.
+_PROVENANCE = {
+    "legislation_only": (
+        "The legislation below was retrieved from the live LEX\n"
+        "service using the same search tools AILA uses."
+    ),
+    "case_law_only": (
+        "The judgments below were retrieved from the National\n"
+        "Archives Find Case Law service using the same search tools AILA uses."
+    ),
+    "legislation_and_case_law": (
+        "The legislation and judgments below were retrieved\n"
+        "from the live LEX service and the National Archives Find Case Law\n"
+        "service, using the same search tools AILA uses."
+    ),
+}
+
+# What section 4 asks of the reviewer, which is not the same job in every mode.
+# Judgments are shown to be checked, not marked up: no metric scores a case
+# citation, so asking for Required/Background/Remove against them would be
+# asking for a decision nothing acts on.
+_CITATION_ASKS = {
+    "legislation_only": (
+        "**Section 4, the citations.** Which of these must a correct answer cite? "
+        "Mark\n   each one Required, Background or Remove."
+    ),
+    "case_law_only": (
+        "**Section 4, the judgments.** Is each one really the case the answer says "
+        "it is,\n   and is a case the answer should have cited missing? There is "
+        "nothing to mark\n   up here."
+    ),
+    "legislation_and_case_law": (
+        "**Section 4, the citations.** Which legislation must a correct answer "
+        "cite? Mark\n   each one Required, Background or Remove. The judgments "
+        "below need no markup,\n   just tell us in section 5 if one is wrong or "
+        "missing."
+    ),
+}
+
+
+def _appendix_counts(record: Dict[str, Any]) -> str:
+    """The rows of the appendix summary that this question's mode has numbers for."""
+    mode = record.get("research_mode", "legislation_only")
+    rows = []
+    if mode in _SHOWS_LEGISLATION:
+        rows.append(
+            f"| Full-Act fallback used | {'yes' if record.get('fallback_used') else 'no'} |"
+        )
+        rows.append(
+            f"| Provisions retrieved | {len(record.get('sources_retrieved') or [])} |"
+        )
+    if mode in _SHOWS_CASE_LAW:
+        rows.append(f"| Judgments read | {len(record.get('cases_retrieved') or [])} |")
+    return "".join(f"{row}\n" for row in rows)
+
+
+def _citation_section(record: Dict[str, Any]) -> str:
+    """Section 4, the parts of it this question's research mode calls for."""
+    mode = record.get("research_mode", "legislation_only")
+    parts = []
+    if mode in _SHOWS_LEGISLATION:
+        parts.append(
+            """Every legislation link in the answer. Mark each one `Required` if a correct
+answer has to cite it, `Background` if it is context, or `Remove` if it does not
+belong in the answer at all.
+
+"""
+            + _fmt_citations(record)
+        )
+    if mode in _SHOWS_CASE_LAW:
+        parts.append(
+            """Judgments the answer cites. Nothing scores these yet, so there is nothing to
+mark up: check them, and say in section 5 if one is wrong or missing.
+
+"""
+            + _fmt_judgments(record)
+        )
+    return "\n" + "\n\n".join(parts) + "\n"
+
+
+def _research_appendix(record: Dict[str, Any]) -> str:
+    """Appendix subsections 6.2 onward, numbered in the order the mode shows them.
+
+    6.1 is the research plan, so these start at 6.2. Which of them appear
+    depends on the mode, hence the numbering here rather than in the template.
+    """
+    mode = record.get("research_mode", "legislation_only")
+    sections: List[tuple] = []
+    if mode in _SHOWS_LEGISLATION:
+        sections.append(
+            (
+                "Provisions retrieved",
+                """Every provision the answer was permitted to rely on. A citation in section 2
+that does not appear below is unsupported by this run's retrieval.""",
+                _fmt_retrieved(record.get("sources_retrieved") or []),
+            )
+        )
+        sections.append(
+            (
+                "Legislation found but never read",
+                """These appeared in search results, so they exist and were located, but their text
+was never retrieved. Citing one is a weaker claim than citing a provision above.""",
+                _fmt_discovered(record.get("sources_discovered") or []),
+            )
+        )
+    if mode in _SHOWS_CASE_LAW:
+        sections.append(
+            (
+                "Judgments read",
+                "Every judgment whose full text the answer was permitted to rely on.",
+                _fmt_cases_retrieved(record.get("cases_retrieved") or []),
+            )
+        )
+        sections.append(
+            (
+                "Judgments found but never read",
+                """These came back from a case law search but their text was never retrieved.
+Citing one is a weaker claim than citing a judgment above.""",
+                _fmt_cases_discovered(record.get("cases_discovered") or []),
+            )
+        )
+    return "\n\n".join(
+        f"### 6.{i + 2} {title}\n\n{blurb}\n\n{body}"
+        for i, (title, blurb, body) in enumerate(sections)
+    )
+
+
 def render_markdown(record: Dict[str, Any]) -> str:
     """Render one reference answer for lawyer review.
 
@@ -495,10 +709,9 @@ def render_markdown(record: Dict[str, Any]) -> str:
 
 **Status: {state}.** {_STATE_NOTE.get(state, '')}{_fmt_problems(review_problems(r))}
 
-**How this was produced:** The legislation below was retrieved from the live LEX
-service using the same search tools AILA uses, and the answer was drafted from
-that retrieved text by {r.get('author', 'unknown')}. Nobody legally qualified
-has checked it.
+**How this was produced:** {_PROVENANCE.get(mode, _PROVENANCE['legislation_only'])}
+The answer was drafted from that retrieved text by {r.get('author', 'unknown')}.
+Nobody legally qualified has checked it.
 
 **Why this is required:** We test AILA by asking it the same questions over and
 over and comparing what it says against a fixed expected answer, which is the
@@ -515,8 +728,7 @@ section 5.
    misleading?
 2. **Section 3, the key statements.** Are these the points a correct answer has
    to make? Mark each one Accept or Amend.
-3. **Section 4, the citations.** Which of these must a correct answer cite? Mark
-   each one Required, Background or Remove.
+3. {_CITATION_ASKS.get(mode, _CITATION_ASKS['legislation_only'])}
 4. **Section 5, your decision. Please complete every line of it**, including
    Approve or Changes required, your name and the date. Nothing counts as
    reviewed until section 5 is filled in, whether or not you have written
@@ -551,13 +763,7 @@ measures, so they need your approval as much as the answer does.
 {_fmt_statements(r.get('statements'), state == 'Verified')}
 
 ## 4. Citation schedule
-
-Every legislation link in the answer. Mark each one `Required` if a correct
-answer has to cite it, `Background` if it is context, or `Remove` if it does not
-belong in the answer at all.
-
-{_fmt_citations(r)}
-
+{_citation_section(r)}
 ## 5. Decision
 
 This is the section we need you to complete. Please fill in every line.
@@ -583,26 +789,12 @@ wrong can be traced back to what was read.
 | Research mode | `{mode}` |
 | Written | {r['generated_at']} |
 | Tool calls | {' → '.join(r.get('tool_sequence') or []) or '_none_'} |
-| Full-Act fallback used | {'yes' if r.get('fallback_used') else 'no'} |
-| Provisions retrieved | {len(r.get('sources_retrieved') or [])} |
-| Reference version | `{r.get('reference_sha256') or reference_fingerprint(r)}` |
+{_appendix_counts(r)}| Reference version | `{r.get('reference_sha256') or reference_fingerprint(r)}` |
 | Version approved | `{review['signed_reference_sha256'] or 'none'}` |
 
 ### 6.1 Research plan
 
 {_fmt_plan(r.get('plan'))}
 
-### 6.2 Provisions retrieved
-
-Every provision the answer was permitted to rely on. A citation in section 2
-that does not appear below is unsupported by this run's retrieval.
-
-{_fmt_retrieved(r.get('sources_retrieved') or [])}
-
-### 6.3 Found but never read
-
-These appeared in search results, so they exist and were located, but their text
-was never retrieved. Citing one is a weaker claim than citing a provision above.
-
-{_fmt_discovered(r.get('sources_discovered') or [])}
+{_research_appendix(r)}
 """

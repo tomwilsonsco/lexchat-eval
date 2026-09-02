@@ -249,6 +249,7 @@ def _signed(**overrides):
         {"research_mode": "legislation_and_case_law"},
         {"retrieval_context": ["different text entirely"]},
         {"sources_retrieved": []},
+        {"cases_retrieved": [{"ncn": "[2025] EWCA Crim 1150", "url": "u"}]},
     ],
     ids=[
         "question",
@@ -258,6 +259,7 @@ def _signed(**overrides):
         "mode",
         "retrieved-text",
         "sources",
+        "judgments",
     ],
 )
 def test_changing_approved_material_changes_the_fingerprint(change):
@@ -279,9 +281,17 @@ def test_changing_the_required_citations_changes_the_fingerprint():
         {"author": "somebody else"},
         {"tool_sequence": ["search_legislation", "search_legislation_sections"]},
         {"sources_discovered": [{"legislation_id": "ukpga/1998/29", "title": "DPA"}]},
+        {"cases_discovered": [{"ncn": "[2020] EWCA Civ 1", "url": "u"}]},
         {"lex_api_calls": 99},
     ],
-    ids=["written-at", "author", "tool-order", "discovered", "call-count"],
+    ids=[
+        "written-at",
+        "author",
+        "tool-order",
+        "discovered",
+        "cases-discovered",
+        "call-count",
+    ],
 )
 def test_presentation_and_provenance_do_not_change_the_fingerprint(change):
     assert reference_fingerprint(_record(**change)) == reference_fingerprint(_record())
@@ -514,3 +524,125 @@ def test_an_approval_is_stamped_on_file_so_a_later_edit_goes_stale(tmp_path):
     assert render_only(tmp_path, None) == 0
 
     assert review_state(load_manifest(tmp_path)[0]) == "Stale"
+
+
+# ---------------------------------------------------------------------------
+# The review document shows the sources its research mode allows, and no others
+# ---------------------------------------------------------------------------
+
+_JUDGMENT_URL = "https://caselaw.nationalarchives.gov.uk/ewca/crim/2025/1150"
+
+_CASE_ANSWER = (
+    "### Summary Answer (BLUF)\n\n"
+    f"The appeal was dismissed, see [Evans v R]({_JUDGMENT_URL}).\n"
+)
+
+_CASES = [
+    {
+        "url": _JUDGMENT_URL,
+        "title": "Graham Andrew Evans v R",
+        "ncn": "[2025] EWCA Crim 1150",
+        "court": "ewca/crim",
+        "date": "2025-09-05",
+    }
+]
+
+
+def _case_record(**overrides):
+    record = _record(
+        research_mode="case_law_only",
+        final_answer=_CASE_ANSWER,
+        research_output=_CASE_ANSWER,
+        sources_retrieved=[],
+        cases_retrieved=list(_CASES),
+        cases_discovered=[],
+        tool_sequence=["search_case_law", "get_case_law_text"],
+    )
+    record.update(overrides)
+    return record
+
+
+def test_a_case_law_answer_shows_its_judgments():
+    markdown = render_markdown(_case_record())
+
+    assert "[2025] EWCA Crim 1150" in markdown
+    assert "Judgments read" in markdown
+
+
+def test_a_case_law_answer_does_not_show_the_legislation_sections():
+    """A section about a source the question excluded reads as a gap in research."""
+    markdown = render_markdown(_case_record())
+
+    assert "Provisions retrieved" not in markdown
+    assert "Full-Act fallback used" not in markdown
+    assert "Legislation found but never read" not in markdown
+
+
+def test_a_legislation_answer_does_not_show_the_case_law_sections():
+    markdown = render_markdown(_record())
+
+    assert "Judgments read" not in markdown
+    assert "Judgments found but never read" not in markdown
+
+
+def test_a_combined_answer_shows_both():
+    markdown = render_markdown(_case_record(research_mode="legislation_and_case_law"))
+
+    assert "Provisions retrieved" in markdown
+    assert "Judgments read" in markdown
+
+
+def test_a_cited_judgment_nobody_read_is_marked_unread():
+    markdown = render_markdown(_case_record(cases_retrieved=[]))
+
+    assert "| no |" in markdown
+
+
+def test_appendix_subsections_are_numbered_without_gaps():
+    for record in (
+        _record(),
+        _case_record(),
+        _case_record(research_mode="legislation_and_case_law"),
+    ):
+        markdown = render_markdown(record)
+        headings = [
+            line.split()[1]
+            for line in markdown.split("\n")
+            if line.startswith("### 6.")
+        ]
+        assert headings == [f"6.{i + 1}" for i in range(len(headings))]
+
+
+def test_a_case_law_answer_names_the_service_its_material_came_from():
+    """Telling a reviewer of judgments that they came from LEX is simply untrue."""
+    markdown = render_markdown(_case_record())
+
+    assert "Find Case Law service" in markdown
+    assert "retrieved from the live LEX" not in markdown
+
+
+def test_a_legislation_answer_still_names_lex():
+    markdown = render_markdown(_record())
+
+    assert "retrieved from the live LEX" in markdown
+    assert "Find Case Law" not in markdown
+
+
+def test_a_combined_answer_names_both_services():
+    markdown = render_markdown(_case_record(research_mode="legislation_and_case_law"))
+
+    assert "live LEX service and the National Archives Find Case Law" in markdown
+
+
+def test_a_case_law_answer_does_not_ask_for_markup_it_then_refuses():
+    """Section 4 says there is nothing to mark up, so the checklist must not ask."""
+    markdown = render_markdown(_case_record())
+
+    assert "There is nothing to mark" in markdown
+    assert "Mark\n   each one Required, Background or Remove" not in markdown
+
+
+def test_a_legislation_answer_still_asks_for_citation_markup():
+    markdown = render_markdown(_record())
+
+    assert "each one Required, Background or Remove" in markdown

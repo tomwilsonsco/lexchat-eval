@@ -29,6 +29,7 @@ from lex_eval.metrics import (
 )
 from lex_eval.metrics.citation_agreement import (
     MIN_OUTPUT_CHARS,
+    NO_EXPECTED_CITATIONS_REASON,
     expected_citations,
     reference_acts,
 )
@@ -152,6 +153,26 @@ def _gate_statements(request, record, reference, test_name, metric_name, thresho
     return None, reason
 
 
+def _gate_expected_citations(
+    request, record, reference, test_name, metric_name, threshold
+):
+    """Fail fast if the reference cites no legislation for a response to match.
+
+    A `case_law_only` reference is the ordinary case: it cites judgments, and
+    this metric reads legislation.gov.uk provisions only. Without this the
+    metric scores 0.0 and the test fails, which reads as the response citing
+    the wrong law rather than as nothing having been measured.
+    """
+    expected, expectation = expected_citations(reference)
+    if expected:
+        return expected, expectation, ""
+
+    _attach_not_measured(
+        request, record, test_name, metric_name, threshold, NO_EXPECTED_CITATIONS_REASON
+    )
+    return None, expectation, NO_EXPECTED_CITATIONS_REASON
+
+
 def _gate_research_plan(request, record, test_name, metric_name, threshold):
     """Fail fast if this isn't a deep-research response with an approved plan."""
     plan = record.get("research_plan") or {}
@@ -211,10 +232,20 @@ def test_citation_agreement(request, record):
     if reference is None:
         pytest.skip(reason)
 
-    test_case: LLMTestCase = record_to_test_case(record)
     # A signed-off reference is scored against the citations the lawyer called
     # required; a draft against every legislation link in its answer.
-    expected, expectation = expected_citations(reference)
+    expected, expectation, reason = _gate_expected_citations(
+        request,
+        record,
+        reference,
+        "citation_agreement",
+        "Citation Agreement",
+        _COVERAGE_THRESHOLD,
+    )
+    if expected is None:
+        pytest.skip(reason)
+
+    test_case: LLMTestCase = record_to_test_case(record)
     approved = expectation == "approved"
     metric = CitationAgreementMetric(
         reference_answer=reference["final_answer"],
