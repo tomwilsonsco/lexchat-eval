@@ -493,24 +493,36 @@ def render_markdown(record: Dict[str, Any]) -> str:
 
     return f"""# Q{r['question_id']} reference answer for review
 
-**Status: {state}.** {_STATE_NOTE.get(state, '')}
-{_fmt_problems(review_problems(r))}
+**Status: {state}.** {_STATE_NOTE.get(state, '')}{_fmt_problems(review_problems(r))}
 
-**How this was produced.** The legislation below was retrieved from the live LEX
-service using the same search tools LexChat uses, and the answer was drafted
-from that retrieved text by {r.get('author', 'unknown')}. Nobody legally
-qualified has checked it.
+**How this was produced:** The legislation below was retrieved from the live LEX
+service using the same search tools AILA uses, and the answer was drafted from
+that retrieved text by {r.get('author', 'unknown')}. Nobody legally qualified
+has checked it.
 
-**How it is being used now.** This answer is already scored against, signed off
-or not. While it is unapproved, every score it produces is labelled as agreement
-with the drafter rather than a statement about the law. Your approval is what
-turns it into a legal yardstick, and it also narrows what LexChat is expected to
-cite to the provisions you mark `Required` in section 4.
+**Why this is required:** We test AILA by asking it the same questions over and
+over and comparing what it says against a fixed expected answer, which is the
+only way to tell whether a change to the system has made its legal answers
+better or worse. That expected answer is currently drafted by an AI model, and
+even the best of them state the law confidently when they have it wrong, so
+scoring one AI against another proves nothing on its own. Your sign-off is what
+turns this from a draft into a legal benchmark we can rely on.
 
-**What we need from you:** decide whether the answer in section 2 is right,
-whether the key statements in section 3 are the points a correct answer must
-make, and which of the citations in section 4 are mandatory. Sections 5 and 6
-are your decision and the research trail behind the answer.
+**What we need from you:** three checks, then your decision written into
+section 5.
+
+1. **Section 2, the answer.** Is it right, and is anything missing or
+   misleading?
+2. **Section 3, the key statements.** Are these the points a correct answer has
+   to make? Mark each one Accept or Amend.
+3. **Section 4, the citations.** Which of these must a correct answer cite? Mark
+   each one Required, Background or Remove.
+4. **Section 5, your decision. Please complete every line of it**, including
+   Approve or Changes required, your name and the date. Nothing counts as
+   reviewed until section 5 is filled in, whether or not you have written
+   comments elsewhere.
+
+Section 6 is the research trail behind the answer. It needs nothing from you.
 
 ## 1. Question
 
@@ -547,6 +559,8 @@ belong in the answer at all.
 {_fmt_citations(r)}
 
 ## 5. Decision
+
+This is the section we need you to complete. Please fill in every line.
 
 - **Approve / Changes required:** {review['verdict'] or '_not yet reviewed_'}
 - **Reviewer:** {review['verified_by'] or '_not yet reviewed_'}

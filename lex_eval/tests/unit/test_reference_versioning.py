@@ -343,9 +343,13 @@ def test_the_document_says_why_an_approval_cannot_be_used():
     assert "the decision is missing" in markdown
 
 
-def test_a_draft_document_says_it_is_already_being_scored_against():
-    """A reviewer must not think their unapproved draft is sitting unused."""
+def test_a_draft_document_tells_the_reviewer_who_drafted_it_and_why_they_matter():
+    """A reviewer must not think a draft written by a model is already authority."""
     text = " ".join(render_markdown(_reference()).split())
 
-    assert "already scored against, signed off or not" in text
     assert "drafted from that retrieved text by a drafting model" in text
+    assert "Nobody legally qualified has checked it." in text
+    assert "Why this is required:" in text
+    assert (
+        "Your sign-off is what turns this from a draft into a legal benchmark" in text
+    )
