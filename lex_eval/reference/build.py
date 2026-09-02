@@ -3,12 +3,17 @@
     python -m lex_eval.reference.build
     python -m lex_eval.reference.build --questions data/questions_new.json
 
-Run it repeatedly. Each run advances every question that has no `q{id}.md` yet
-through three stages, and prints what it needs from you next:
+Run it repeatedly. Each run advances every question with no answer in the
+manifest yet through three stages, and prints what it needs from you next:
 
     1. SCAFFOLD  creates `.authored/q{id}/` with template files
     2. RETRIEVE  runs the searches you listed and writes `retrieved.md` to read
     3. BUILD     turns your answer plus the retrieval audit into `q{id}.md`
+
+After a lawyer sends changes back, edit `.authored/q{id}/answer.md` or
+`statements.json` and run `--render-only`. That re-reads what you wrote into the
+manifest and regenerates the Markdown without calling LEX, so the retrieval
+audit still shows the material the answer was actually written from.
 
 The searches and the writing are yours; everything mechanical is the script's. That
 split is deliberate: choosing what to search for and reading the legislation is the
@@ -30,6 +35,7 @@ from .store import (
     ANSWERS_DIR,
     QUESTIONS_PATH,
     carry_review_forward,
+    is_built,
     load_manifest,
     load_questions,
     new_review_block,
@@ -280,6 +286,26 @@ def build(
     return record
 
 
+def resync(record: Dict[str, Any], src: Path) -> Dict[str, Any]:
+    """Re-read the authored answer and statements into an existing record.
+
+    Makes no LEX call, so the retrieval audit recorded when the answer was
+    researched is carried over untouched. That is the point: a lawyer's
+    correction should not silently re-run the searches and leave the answer
+    citing text nobody read.
+    """
+    answer = _read(src / "answer.md")
+    if _is_template(answer):
+        raise ValueError(f"{src / 'answer.md'} is still the template")
+    statements = read_statements(src)
+
+    updated = dict(record)
+    updated["final_answer"] = answer
+    updated["research_output"] = answer
+    updated["statements"] = statements
+    return updated
+
+
 # ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
@@ -360,6 +386,46 @@ def attach_statements(
     return (f"STATEMENTS  q{qid}.md, {len(record['statements'])} statements", record)
 
 
+def render_only(answers_dir: Path, question_id: Optional[int]) -> int:
+    """Re-read every authored answer into the manifest and regenerate its Markdown.
+
+    Offline. Works from the manifest rather than a question file, because every
+    question set shares one answers directory. A question whose authored files
+    are missing or unfinished is reported and left exactly as it was, manifest
+    entry and Markdown together.
+    """
+    records = [
+        r
+        for r in load_manifest(answers_dir)
+        if question_id is None or r["question_id"] == question_id
+    ]
+    if not records:
+        print("No reference answers to render.")
+        return 1
+
+    updated: List[Dict[str, Any]] = []
+    failures = 0
+    for record in records:
+        qid = record["question_id"]
+        try:
+            new = resync(record, authored_dir(answers_dir, qid))
+        except Exception as exc:
+            logger.debug("Q%s failed", qid, exc_info=True)
+            print(f"  Q{qid}  FAILED      {type(exc).__name__}: {exc}")
+            failures += 1
+            continue
+        changed = new["final_answer"] != record.get("final_answer") or new[
+            "statements"
+        ] != record.get("statements")
+        print(f"  Q{qid}  {'RESYNCED    ' if changed else 'RENDERED    '}q{qid}.md")
+        updated.append(new)
+
+    if updated:
+        write(updated, answers_dir)
+    print(f"\n{len(updated)} rendered, {failures} failed. No LEX calls were made.")
+    return 1 if failures else 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -373,12 +439,21 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Rebuild questions that already have a q{id}.md.",
+        help="Rebuild questions that already have an answer in the manifest.",
     )
     parser.add_argument(
         "--refetch",
         action="store_true",
         help="Re-run the searches even if retrieved.md exists (after editing searches.json).",
+    )
+    parser.add_argument(
+        "--render-only",
+        action="store_true",
+        help=(
+            "Offline. Re-read answer.md and statements.json into the manifest and "
+            "regenerate every q{id}.md, without calling LEX or touching the "
+            "retrieval audit. Use this after a lawyer sends changes back."
+        ),
     )
     parser.add_argument(
         "--statements-only",
@@ -406,6 +481,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         level=logging.DEBUG if args.verbose else logging.WARNING,
         format="%(levelname)s: %(message)s",
     )
+
+    if args.render_only:
+        return render_only(args.answers_dir, args.question_id)
 
     questions = load_questions(args.questions)
     if args.question_id is not None:
@@ -435,7 +513,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if (
             not args.overwrite
             and not args.statements_only
-            and (args.answers_dir / f"q{qid}.md").is_file()
+            and is_built(previous.get(qid))
         ):
             done.append(qid)
             continue
@@ -470,8 +548,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         )
     if records:
         print(
-            "\nThese are UNVERIFIED drafts. A lawyer completes the review block in "
-            "each Markdown file before anything treats them as ground truth."
+            "\nThese are UNVERIFIED drafts. A lawyer reviews each Markdown file and "
+            "returns a decision before anything treats them as ground truth."
         )
     return 1 if failures else 0
 

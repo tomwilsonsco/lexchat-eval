@@ -85,6 +85,15 @@ drafts. Nothing sets `verified: true` automatically. A completed review survives
 is carried forward verbatim and only marked `stale: true` when the answer it was given against has
 changed.
 
+## The Markdown is a view, not a copy
+
+`q{id}.md` is generated from the manifest record: the answer, the key statements the judge is shown,
+the citations to mark up, a decision, and the research trail as an appendix. Nothing reads it back,
+so a lawyer's changes reach the evaluator only by way of `.authored/q{id}/`, then
+`python -m lex_eval.reference.build --render-only`, which re-reads those files into the manifest and
+regenerates the Markdown without calling LEX. Whether a question has been answered is decided from
+the manifest record, so deleting a Markdown file costs a re-render and not a rebuild.
+
 ## Current state
 
 All six legislation questions have draft answers, **none verified**.

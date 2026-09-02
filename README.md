@@ -188,8 +188,8 @@ and is then written up by hand.
 This does **not** need a running LexChat instance. It talks to the LEX API directly, so it works
 when Steps 1-2 cannot run.
 
-> Generated answers are **unverified drafts** until a lawyer completes the review block at the foot
-> of each Markdown file. `load_reference_answers()` returns only signed-off answers by default.
+> Generated answers are **unverified drafts** until a lawyer returns a decision on the Markdown
+> file. `load_reference_answers()` returns only signed-off answers by default.
 
 ### Building them
 
@@ -197,8 +197,8 @@ when Steps 1-2 cannot run.
 python -m lex_eval.reference.build --author "Your Name"
 ```
 
-Run it repeatedly. It looks for questions with no `q{id}.md` yet and advances each one a stage,
-printing what it needs from you next:
+Run it repeatedly. It looks for questions with no answer in the manifest yet and advances each one
+a stage, printing what it needs from you next:
 
 | Stage | What the script does | What you do next |
 | --- | --- | --- |
@@ -271,7 +271,7 @@ retrieved text and cite it. Use the four headings the Worker system prompt manda
 
 ```text
 lex_eval/data/reference_answers/
-├── q1.md                      # for review: plan, answer, retrieval audit, sign-off block
+├── q1.md                      # for review: answer, key statements, citations, decision, research appendix
 ├── reference_answers.json     # machine-readable manifest, all questions
 └── .authored/q1/              # your three files, plus the generated retrieved.md
 ```
@@ -287,6 +287,17 @@ answers = load_reference_answers(verified_only=False)   # including drafts
 
 A completed review survives a rebuild; if the answer changes after sign-off the review is kept but
 flagged `stale: true`.
+
+`q{id}.md` is a generated view of the manifest record, not a second copy of the answer. When a lawyer
+sends changes back, edit `.authored/q{id}/answer.md` or `statements.json` and run:
+
+```bash
+python -m lex_eval.reference.build --render-only
+```
+
+That re-reads what you wrote into the manifest and regenerates every Markdown file offline, leaving
+the retrieval audit showing the material the answer was actually written from. Editing `q{id}.md`
+itself changes nothing that is scored.
 
 ### The retrieval audit
 

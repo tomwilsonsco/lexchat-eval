@@ -2,9 +2,11 @@
 
 Two artefacts per question:
 
-* `q{id}.md`, for a lawyer to review: the plan, the answer, the retrieval audit and
-  a sign-off block.
 * an entry in `reference_answers.json`, the machine-readable manifest metrics read.
+  This is the record; whether a question has been answered is decided from it.
+* `q{id}.md`, a generated view of that record for a lawyer to review: the answer,
+  the key statements, the citations to mark up, a decision, and the research
+  trail as an appendix. Editing it changes nothing that is scored.
 """
 
 from __future__ import annotations
@@ -32,6 +34,20 @@ def load_manifest(answers_dir: Path = ANSWERS_DIR) -> List[Dict[str, Any]]:
         return []
     with open(path, "r", encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def is_built(record: Optional[Dict[str, Any]]) -> bool:
+    """Whether a manifest record is a usable reference answer.
+
+    This, not the presence of `q{id}.md`, is what says a question is done. The
+    Markdown is a generated view, so deleting it should cost a re-render and
+    not a rebuild.
+    """
+    return bool(
+        record
+        and (record.get("final_answer") or "").strip()
+        and (record.get("statements") or [])
+    )
 
 
 def load_reference_answers(
@@ -112,23 +128,101 @@ def write(records: List[Dict[str, Any]], answers_dir: Path = ANSWERS_DIR) -> Pat
 # Markdown
 # ---------------------------------------------------------------------------
 
+# The rendered answer sits between these two markers so a test can pull the
+# exact text back out and compare it with the manifest. Nothing else in the
+# document may be inserted between them.
+ANSWER_BEGIN = "<!-- BEGIN REFERENCE ANSWER -->"
+ANSWER_END = "<!-- END REFERENCE ANSWER -->"
+
+_MODE_NOTE = {
+    "legislation_only": (
+        "Legislation only. Case law is out of scope, so an answer that turns on "
+        "a decided case is not expected to cite one here."
+    ),
+    "case_law_only": "Case law only. Legislation is out of scope for this answer.",
+    "legislation_and_case_law": "Legislation and case law are both in scope.",
+}
+
+
+def answer_section(markdown: str) -> str:
+    """The reference answer as it appears in a rendered `q{id}.md`.
+
+    Raises if the markers are missing, which means the file was written by an
+    older renderer or edited by hand. Either way it is no longer a view of the
+    record and should be regenerated.
+    """
+    start = markdown.find(ANSWER_BEGIN)
+    end = markdown.find(ANSWER_END)
+    if start < 0 or end < start:
+        raise ValueError("no marked reference answer in this Markdown")
+    return markdown[start + len(ANSWER_BEGIN) : end].strip()
+
+
+def review_status(review: Optional[Dict[str, Any]]) -> str:
+    """One word for where a reference stands: Draft, Verified or Stale."""
+    review = review or {}
+    if not review.get("verified"):
+        return "Draft"
+    return "Stale" if review.get("stale") else "Verified"
+
 
 def _fmt_plan(plan: Optional[Dict[str, Any]]) -> str:
     if not plan or not plan.get("steps"):
         return "_No plan recorded._"
-    lines = [f"**Scope:** {plan.get('scope_note', '')}", ""]
-    for step in plan["steps"]:
-        lines += [f"{step['id']}. **{step['title']}**", f"   {step['detail']}", ""]
-    return "\n".join(lines).rstrip()
+    return "\n".join(
+        f"{step['id']}. **{step['title']}**\n   {step['detail']}\n"
+        for step in plan["steps"]
+    ).rstrip()
 
 
 def _fmt_statements(statements: Optional[List[str]]) -> str:
+    """The statements, each with a place to accept or amend it."""
     if not statements:
         return (
             "_None recorded. Write them in `.authored/q{id}/statements.json`, then "
             "run `python -m lex_eval.reference.build --statements-only`._"
         )
-    return "\n".join(f"{i + 1}. {s}" for i, s in enumerate(statements))
+    return "\n\n".join(
+        f"{i + 1}. {s}\n   - Accept / Amend (write the replacement here):"
+        for i, s in enumerate(statements)
+    )
+
+
+def _fmt_citations(record: Dict[str, Any]) -> str:
+    """Every legislation link in the answer, for the lawyer to mark up.
+
+    The links are read with the same parser the Citation Agreement metric uses,
+    so this table is exactly the list that metric expects a response to cite.
+    Marking one `Background` has no effect on scoring yet, see
+    docs/reference-answers-changes.md section 8.
+    """
+    from ..metrics.citation_agreement import cited_provisions
+    from ..metrics.structure import provision_id_from_url
+
+    cited = sorted(cited_provisions(record.get("final_answer") or ""))
+    if not cited:
+        return (
+            "_The answer contains no legislation.gov.uk links. Citation Agreement "
+            "cannot measure this question until the provisions it relies on are "
+            "written into the answer as links._"
+        )
+
+    retrieved = {
+        provision_id_from_url(s.get("uri") or ""): s
+        for s in (record.get("sources_retrieved") or [])
+    }
+    lines = [
+        "| Provision | Title | Read during research | Required / Background / Remove |",
+        "| --- | --- | --- | --- |",
+    ]
+    for pid in cited:
+        source = retrieved.get(pid) or {}
+        title = (source.get("title") or "").replace("|", "\\|") or "_not retrieved_"
+        lines.append(
+            f"| [{pid}](https://www.legislation.gov.uk/{pid}) | {title} "
+            f"| {'yes' if source else 'no'} | |"
+        )
+    return "\n".join(lines)
 
 
 def _fmt_retrieved(sources: List[Dict[str, Any]]) -> str:
@@ -153,80 +247,101 @@ def _fmt_discovered(sources: List[Dict[str, Any]]) -> str:
 
 
 def render_markdown(record: Dict[str, Any]) -> str:
-    """Render one reference answer for lawyer review."""
+    """Render one reference answer for lawyer review.
+
+    The answer, the key statements and the citations come first, because those
+    are what the reviewer decides on. How the answer was researched is an
+    appendix: it is there to be checked if a citation looks wrong, not to be
+    signed off.
+    """
     r = record
     review = r.get("review", {})
-    status = "VERIFIED" if review.get("verified") else "UNVERIFIED, draft"
-    if review.get("stale"):
-        status += " (review is STALE: the answer changed after sign-off)"
+    status = review_status(review)
+    if status == "Stale":
+        status = "Stale, the answer changed after it was signed off"
+    mode = r.get("research_mode", "legislation_only")
 
-    return f"""# Q{r['question_id']}: {r['question']}
+    return f"""# Q{r['question_id']} reference answer for review
 
-> **Status: {status}.** Researched against the live LEX API using LexChat's own
-> legislation tools, and written by {r.get('author', 'unknown')}. This becomes a
-> reference answer once a qualified lawyer has checked it and completed the review
-> block at the foot of this file.
+**Status: {status}.** Written by {r.get('author', 'unknown')} against the live
+LEX legislation service, and not yet law. It becomes the yardstick LexChat is
+scored against once a lawyer approves it.
+
+**What we need from you:** decide whether the answer in section 2 is right,
+whether the key statements in section 3 are the points a correct answer must
+make, and which of the citations in section 4 are mandatory. Sections 5 and 6
+are your decision and the research trail behind the answer.
+
+## 1. Question
+
+> {r['question']}
+
+{_MODE_NOTE.get(mode, f'Research mode `{mode}`.')}
+
+{('**Scope of this answer:** ' + r['plan']['scope_note']) if (r.get('plan') or {}).get('scope_note') else ''}
+
+## 2. Reference answer
+
+{ANSWER_BEGIN}
+
+{r.get('final_answer', '') or '_none_'}
+
+{ANSWER_END}
+
+## 3. Key statements used by evaluation
+
+The points a correct answer has to make, most important first. These are the
+fixed list the `Reference Answer Agreement` metric scores a response against:
+the judge is shown these and the response, never the answer above, and labels
+each one stated, contradicted or missing. Editing them changes what that metric
+measures, so they need your approval as much as the answer does.
+
+{_fmt_statements(r.get('statements'))}
+
+## 4. Citation schedule
+
+Every legislation link in the answer. Mark each one `Required` if a correct
+answer has to cite it, `Background` if it is context, or `Remove` if it does not
+belong in the answer at all.
+
+{_fmt_citations(r)}
+
+## 5. Decision
+
+- **Approve / Changes required:**
+- **Reviewer:**
+- **Date:**
+- **What is wrong, missing or misleading:**
+- **Notes:**
+
+## 6. Appendix, how this answer was researched
+
+You are not asked to approve any of this. It is here so a citation that looks
+wrong can be traced back to what was read.
 
 | | |
 | --- | --- |
-| Research mode | `{r['research_mode']}` |
+| Research mode | `{mode}` |
 | Written | {r['generated_at']} |
 | Tool calls | {' → '.join(r.get('tool_sequence') or []) or '_none_'} |
 | Full-Act fallback used | {'yes' if r.get('fallback_used') else 'no'} |
 | Provisions retrieved | {len(r.get('sources_retrieved') or [])} |
 
----
-
-## 1. Research plan
+### 6.1 Research plan
 
 {_fmt_plan(r.get('plan'))}
 
----
+### 6.2 Provisions retrieved
 
-## 2. Answer
-
-{r.get('final_answer', '') or '_none_'}
-
----
-
-## 3. Key statements
-
-The points a correct answer has to make, most important first. These are the
-fixed list the `Reference Answer Agreement` metric scores a response against: the
-judge is shown these and the response, and labels each one stated, contradicted
-or missing. Editing them changes what that metric measures.
-
-{_fmt_statements(r.get('statements'))}
-
----
-
-## 4. Retrieval audit
-
-Every provision the answer was permitted to rely on. A citation in section 2 that
-does not appear below is unsupported by this run's retrieval.
+Every provision the answer was permitted to rely on. A citation in section 2
+that does not appear below is unsupported by this run's retrieval.
 
 {_fmt_retrieved(r.get('sources_retrieved') or [])}
 
-**Found but never read.** These appeared in search results, so they exist and were
-located, but their text was never retrieved. Citing one is a weaker claim than
-citing a provision above, and the answer should say so.
+### 6.3 Found but never read
+
+These appeared in search results, so they exist and were located, but their text
+was never retrieved. Citing one is a weaker claim than citing a provision above.
 
 {_fmt_discovered(r.get('sources_discovered') or [])}
-
----
-
-## 5. Lawyer review
-
-Complete this section, then set `verified: true` for this question in
-`reference_answers.json`.
-
-- **Reviewer:**
-- **Date:**
-- **Verdict (A–D):**
-- **Is the answer substantively correct?** yes / no / partly
-- **Citations that MUST appear in a correct answer:**
-  -
-- **Anything wrong, missing, or misleading:**
-  -
-- **Corrected answer (if the one above cannot stand):**
 """
