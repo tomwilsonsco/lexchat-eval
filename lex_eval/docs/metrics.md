@@ -215,7 +215,7 @@ alone already separated the two genuine contradictions found in testing (highest
 
 ## Citation Agreement
 
-**Aim.** Checks how much of the legislation the hand-written reference answer cites is also cited by
+**Aim.** Checks how much of the legislation the authored reference answer expects is also cited by
 the response being scored. Catches an answer that reaches a plausible-sounding conclusion without ever
 citing the provisions the question actually turns on. It does not check whether the response uses those
 citations correctly; that's Reference Answer Agreement's job.
@@ -267,7 +267,7 @@ compared a response to a known-correct answer, only to its own retrieval.
 
 ## Reference Answer Agreement
 
-**Aim.** Scores how many of a question's key legal statements, hand-written alongside the reference
+**Aim.** Scores how many of a question's key legal statements, written alongside the reference
 answer, the response also makes, and whether it contradicts any of them. This is the only metric that
 compares a response against material a person researched, so it's the only one that can catch a
 response that is faithful to its own retrieval but wrong about the law.

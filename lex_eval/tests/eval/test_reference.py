@@ -1,5 +1,5 @@
 """
-Compare LexChat responses against the hand written reference ("gold") answers.
+Compare LexChat responses against the authored reference ("gold") answers.
 
 Three metrics, all anchored to the reference answer for the same question:
 

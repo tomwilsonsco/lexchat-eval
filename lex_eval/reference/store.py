@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -109,13 +110,42 @@ def normalise_review(review: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return block
 
 
-def normalise_citations(citations: Optional[List[str]]) -> List[str]:
-    """Citation URLs or ids as canonical provision ids, sorted and deduplicated."""
-    from ..metrics.structure import provision_id_from_url
+# A provision id: a legislation type, a year, a number, then any provision path
+# below it, e.g. ukpga/2018/12 or asp/2009/12/section/35a.
+_PROVISION_ID_RE = re.compile(r"^[a-z]{2,10}/\d{4}/[A-Za-z0-9.\-]+(/[A-Za-z0-9.\-]+)*$")
 
+
+def citation_id(citation: str) -> Optional[str]:
+    """One required citation as a canonical provision id, or None if it is not one.
+
+    Accepts a legislation.gov.uk URL or a bare provision id. Anything else, a
+    link to another site, a case reference, a note typed into the field, has no
+    id and cannot be scored against.
+    """
+    text = (citation or "").strip()
+    if not text:
+        return None
+    if "://" in text or text.lower().startswith("www."):
+        from ..metrics.structure import provision_id_from_url
+
+        if "legislation.gov.uk" not in text.lower():
+            return None
+        identifier = provision_id_from_url(text)
+    else:
+        identifier = text.strip("/").lower()
+    return identifier if _PROVISION_ID_RE.match(identifier or "") else None
+
+
+def normalise_citations(citations: Optional[List[str]]) -> List[str]:
+    """Required citations as canonical provision ids, sorted and deduplicated.
+
+    An entry that is not a citation is kept as its own text rather than dropped,
+    so that the fingerprint still changes when somebody corrects it and
+    `review_problems()` can name it.
+    """
     return sorted(
         {
-            provision_id_from_url(c) if "://" in c else c.strip().strip("/").lower()
+            citation_id(c) or c.strip().lower()
             for c in citations or []
             if c and c.strip()
         }
@@ -154,26 +184,85 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
+def citation_problems(record: Dict[str, Any]) -> List[str]:
+    """Why each approved citation cannot be used as the expected answer, if any.
+
+    A required citation has to be a legislation.gov.uk provision, has to appear
+    in the answer, and has to be one the research actually read. A citation
+    failing any of those would make the scored expectation something the
+    reference cannot support.
+    """
+    from ..metrics.citation_agreement import _is_covered, cited_provisions
+
+    review = normalise_review(record.get("review"))
+    cited = cited_provisions(record.get("final_answer") or "")
+    retrieved = {
+        citation_id(s.get("uri") or "") or ""
+        for s in record.get("sources_retrieved") or []
+    }
+
+    problems = []
+    for raw in review["required_citations"]:
+        identifier = citation_id(raw)
+        if not identifier:
+            problems.append(f"not a legislation.gov.uk provision: {raw!r}")
+        elif not _is_covered(identifier, cited):
+            problems.append(f"required but not cited in the answer: {identifier}")
+        elif not _is_covered(identifier, retrieved):
+            problems.append(f"required but never retrieved: {identifier}")
+    return problems
+
+
+def review_problems(record: Dict[str, Any]) -> List[str]:
+    """Everything stopping this record's approval from counting, in plain words.
+
+    Empty for a record nobody has approved, and empty for a good approval. A
+    non-empty list means somebody has set `verified: true` on something that
+    cannot stand as a lawyer's approval of what is in the record now.
+    """
+    review = normalise_review(record.get("review"))
+    if not review["verified"]:
+        return []
+
+    problems = []
+    if review["verdict"] != APPROVE:
+        problems.append(
+            f"the decision is {review['verdict'] or 'missing'}, not {APPROVE!r}"
+        )
+    if not review["verified_by"]:
+        problems.append("no reviewer is recorded")
+    if not review["verified_at"]:
+        problems.append("no review date is recorded")
+    if not review["citations_reviewed"]:
+        problems.append("the citations have not been marked up")
+    problems += citation_problems(record)
+    return problems
+
+
 def review_state(record: Dict[str, Any]) -> str:
     """Where this reference stands, in one phrase a reviewer can act on."""
     review = normalise_review(record.get("review"))
+    if review["verdict"] == CHANGES_REQUIRED:
+        return CHANGES_REQUIRED
     if not review["verified"]:
-        return CHANGES_REQUIRED if review["verdict"] == CHANGES_REQUIRED else "Draft"
-    if not (
-        review["verified_by"] and review["verified_at"] and review["citations_reviewed"]
-    ):
-        return "Sign-off incomplete"
+        return "Draft"
+    # Staleness first: when the approval was given against a different version,
+    # what is wrong with it as an approval of this one is beside the point.
     if review["signed_reference_sha256"] != reference_fingerprint(record):
         return "Stale"
+    if review_problems(record):
+        return "Sign-off unusable"
     return "Verified"
 
 
 def effective_verified(record: Dict[str, Any]) -> bool:
     """Whether this reference carries a lawyer approval that still holds.
 
-    A sign-off missing its reviewer, date or citation decision, or given
-    against a version of the answer, statements, citations or evidence that has
-    since changed, is not an approval of what is here now.
+    A sign-off that does not say `Approve`, is missing its reviewer, date or
+    citation decision, names a citation the answer does not make or the
+    research never read, or was given against a version of the answer,
+    statements, citations or evidence that has since changed, is not an
+    approval of what is here now.
     """
     return review_state(record) == "Verified"
 
@@ -277,9 +366,10 @@ _STATE_NOTE = {
         "retrieved material have changed since. The approval no longer covers "
         "what is in this file and the reviewer needs to see it again."
     ),
-    "Sign-off incomplete": (
-        "This is marked approved but the reviewer, the date or the citation "
-        "decision is missing, so it is not counted as approved."
+    "Sign-off unusable": (
+        "This is marked approved, but the approval cannot stand as recorded. "
+        "What is wrong is listed under the status above, and it is not counted "
+        "as approved until that is put right."
     ),
 }
 
@@ -291,6 +381,14 @@ def _fmt_plan(plan: Optional[Dict[str, Any]]) -> str:
         f"{step['id']}. **{step['title']}**\n   {step['detail']}\n"
         for step in plan["steps"]
     ).rstrip()
+
+
+def _fmt_problems(problems: List[str]) -> str:
+    """What is stopping an approval from counting, if anything is."""
+    if not problems:
+        return ""
+    listed = "\n".join(f"> - {p}" for p in problems)
+    return f"\n> **The approval on file cannot be used:**\n{listed}\n"
 
 
 def _fmt_statements(statements: Optional[List[str]], approved: bool) -> str:
@@ -312,11 +410,11 @@ def _fmt_citations(record: Dict[str, Any]) -> str:
     """Every legislation link in the answer, for the lawyer to mark up.
 
     The links are read with the same parser the Citation Agreement metric uses,
-    so this table is exactly the list that metric expects a response to cite.
-    Marking one `Background` has no effect on scoring yet, see
-    docs/reference-answers-changes.md section 8.
+    so this table is exactly the list that metric expects a response to cite
+    while the reference is a draft. Once the lawyer marks them up, the ones
+    marked `Required` become that expectation on their own.
     """
-    from ..metrics.citation_agreement import cited_provisions
+    from ..metrics.citation_agreement import _is_covered, cited_provisions
     from ..metrics.structure import provision_id_from_url
 
     cited = sorted(cited_provisions(record.get("final_answer") or ""))
@@ -339,7 +437,13 @@ def _fmt_citations(record: Dict[str, Any]) -> str:
     ]
     for pid in cited:
         source = retrieved.get(pid) or {}
-        title = (source.get("title") or "").replace("|", "\\|") or "_not retrieved_"
+        # An instrument-level citation is read if any provision of it was read,
+        # the same rule the score and the citation checks use.
+        read = bool(source) or _is_covered(pid, set(retrieved))
+        if source:
+            title = (source.get("title") or "").replace("|", "\\|")
+        else:
+            title = "the instrument as a whole" if read else "_not retrieved_"
         if pid in required:
             mark = "**Required**"
         elif review["citations_reviewed"]:
@@ -348,7 +452,7 @@ def _fmt_citations(record: Dict[str, Any]) -> str:
             mark = ""
         lines.append(
             f"| [{pid}](https://www.legislation.gov.uk/{pid}) | {title} "
-            f"| {'yes' if source else 'no'} | {mark} |"
+            f"| {'yes' if read else 'no'} | {mark} |"
         )
     return "\n".join(lines)
 
@@ -389,9 +493,19 @@ def render_markdown(record: Dict[str, Any]) -> str:
 
     return f"""# Q{r['question_id']} reference answer for review
 
-**Status: {state}.** {_STATE_NOTE.get(state, '')} Written by
-{r.get('author', 'unknown')} against the live LEX legislation service. It is the
-yardstick LexChat is scored against once a lawyer approves it.
+**Status: {state}.** {_STATE_NOTE.get(state, '')}
+{_fmt_problems(review_problems(r))}
+
+**How this was produced.** The legislation below was retrieved from the live LEX
+service using the same search tools LexChat uses, and the answer was drafted
+from that retrieved text by {r.get('author', 'unknown')}. Nobody legally
+qualified has checked it.
+
+**How it is being used now.** This answer is already scored against, signed off
+or not. While it is unapproved, every score it produces is labelled as agreement
+with the drafter rather than a statement about the law. Your approval is what
+turns it into a legal yardstick, and it also narrows what LexChat is expected to
+cite to the provisions you mark `Required` in section 4.
 
 **What we need from you:** decide whether the answer in section 2 is right,
 whether the key statements in section 3 are the points a correct answer must

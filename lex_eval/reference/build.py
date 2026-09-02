@@ -41,6 +41,7 @@ from .store import (
     load_questions,
     new_review_block,
     normalise_review,
+    review_problems,
     review_state,
     write,
 )
@@ -458,6 +459,8 @@ def render_only(answers_dir: Path, question_id: Optional[int]) -> int:
         print(
             f"  Q{qid}  {'RESYNCED    ' if changed else 'RENDERED    '}q{qid}.md, {note}"
         )
+        for problem in review_problems(new):
+            print(f"          approval not usable: {problem}")
         updated.append(new)
 
     if updated:

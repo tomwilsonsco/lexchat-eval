@@ -150,7 +150,7 @@ clearing (useful for testing a metric's determinism).
 | `citation_agreement` | Fast | Hand written reference answers |
 | `consistency` | Fast | ≥2 responses per question/LLM/chat mode |
 | `response_groundedness`, `claim_support` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
-| `reference_answer_agreement` | Medium (2 LLM calls/test) | `OPENROUTER_API_KEY` + hand written reference answers |
+| `reference_answer_agreement` | Medium (2 LLM calls/test) | `OPENROUTER_API_KEY` + authored reference answers |
 | `report_integration` | Slow (1 LLM call per plan step, each sending the whole final answer) | `OPENROUTER_API_KEY` |
 
 ## Step 4 Streamlit dashboard
@@ -183,7 +183,9 @@ Streamlit Cloud to point at `deploy.db`.
 A set of expected answers for the questions in `questions.json`, for tests to compare LexChat's
 responses against. Each answer is researched against the live LEX API using the same legislation
 tools LexChat's Worker agent uses, so it rests on exactly the material LexChat would have retrieved,
-and is then written up by hand.
+and is then written up from that retrieved text by the author recorded on the answer. For the
+current set that author is an AI model (Claude Opus 5) rather than a person, which is exactly why a
+lawyer's sign-off, not the drafting, is what makes an answer ground truth.
 
 This does **not** need a running LexChat instance. It talks to the LEX API directly, so it works
 when Steps 1-2 cannot run.
@@ -419,7 +421,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Report Integration | Deep research only, AI as a judge metric: For every step that reported a real, cited finding of its own, does the final answer reflect it, rather than dropping it when the Manager condenses several step reports into one response. |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed for information, but does not decide pass or fail: an agent searching a live corpus twice will touch different secondary provisions each run. |
 | Citation Agreement | Of the legislation provisions the reference answer expects, how many does the response cite too. No AI judge, it compares lists of legislation.gov.uk links. Once a lawyer has signed a reference off, the expected list is the citations they marked required and the threshold is 1.0; for a draft it is every link in the reference answer and the threshold is 0.3. For each Act the reference answer relied on that the response does not cite, the reason says whether any search turned it up, so the reader can tell a search that missed the law from an answer that had the law and left it out. |
-| Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, between one and five of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
+| Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, between one and five of them. The statements are written once alongside the reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
 | Plan Coverage | Deep research only, AI as a judge metric: Does the approved research plan set out to cover the question's key statements, before any research happens. Reuses the same fixed statement list as Reference Answer Agreement instead of a separately authored golden plan. |
 | Claim Support | AI as a judge metric: What share of the report's verifiable legal claims are backed by text the researcher actually read? Claims whose truth depends on the absence of a provision are reported separately because absence generally cannot be established from retrieved excerpts or summaries. |
 | Response Groundedness | Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which either passes it or fails it: it fails on any unsupported claim or meaningful misrepresentation, and passes only trivial wording differences. There is no partial credit, so the average for this metric is a pass rate. |

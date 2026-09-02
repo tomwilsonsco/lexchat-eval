@@ -325,7 +325,7 @@ def test_a_sign_off_without_a_reviewer_or_date_is_not_verified(missing):
     record = _signed()
     record["review"][missing] = None
 
-    assert review_state(record) == "Sign-off incomplete"
+    assert review_state(record) == "Sign-off unusable"
     assert not effective_verified(record)
 
 
@@ -364,6 +364,7 @@ def test_a_new_approval_is_stamped_with_the_version_in_front_of_it():
             "verified": True,
             "verified_by": "A Lawyer",
             "verified_at": "2026-02-01",
+            "verdict": APPROVE,
             "citations_reviewed": True,
         },
     )
