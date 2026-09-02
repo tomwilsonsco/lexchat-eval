@@ -51,9 +51,143 @@ def _vlog(f, msg: str) -> None:
         f.write(msg + "\n")
 
 
+def _tool_result_json(tool: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Parse a tool's own JSON result out of an audit tool entry.
+
+    ``raw_result`` is what the tool returned; ``final_result`` is the same
+    thing after any summarisation or appended guidance, so raw is preferred.
+    Returns None if neither parses as a JSON object.
+    """
+    for key in ("raw_result", "final_result"):
+        value = tool.get(key)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        try:
+            parsed = json.loads(value)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+
+def derive_retrieval(
+    audit: Dict[str, Any],
+) -> tuple[List[str], List[Dict[str, Any]], bool]:
+    """Derive (retrieval_context, case_law_context, fallback_used) from an audit event.
+
+    Split out of :func:`audit_capture` so a stored audit event can be re-read
+    without gathering the response again (``db.py --backfill-case-law``).
+    """
+    retrieval_context: List[str] = []
+    case_law_context: List[Dict[str, Any]] = []
+    fallback_used = False
+
+    for d in audit.get("delegations", []):
+        for t in d.get("tools", []):
+            tool_name = t.get("name", "")
+
+            # Case law tools read from the tool's own result, not from
+            # api_calls. The National Archives returns Atom XML/LegalDocML,
+            # which LexChat parses into JSON inside the tool; the api_call
+            # response it records is only the first 300 chars of that raw XML
+            # (executor.py, "preview"), so there is nothing structured there.
+            if tool_name == "search_case_law":
+                result = _tool_result_json(t)
+                results = result.get("results", []) if result else []
+                for r in results:
+                    if not isinstance(r, dict):
+                        continue
+                    case_law_context.append(
+                        {
+                            "title": r.get("title", ""),
+                            "ncn": r.get("ncn", ""),
+                            "court": r.get("court", ""),
+                            "date": r.get("date", ""),
+                            "url": r.get("url", ""),
+                        }
+                    )
+                    parts = [
+                        p for p in [r.get("ncn"), r.get("court"), r.get("date")] if p
+                    ]
+                    title = r.get("title", "")
+                    retrieval_context.append(
+                        f"{title} ({' | '.join(parts)})" if parts else title
+                    )
+                continue
+
+            if tool_name == "get_case_law_text":
+                result = _tool_result_json(t)
+                text = result.get("text", "") if result else ""
+                if text:
+                    ncn = result.get("ncn", "")
+                    header = " ".join(p for p in [result.get("title", ""), ncn] if p)
+                    retrieval_context.append(f"{header}: {text}" if header else text)
+                continue
+
+            for call in t.get("api_calls", []):
+                resp = call.get("response", {})
+
+                if tool_name == "get_legislation_text":
+                    fallback_used = True
+                    if isinstance(resp, dict) and resp.get("full_text"):
+                        retrieval_context.append(resp["full_text"])
+
+                elif tool_name == "search_legislation_sections":
+                    if isinstance(resp, list):
+                        sections = resp
+                    elif isinstance(resp, dict):
+                        sections = resp.get("sections") or resp.get("results") or []
+                    else:
+                        sections = []
+                    for sec in sections:
+                        if not isinstance(sec, dict):
+                            continue
+                        content = (
+                            sec.get("content")
+                            or sec.get("text")
+                            or sec.get("excerpt")
+                            or ""
+                        )
+                        sec_title = sec.get("title") or sec.get("section_title") or ""
+                        if content:
+                            retrieval_context.append(
+                                f"{sec_title}: {content}" if sec_title else content
+                            )
+
+                elif tool_name == "search_legislation":
+                    results = resp.get("results", []) if isinstance(resp, dict) else []
+                    for r in results:
+                        if not isinstance(r, dict):
+                            continue
+                        title = r.get("title", "")
+                        year = str(r.get("year", "")) if r.get("year") else ""
+                        status = r.get("status", "")
+                        parts = [p for p in [year, status] if p]
+                        retrieval_context.append(
+                            f"{title} ({', '.join(parts)})" if parts else title
+                        )
+
+    # deduplicate retrieval_context preserving order
+    retrieval_context = list(dict.fromkeys(retrieval_context))
+
+    # the same judgment usually comes back from several searches, keep one entry
+    _seen_cases: set = set()
+    _deduped_cases: List[Dict[str, Any]] = []
+    for case in case_law_context:
+        key = (case.get("ncn", ""), case.get("url", ""))
+        if key in _seen_cases:
+            continue
+        _seen_cases.add(key)
+        _deduped_cases.append(case)
+    case_law_context = _deduped_cases
+
+    return retrieval_context, case_law_context, fallback_used
 
 
 def audit_capture(
@@ -322,83 +456,7 @@ def audit_capture(
             )
             tool_sequence.append(f"Worker: {tool_name}")
 
-    # retrieval_context, case_law_context, fallback_used
-    retrieval_context: List[str] = []
-    case_law_context: List[Dict[str, Any]] = []
-    fallback_used = False
-
-    for d in audit.get("delegations", []):
-        for t in d.get("tools", []):
-            tool_name = t.get("name", "")
-            for call in t.get("api_calls", []):
-                resp = call.get("response", {})
-
-                if tool_name == "get_legislation_text":
-                    fallback_used = True
-                    if isinstance(resp, dict) and resp.get("full_text"):
-                        retrieval_context.append(resp["full_text"])
-
-                elif tool_name == "search_legislation_sections":
-                    if isinstance(resp, list):
-                        sections = resp
-                    elif isinstance(resp, dict):
-                        sections = resp.get("sections") or resp.get("results") or []
-                    else:
-                        sections = []
-                    for sec in sections:
-                        if not isinstance(sec, dict):
-                            continue
-                        content = (
-                            sec.get("content")
-                            or sec.get("text")
-                            or sec.get("excerpt")
-                            or ""
-                        )
-                        sec_title = sec.get("title") or sec.get("section_title") or ""
-                        if content:
-                            retrieval_context.append(
-                                f"{sec_title}: {content}" if sec_title else content
-                            )
-
-                elif tool_name == "search_case_law":
-                    results = resp.get("results", []) if isinstance(resp, dict) else []
-                    for r in results:
-                        if not isinstance(r, dict):
-                            continue
-                        case_law_context.append(
-                            {
-                                "title": r.get("title", ""),
-                                "ncn": r.get("ncn", ""),
-                                "court": r.get("court", ""),
-                                "date": r.get("date", ""),
-                                "url": r.get("url", ""),
-                            }
-                        )
-                        parts = [
-                            p
-                            for p in [r.get("ncn"), r.get("court"), r.get("date")]
-                            if p
-                        ]
-                        title = r.get("title", "")
-                        retrieval_context.append(
-                            f"{title} ({' | '.join(parts)})" if parts else title
-                        )
-
-                elif tool_name == "search_legislation":
-                    results = resp.get("results", []) if isinstance(resp, dict) else []
-                    for r in results:
-                        if not isinstance(r, dict):
-                            continue
-                        title = r.get("title", "")
-                        year = str(r.get("year", "")) if r.get("year") else ""
-                        status = r.get("status", "")
-                        parts = [p for p in [year, status] if p]
-                        retrieval_context.append(
-                            f"{title} ({', '.join(parts)})" if parts else title
-                        )
-
-    # deduplicate retrieval_context preserving order
-    retrieval_context = list(dict.fromkeys(retrieval_context))
+    retrieval_context, case_law_context, fallback_used = derive_retrieval(audit)
 
     # summarisation_used and summarisation_output
     summarisation_used = any(

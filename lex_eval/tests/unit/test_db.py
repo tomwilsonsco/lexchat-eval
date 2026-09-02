@@ -7,6 +7,7 @@ Tests focus on the ``init_db`` migration exception handling:
     silently swallowed
 """
 
+import json
 import logging
 
 import duckdb
@@ -697,3 +698,110 @@ class TestMeasuredColumn:
         rows = load_eval_results(db_path, metric="plan_coverage", read_only=True)
         assert [r["measured"] for r in rows] == [False, True]
         assert backfill_measured_column(db_path) == 0, "must be safe to re-run"
+
+
+class TestBackfillCaseLawContext:
+    """Repairing rows gathered before case law results were read correctly."""
+
+    def _audit(self):
+        return {
+            "type": "audit",
+            "schema_version": 1,
+            "research_mode": "case_law_only",
+            "answer": "a",
+            "delegations": [
+                {
+                    "id": "d1",
+                    "brief": "b",
+                    "report": "r",
+                    "tools": [
+                        {
+                            "name": "search_case_law",
+                            "args": {"query": "detention"},
+                            "raw_result": json.dumps(
+                                {
+                                    "results": [
+                                        {
+                                            "title": "Burgin v Commission of Police",
+                                            "ncn": "[2011] EWHC 1835 (Admin)",
+                                            "court": "ewhc/admin",
+                                            "date": "2011-07-13",
+                                            "url": "https://caselaw.nationalarchives.gov.uk/ewhc/admin/2011/1835",
+                                        }
+                                    ],
+                                    "total": 1,
+                                }
+                            ),
+                            "final_result": "...",
+                            "api_calls": [
+                                {"url": "u", "response": {"preview": "<feed"}}
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_empty_case_law_context_is_repaired(self, tmp_path):
+        from lex_eval.utils.db import (
+            backfill_case_law_context,
+            get_connection,
+            init_db,
+            insert_response,
+            load_records,
+        )
+
+        db = tmp_path / "r.db"
+        conn = get_connection(db)
+        init_db(conn)
+        insert_response(
+            conn,
+            {
+                "question_id": 1,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+                "research_mode": "case_law_only",
+                "retrieval_context": [],
+                "case_law_context": [],
+                "audit_json": self._audit(),
+            },
+        )
+        conn.commit()
+        conn.close()
+
+        assert backfill_case_law_context(path=db) == 1
+
+        rec = load_records(path=db)[0]
+        assert [c["ncn"] for c in rec["case_law_context"]] == [
+            "[2011] EWHC 1835 (Admin)"
+        ]
+        assert "[2011] EWHC 1835 (Admin)" in " ".join(rec["retrieval_context"])
+
+    def test_running_twice_changes_nothing_the_second_time(self, tmp_path):
+        from lex_eval.utils.db import (
+            backfill_case_law_context,
+            get_connection,
+            init_db,
+            insert_response,
+        )
+
+        db = tmp_path / "r.db"
+        conn = get_connection(db)
+        init_db(conn)
+        insert_response(
+            conn,
+            {
+                "question_id": 1,
+                "question": "q",
+                "llm_name": "m",
+                "timestamp": "t",
+                "research_mode": "case_law_only",
+                "audit_json": self._audit(),
+            },
+        )
+        conn.commit()
+        conn.close()
+
+        backfill_case_law_context(path=db)
+        assert backfill_case_law_context(path=db) == 0

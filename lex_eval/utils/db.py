@@ -755,6 +755,60 @@ def backfill_halt_columns(path: Optional[Path] = None) -> int:
     return filled
 
 
+def backfill_case_law_context(path: Optional[Path] = None) -> int:
+    """Re-derive retrieval_context and case_law_context from stored audit_json.
+
+    Case law tool results were read from the wrong place until Sept 2026, so
+    responses gathered before then recorded no retrieved case law even when the
+    Worker found real judgments. The stored audit event holds everything needed,
+    so those rows can be repaired without gathering them again.
+
+    Only rows whose re-derived values differ are written, so this is safe to run
+    repeatedly. Returns the number of rows updated.
+    """
+    from .audit_capture import derive_retrieval
+
+    path = path or DEFAULT_DB
+    if not path.exists():
+        print("Database not found:", path)
+        return 0
+
+    conn = get_connection(path)
+    try:
+        init_db(conn)
+        rows = conn.execute(
+            "SELECT id, audit_json, retrieval_context, case_law_context "
+            "FROM responses WHERE audit_json IS NOT NULL"
+        ).fetchall()
+
+        updated = 0
+        for row_id, audit_json, old_retrieval, old_case_law in rows:
+            try:
+                audit = json.loads(audit_json)
+            except (ValueError, TypeError):
+                logger.warning("response %s: audit_json is not valid JSON", row_id)
+                continue
+            retrieval, case_law, _ = derive_retrieval(audit)
+            new_retrieval = json.dumps(retrieval)
+            new_case_law = json.dumps(case_law)
+            if new_retrieval == (old_retrieval or "") and new_case_law == (
+                old_case_law or ""
+            ):
+                continue
+            conn.execute(
+                "UPDATE responses SET retrieval_context = ?, case_law_context = ? "
+                "WHERE id = ?",
+                [new_retrieval, new_case_law, row_id],
+            )
+            updated += 1
+        conn.commit()
+    finally:
+        conn.close()
+
+    print(f"Re-derived retrieval context on {updated} of {len(rows)} row(s).")
+    return updated
+
+
 def backfill_measured_column(path: Optional[Path] = None) -> int:
     """Set measured = FALSE on eval rows written before the column existed.
 
@@ -1422,6 +1476,13 @@ if __name__ == "__main__":
         "their placeholder score of 0.0 is kept out of every mean",
     )
     _parser.add_argument(
+        "--backfill-case-law",
+        action="store_true",
+        help="Re-derive retrieval_context and case_law_context from stored "
+        "audit_json, repairing responses gathered before case law tool results "
+        "were read correctly",
+    )
+    _parser.add_argument(
         "--delete-response",
         metavar="ID",
         type=int,
@@ -1446,6 +1507,8 @@ if __name__ == "__main__":
         completeness_report()
     elif _args.backfill_measured:
         backfill_measured_column()
+    elif _args.backfill_case_law:
+        backfill_case_law_context()
     elif _args.delete_response is not None:
         delete_response(_args.delete_response)
     elif _args.clean or _args.dry_run:
