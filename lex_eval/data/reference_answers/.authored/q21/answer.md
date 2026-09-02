@@ -1,6 +1,4 @@
-# Reporting and publishing Scottish Water's accounts
-
-## 1. Summary Answer (BLUF)
+### 1. Summary Answer (BLUF)
 
 Scottish Water's accounting duties are in **section 45 of the Water Industry (Scotland) Act 2002**, and the deadline for sending the accounts to the Auditor General is in **section 21(2) of the Public Finance and Accountability (Scotland) Act 2000**.
 
@@ -18,9 +16,9 @@ Cited to the subsection that carries each requirement:
 
 ---
 
-## 2. Detailed Analysis
+### 2. Detailed Analysis
 
-### 2.1 Section 45(1): the three duties
+#### 2.1 Section 45(1): the three duties
 
 > **Section 45 - Accounts and audit**
 > (1) Scottish Water must -
@@ -32,7 +30,7 @@ Cited to the subsection that carries each requirement:
 
 These are three distinct obligations, not one: a continuing record-keeping duty (a), an annual preparation duty with a substantive standard, "a true and fair view" (b), and a transmission duty (c).
 
-### 2.2 Section 45(2): what Ministers may direct about the statement
+#### 2.2 Section 45(2): what Ministers may direct about the statement
 
 > (2) Every statement of accounts prepared by Scottish Water in accordance with this section must comply with any direction given by the Scottish Ministers relating to -
 > &nbsp;&nbsp;&nbsp;**(a)** the information to be contained in the statement of accounts,
@@ -41,7 +39,7 @@ These are three distinct obligations, not one: a continuing record-keeping duty 
 
 Subsection (2) is what makes the content of the statement largely a matter of ministerial direction rather than of the Act. An answer that asks "what must the accounts contain?" and looks only at the 2002 Act will find the direction-making power, not a list.
 
-### 2.3 The deadline is in the 2000 Act, not the 2002 Act
+#### 2.3 The deadline is in the 2000 Act, not the 2002 Act
 
 Section 45(1)(c) fixes no date; it defers to ministerial direction. The backstop is general:
 
@@ -54,7 +52,7 @@ Section 45(1)(c) fixes no date; it defers to ministerial direction. The backstop
 
 Section 45(1)(c) is an enactment requiring an account to be sent to the Auditor General for auditing, so section 21(1)(b) is engaged and section 21(2) applies. A ministerial direction under section 45(1)(c) may set an earlier date but cannot go beyond the 6 months.
 
-### 2.4 What the auditor must report on
+#### 2.4 What the auditor must report on
 
 Section 22(1) requires the auditor's report to set out findings on whether the expenditure and receipts shown in the account were incurred or applied in accordance with the enactment authorising them, the Budget Act or Acts for the year, and sections 4 to 7 of the 2000 Act; and, where sums were paid out of the Scottish Consolidated Fund to meet that expenditure, whether they were applied accordingly ([asp/2000/1, s.22](http://www.legislation.gov.uk/id/asp/2000/1/section/22)).
 
@@ -62,7 +60,7 @@ This is a regularity audit sitting alongside the true and fair requirement in se
 
 ---
 
-## 3. Jurisdiction & Status
+### 3. Jurisdiction & Status
 
 - **Extent.** Both Acts extend to Scotland and were returned in revised form.
 - **Publication and laying.** No provision requiring Scottish Water's statement of accounts to be **published** or **laid before the Scottish Parliament** was retrieved. Section 45 requires preparation and transmission to the Auditor General; it does not, on the text retrieved, require publication. An answer asserting a publication or laying duty for these accounts should be checked against a provision, since none was found here.
@@ -70,7 +68,7 @@ This is a regularity audit sitting alongside the true and fair requirement in se
 
 ---
 
-## 4. References
+### 4. References
 
 - [Water Industry (Scotland) Act 2002, s.45 - Accounts and audit](http://www.legislation.gov.uk/id/asp/2002/3/section/45)
 - [Water Industry (Scotland) Act 2002, s.20 - Scottish Water](http://www.legislation.gov.uk/id/asp/2002/3/section/20)

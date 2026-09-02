@@ -1,6 +1,4 @@
-# can scottish public authorities refuse a freedom of information request because it would cost too much to deal with, is there a cost limit and how is the cost worked out?
-
-## Summary Answer (BLUF)
+### Summary Answer (BLUF)
 
 Yes. Under **section 12(1) of the Freedom of Information (Scotland) Act 2002** a Scottish public
 authority is not obliged to comply with a request if the projected cost of complying exceeds the
@@ -15,23 +13,23 @@ indirect, the authority reasonably estimates it is likely to incur in **locating
 providing** the information, and any estimate of staff time **must not exceed £15 per hour per
 member of staff**.
 
-## Detailed Analysis
+### Detailed Analysis
 
-### The power to refuse (section 12 FOISA)
+#### The power to refuse (section 12 FOISA)
 
 Section 12(1) provides that a Scottish public authority is not obliged to comply with a request
 where the authority estimates that the cost of complying would exceed the amount prescribed for
 the purposes of that subsection in regulations made by the Scottish Ministers. The section is a
 power to decline to comply, not an exemption, and it fixes no monetary figure of its own.
 
-### The prescribed amount (regulation 5, SSI 2004/467)
+#### The prescribed amount (regulation 5, SSI 2004/467)
 
 Regulation 5 is titled "Excessive cost, prescribed amount" and provides that the amount prescribed
 for the purposes of section 12(1) of the Act is **£600**. Answering the question therefore requires
 following the reference out of the Act and into the Regulations; the £600 exists nowhere in FOISA
 itself.
 
-### How the cost is calculated (regulation 3, SSI 2004/467)
+#### How the cost is calculated (regulation 3, SSI 2004/467)
 
 Regulation 3(1) defines "projected costs" as the total costs, **whether direct or indirect**, which
 the authority reasonably estimates it is likely to incur in **locating, retrieving and providing**
@@ -44,32 +42,32 @@ The three permitted activities are exhaustive of what the estimate may cover. Co
 whether the authority holds the information, or whether the applicant is entitled to it, are not
 among them.
 
-### Fees below the limit (regulation 4)
+#### Fees below the limit (regulation 4)
 
 Regulation 4 deals with the separate question of charging where the cost is under the limit. Where
 projected costs do not exceed **£100**, no fee is payable. Where they exceed £100 but do not exceed
 the prescribed amount, the fee must not exceed **10% of the difference between the projected costs
 and £100**.
 
-### The procedural duty (section 16(4))
+#### The procedural duty (section 16(4))
 
 Where an authority claims that section 12(1) applies, it must, **within the time allowed by or by
 virtue of section 10** for complying with the request, give the applicant a notice stating that it
 so claims.
 
-### Aggregating related requests
+#### Aggregating related requests
 
 Regulation 7 allows costs to be aggregated across two or more requests where the conditions there
 are met, including that the authority estimates the total cost of complying with all of them would
 exceed the prescribed amount.
 
-## Jurisdiction & Status
+### Jurisdiction & Status
 
 Scotland. The Freedom of Information (Scotland) Act 2002 (asp 2002/13) is in force, status
 "revised". SSI 2004/467 is in force, status "final". This is the Scottish regime and is distinct
 from the UK Freedom of Information Act 2000 and its own cost limits.
 
-## References
+### References
 
 - Freedom of Information (Scotland) Act 2002, s.12 (excessive cost of compliance)
 - Freedom of Information (Scotland) Act 2002, s.16(4) (refusal notice)

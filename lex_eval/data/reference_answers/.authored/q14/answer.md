@@ -1,6 +1,4 @@
-# Vitamin levels in margarine sold in the UK
-
-## 1. Summary Answer (BLUF)
+### 1. Summary Answer (BLUF)
 
 **There is no single UK answer.** The requirement was once uniform across the UK but has since been removed in England while remaining in force elsewhere.
 
@@ -13,9 +11,9 @@ An answer that cites the 2013 revocation as having removed the requirement gener
 
 ---
 
-## 2. Detailed Analysis
+### 2. Detailed Analysis
 
-### 2.1 England: the requirement was removed in 2013
+#### 2.1 England: the requirement was removed in 2013
 
 Regulation 4 of the Spreadable Fats (Marketing Standards) and the Milk and Milk Products (Protection of Designations) (England) Regulations 2008 ([uksi/2008/1287, reg 4](http://www.legislation.gov.uk/id/uksi/2008/1287/regulation/4)) is headed "Vitamin content of margarine" and now returns **no operative text**, the database rendering it as omitted.
 
@@ -35,7 +33,7 @@ Two points a reader is likely to need:
 - **It is an amendment, not a revocation.** The separate revocation provision, regulation 2, revokes three environmental-noise and site-waste instruments and says nothing about margarine ([uksi/2013/2854, reg 2](http://www.legislation.gov.uk/id/uksi/2013/2854/regulation/2)). Citing "the 2013 revocation" for the removal of the vitamin rule points at the wrong regulation of the right instrument.
 - **Its reach is England.** Regulation 3(1) names only the England Regulations. Nothing in it touches the Scottish, Welsh or Northern Irish instruments.
 
-### 2.2 Scotland: the requirement remains
+#### 2.2 Scotland: the requirement remains
 
 > **Regulation 4 — Vitamin content of margarine**
 > No person may sell by retail any margarine unless it contains in every 100 grams —
@@ -47,7 +45,7 @@ Two points a reader is likely to need:
 
 Contravention is an offence under regulation 6 and enforcement falls to food authorities under regulation 5 ([ssi/2008/216](http://www.legislation.gov.uk/id/ssi/2008/216)).
 
-### 2.3 Wales
+#### 2.3 Wales
 
 Regulation 4 of the Spreadable Fats (Marketing Standards) (Wales) Regulations 2001 imposes the same levels, in the older two-limb drafting:
 
@@ -56,13 +54,13 @@ Regulation 4 of the Spreadable Fats (Marketing Standards) (Wales) Regulations 20
 
 ([wsi/2001/1361, reg 4](http://www.legislation.gov.uk/id/wsi/2001/1361/regulation/4))
 
-### 2.4 Northern Ireland
+#### 2.4 Northern Ireland
 
 The relevant instruments are the Margarine Regulations (Northern Ireland) 1968 ([nisro/1968/3](http://www.legislation.gov.uk/id/nisro/1968/3)) and the Spreadable Fats (Marketing Standards) Regulations (Northern Ireland) 1996 ([nisr/1996/47](http://www.legislation.gov.uk/id/nisr/1996/47)). Their vitamin provisions were not retrieved in this research and the Northern Irish position is therefore **not established** by this answer.
 
 ---
 
-## 3. Jurisdiction & Status
+### 3. Jurisdiction & Status
 
 - **The question has four answers, not one.** This is the whole point of the question: "the UK" is not a single regulatory area for margarine composition.
 - **Verified here:** the England omission (positively, from the text of the amending instrument), the Scottish requirement, and the Welsh requirement as drafted.
@@ -70,7 +68,7 @@ The relevant instruments are the Margarine Regulations (Northern Ireland) 1968 (
 
 ---
 
-## 4. References
+### 4. References
 
 - [Spreadable Fats ... (England) Regulations 2008, reg 4](http://www.legislation.gov.uk/id/uksi/2008/1287/regulation/4)
 - [Environmental Noise, Site Waste Management Plans and Spreadable Fats etc. (Revocations and Amendments) Regulations 2013, reg 3](http://www.legislation.gov.uk/id/uksi/2013/2854/regulation/3)

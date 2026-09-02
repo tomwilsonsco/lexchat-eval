@@ -187,12 +187,15 @@ def scaffold(src: Path, question: Dict[str, Any]) -> None:
     (src / REVIEW_NAME).write_text(
         json.dumps(new_review_block(), indent=2) + "\n", encoding="utf-8"
     )
+    # Headings start at H3: the answer is shown inside a section of the
+    # generated review document, and a heading above that level would sit
+    # outside its own section in the reader's contents.
     (src / "answer.md").write_text(
-        f"# {question['question']}\n\n{_TODO}\n\n"
-        "## Summary Answer (BLUF)\n\n"
-        "## Detailed Analysis\n\n"
-        "## Jurisdiction & Status\n\n"
-        "## References\n",
+        f"{_TODO}\n\n"
+        "### Summary Answer (BLUF)\n\n"
+        "### Detailed Analysis\n\n"
+        "### Jurisdiction & Status\n\n"
+        "### References\n",
         encoding="utf-8",
     )
 
@@ -461,6 +464,14 @@ def render_only(answers_dir: Path, question_id: Optional[int]) -> int:
         )
         for problem in review_problems(new):
             print(f"          approval not usable: {problem}")
+        if any(
+            ln.startswith("# ") or ln.startswith("## ")
+            for ln in new["final_answer"].split("\n")
+        ):
+            print(
+                "          headings above H3 in answer.md; they will sit outside "
+                "their own section in q{}.md".format(qid)
+            )
         updated.append(new)
 
     if updated:

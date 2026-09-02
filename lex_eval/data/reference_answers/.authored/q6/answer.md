@@ -1,14 +1,12 @@
-# Regulation of the health professions and the legislative competence of the Scottish Parliament
-
-## 1. Summary Answer (BLUF)
+### 1. Summary Answer (BLUF)
 
 **Regulation of the health professions is a reserved matter** and so, as a general rule, **outside** the Scottish Parliament's legislative competence: **Section G2 of Part II of Schedule 5 to the Scotland Act 1998** reserves "**Regulation of the health professions**", and by **s.29(2)(b)** a provision of an Act of the Scottish Parliament is outside competence so far as it "relates to reserved matters". The extent of the reservation is, however, **narrower than the phrase suggests**, for three reasons that appear on the face of the Schedule. First, "the health professions" is defined by a **closed, exhaustive list of nine regulating enactments** — a profession not regulated by one of those nine Acts is not within the G2 reservation at all. Second, **two express exceptions** carve out the subject-matter of s.21 of the National Health Service (Scotland) Act 1978 and of s.25 of that Act so far as it relates to **vocational training and disciplinary proceedings**. Third, the reservation is of **regulation of the professions**, not of the health service: the organisation, funding and delivery of NHS services in Scotland is devolved and is not reserved by G2. Whether any particular Bill is within competence turns on the **purpose test in s.29(3)** — whether the provision *relates to* the reserved matter, judged by reference to its purpose, having regard among other things to its effect in all the circumstances.
 
 ---
 
-## 2. Detailed Analysis
+### 2. Detailed Analysis
 
-### 2.1 The competence test — s.29
+#### 2.1 The competence test — s.29
 
 > **s.29(1):** "An Act of the Scottish Parliament is not law so far as any provision of the Act is outside the legislative competence of the Parliament."
 >
@@ -24,7 +22,7 @@ Section 29(4) adds a specific rule: a provision which would otherwise not relate
 
 **Section 30(1)** gives Schedule 5 effect: "Schedule 5 (which defines reserved matters) shall have effect" ([s.30](http://www.legislation.gov.uk/ukpga/1998/46/section/30)).
 
-### 2.2 The reservation — Schedule 5, Part II, Head G, Section G2
+#### 2.2 The reservation — Schedule 5, Part II, Head G, Section G2
 
 Head G of Part II is headed "**Regulation of the Professions**" and contains three entries: G1 (architects), **G2 (health professions)** and G3 (auditors). Section G2 reads, in full ([Schedule 5](http://www.legislation.gov.uk/ukpga/1998/46/schedule/5)):
 
@@ -39,7 +37,7 @@ Head G of Part II is headed "**Regulation of the Professions**" and contains thr
 > "**The health professions**" means the professions regulated by—
 > the Pharmacy Act 1954, the Professions Supplementary to Medicine Act 1960, the Veterinary Surgeons Act 1966, the Medical Act 1983, the Dentists Act 1984, the Opticians Act 1989, the Osteopaths Act 1993, the Chiropractors Act 1994, and the Nurses, Midwives and Health Visitors Act 1997.
 
-### 2.3 The closed list — the single most important limit on the reservation
+#### 2.3 The closed list — the single most important limit on the reservation
 
 The interpretation provision does **not** define "the health professions" by reference to a general description such as "professions concerned with health care". It defines them as "**the professions regulated by**" **nine named enactments**. Three consequences follow directly from the text:
 
@@ -49,7 +47,7 @@ The interpretation provision does **not** define "the health professions" by ref
 
 Two further textual points on the list itself: it includes **veterinary surgeons** (Veterinary Surgeons Act 1966), which is not a human-health profession but is within the defined term; and it does **not** include social workers or social care professionals, whose regulation is accordingly untouched by G2.
 
-### 2.4 The exceptions, and a repeal that matters
+#### 2.4 The exceptions, and a repeal that matters
 
 The exceptions carve out of the reservation "the subject-matter of" two provisions of the National Health Service (Scotland) Act 1978:
 
@@ -66,7 +64,7 @@ The second exception is expressly partial: general dental services arrangements 
 
 So the excepted subject-matter is that of s.21 **as it stood on the principal appointed day**, not as it stands now. The exception continues to operate by reference to the historic text. Establishing its present scope therefore requires the **as-at-1999 text** of s.21, which was not retrieved in this run — the revised text held by the database is the omitted version.
 
-### 2.5 How the entry is to be read — Schedule 5, Part II, Preliminary
+#### 2.5 How the entry is to be read — Schedule 5, Part II, Preliminary
 
 The preliminary paragraphs of Part II govern the construction of every Section in it:
 
@@ -76,7 +74,7 @@ The preliminary paragraphs of Part II govern the construction of every Section i
 
 Paragraph 3 is significant in practice: the G2 exceptions **cannot be borrowed** to narrow any other reservation, and conversely a matter excepted from G2 may still be reserved by a different Section of Part II. A provision escaping G2 must still be checked against the rest of Schedule 5 — and against the other limbs of s.29(2), notably the Schedule 4 restrictions.
 
-### 2.6 What is *not* reserved by G2
+#### 2.6 What is *not* reserved by G2
 
 Reading G2 with the s.29(3) purpose test, the reservation bites on the **regulation of the listed professions** — registration, professional standards, fitness to practise, and the regulatory bodies constituted under the nine Acts. It does not, of itself, reserve:
 
@@ -86,7 +84,7 @@ Reading G2 with the s.29(3) purpose test, the reservation bites on the **regulat
 
 The dividing line is the s.29(3) one: a provision whose **purpose** is to regulate the profession relates to the reserved matter; a provision whose purpose is to organise the delivery of devolved health services does not, even if it has incidental effects on how members of a listed profession work.
 
-### 2.7 Altering the reservation — s.30(2) and (5)–(6)
+#### 2.7 Altering the reservation — s.30(2) and (5)–(6)
 
 The boundary is not fixed. **"Her Majesty may by Order in Council make any modifications of Schedule 4 or 5 which She considers necessary or expedient"** (**s.30(2)**), and such an Order may make consequential modifications of any enactment, prerogative instrument or other instrument (s.30(4)).
 
@@ -94,13 +92,13 @@ Where an alteration to the reserved matters has the effect that a provision of a
 
 That Schedule 5 is a live instrument in the health field is evident from the retrieved text: **Part III, paragraph 4A** — "**Assisted dying: identification and regulation of substances and devices**" — disapplies the reservation of the conferral of certain powers on the Scottish Ministers and the Secretary of State in relation to substances or devices for use in assisting terminally ill adults to end their own lives, subject to detailed conditions, and applies "only in relation to a provision that is contained in an Act of the Parliament resulting from a Bill **passed on or before 7 May 2026**" (para 4A(3)). This is a targeted, time-limited carve-out and does **not** bear on G2, but it demonstrates that the Schedule as retrieved incorporates recent modification.
 
-### 2.8 Scrutiny before enactment — s.31
+#### 2.8 Scrutiny before enactment — s.31
 
 Competence is tested before Royal Assent as well as after. **Section 31** provides for scrutiny of Bills for legislative competence ([s.31](http://www.legislation.gov.uk/ukpga/1998/46/section/31)); s.101 supplies a reading-down rule for the interpretation of Acts of the Scottish Parliament ([s.101](http://www.legislation.gov.uk/ukpga/1998/46/section/101)). Neither was retrieved in full and neither is relied on above beyond its existence.
 
 ---
 
-## 3. Jurisdiction & Status
+### 3. Jurisdiction & Status
 
 - **Extent.** The Scotland Act 1998 (ukpga/1998/46) is recorded with extent `["United Kingdom"]`; the National Health Service (Scotland) Act 1978 (ukpga/1978/29) likewise. The competence rules apply to the Scottish Parliament and so operate as regards Scotland.
 - **Status.** Both Acts are recorded as `revised` — the text held incorporates effected amendments. The Schedule 5 text retrieved plainly includes recent amendment (Part III paragraph 4A refers to a Bill passed on or before **7 May 2026**), so the version relied on is current as at the database's revision date.
@@ -110,7 +108,7 @@ Competence is tested before Royal Assent as well as after. **Section 31** provid
 
 ---
 
-## 4. References
+### 4. References
 
 **Scotland Act 1998 (ukpga/1998/46)**
 - [**s.29 — Legislative competence**](http://www.legislation.gov.uk/ukpga/1998/46/section/29)

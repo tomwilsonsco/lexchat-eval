@@ -1,6 +1,4 @@
-# Can you identify duties or functions conferred on procurator fiscals, prosecutors, or the Lord Advocate under the Victims and Witnesses (Scotland) Act 2014?
-
-## Summary Answer (BLUF)
+### Summary Answer (BLUF)
 
 The Victims and Witnesses (Scotland) Act 2014 confers duties on these office-holders in three
 groups: **overarching duties** on the Lord Advocate (ss.1, 1A, 2), a set of **victims' rights
@@ -12,9 +10,9 @@ Procurators fiscal are reached in two different ways, and the distinction matter
 them because they fall within the **definition of "prosecutor"**, and others reach them through the
 **interpretation provision in section 32**.
 
-## Detailed Analysis
+### Detailed Analysis
 
-### Overarching duties on the Lord Advocate
+#### Overarching duties on the Lord Advocate
 
 - **s.1 (General principles)**: the Lord Advocate must have regard to the general principles when
   carrying out functions relating to victims and witnesses.
@@ -23,7 +21,7 @@ them because they fall within the **definition of "prosecutor"**, and others rea
 - **s.2 (Standards of service)**: the Lord Advocate must set and publish standards of service
   relating to the functions covered by the Act.
 
-### Victims' rights duties
+#### Victims' rights duties
 
 - **s.3B (The Victims' Code for Scotland)**.
 - **s.3C (Victims' right to receive information)**.
@@ -37,7 +35,7 @@ them because they fall within the **definition of "prosecutor"**, and others rea
 - **s.9D (Right to avoid contact between victim and offender)**.
 - **s.9E (Victims' right to protection of privacy)**.
 
-### Prosecution-specific duties
+#### Prosecution-specific duties
 
 - **s.4 (Rules: review of decision not to prosecute)**: the Lord Advocate must make and publish
   rules establishing a procedure by which a person may request a review of a decision not to
@@ -49,7 +47,7 @@ them because they fall within the **definition of "prosecutor"**, and others rea
 not to prosecute; section 6 is about disclosing information about proceedings. An answer that
 attributes the review procedure to section 6 has the Act wrong.
 
-### Other relevant provisions
+#### Other relevant provisions
 
 - **s.5 (Restorative justice)**.
 - **s.8A (Certain medical examinations: additional information to be provided)**.
@@ -57,7 +55,7 @@ attributes the review procedure to section 6 has the Act wrong.
 - **s.27B (Provision of information to person supporting victim)**.
 - **s.29B (Application of Act where victim's death caused by offence)**.
 
-### How procurators fiscal are caught
+#### How procurators fiscal are caught
 
 Section 32 is the interpretation provision and is the key to reading the duties correctly. Rather
 than naming procurators fiscal in every operative section, the Act reaches them partly through the
@@ -66,13 +64,13 @@ provisions apply. An answer that lists duties without explaining this mechanism 
 question as asked, because the question is specifically about procurators fiscal and prosecutors as
 well as the Lord Advocate.
 
-## Jurisdiction & Status
+### Jurisdiction & Status
 
 Scotland. The Victims and Witnesses (Scotland) Act 2014 (asp 2014/1) extends to Scotland and is in
 force, status "revised". It has been commenced in stages by a series of commencement orders,
 including SSI 2020/405 (No. 7), SSI 2021/39 (No. 8) and SSI 2022/22 (No. 9).
 
-## References
+### References
 
 - Victims and Witnesses (Scotland) Act 2014, ss.1, 1A, 2 (general principles, standards of service)
 - Victims and Witnesses (Scotland) Act 2014, ss.3B to 3I (Victims' Code and victims' rights)

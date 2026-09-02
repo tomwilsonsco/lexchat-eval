@@ -15,7 +15,7 @@ global question id, in `lex_eval/data/reference_answers/`, shared by every quest
   searches.json           the LEX calls to make
   retrieved.md            generated dump of what they returned, what the answer is written from
   plan.json               how the question breaks down
-  answer.md               the answer
+  answer.md               the answer, headings starting at H3
   statements.json         the points a correct answer must make
   review.json             the lawyer's decision
         |
@@ -40,8 +40,9 @@ Every editable field has exactly one owner:
 
 Consequences worth stating outright:
 
-- **Editing `q{id}.md` or `reference_answers.json` by hand changes nothing that is scored**, and the
-  next render overwrites it. Lawyer changes go into `.authored/q{id}/` and then `--render-only`.
+- **Do not edit `q{id}.md` or `reference_answers.json` by hand.** Markdown edits are ignored;
+  manifest edits affect scoring immediately but are overwritten by the next render. Apply changes
+  under `.authored/q{id}/` and run `--render-only`.
 - **`--render-only` never calls LEX.** It re-reads the answer, statements and decision, recalculates
   the fingerprint, and rewrites the manifest and Markdown together, leaving the retrieval evidence
   exactly as captured. Research is refreshed only by an explicit `--refetch` or `--overwrite`, which

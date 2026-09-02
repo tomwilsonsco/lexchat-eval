@@ -147,7 +147,7 @@ clearing (useful for testing a metric's determinism).
 |---|---|---|
 | `tool_usage` | Fast | Nothing extra |
 | `mandatory_structure`, `citation_passthrough`, `citation_grounding`, `citation_read`, `citation_domain`, `genuine_gap`, `step_completion` | Fast | Nothing extra |
-| `citation_agreement` | Fast | Hand written reference answers |
+| `citation_agreement` | Fast | Authored reference answers |
 | `consistency` | Fast | ≥2 responses per question/LLM/chat mode |
 | `response_groundedness`, `claim_support` | Medium (1 LLM call/test) | `OPENROUTER_API_KEY` |
 | `reference_answer_agreement` | Medium (2 LLM calls/test) | `OPENROUTER_API_KEY` + authored reference answers |
@@ -272,8 +272,11 @@ reviewable, not just the conclusion.
 ```
 
 **`answer.md`**: the answer itself, written from `retrieved.md`. Ground every statement in the
-retrieved text and cite it. Use the four headings the Worker system prompt mandates:
-**Summary Answer (BLUF)**, **Detailed Analysis**, **Jurisdiction & Status**, **References**.
+retrieved text and cite it, as a legislation.gov.uk link rather than a name in prose, or nothing can
+check it. Use the four headings the Worker system prompt mandates: **Summary Answer (BLUF)**,
+**Detailed Analysis**, **Jurisdiction & Status**, **References**. Write them as `###`, and anything
+below them as `####`: the answer is shown inside a section of the generated review document, so a
+heading above H3 would sit outside its own section in a reader's contents.
 
 **`statements.json`**: the one to five points a correct answer must make, most important first, as
 described above.
@@ -335,16 +338,16 @@ a decision on which citations are mandatory) and still matches the record it was
 the answer, the statements, the required citations or the retrieved material change afterwards, the
 record reads `Stale` and drops back to being a draft until the reviewer confirms the new version.
 
-`q{id}.md` is a generated view of the manifest record, not a second copy of the answer. When a lawyer
-sends changes back, edit `.authored/q{id}/answer.md` or `statements.json` and run:
+Do not edit `q{id}.md` or `reference_answers.json` by hand. Markdown edits are ignored; manifest
+edits affect scoring immediately but are overwritten by the next render. When a lawyer sends changes
+back, edit `.authored/q{id}/answer.md`, `statements.json` or `review.json` and run:
 
 ```bash
 python -m lex_eval.reference.build --render-only
 ```
 
 That re-reads what you wrote into the manifest and regenerates every Markdown file offline, leaving
-the retrieval audit showing the material the answer was actually written from. Editing `q{id}.md`
-itself changes nothing that is scored.
+the retrieval audit showing the material the answer was actually written from.
 
 ### The retrieval audit
 

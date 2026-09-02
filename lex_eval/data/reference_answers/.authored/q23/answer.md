@@ -1,11 +1,9 @@
-# Is the Social Security (Amendment) (Scotland) Act 2025 in force?
-
 <!-- TODO: write the answer here, then re-run the build script. -->
 
-## Summary Answer (BLUF)
+### Summary Answer (BLUF)
 
-## Detailed Analysis
+### Detailed Analysis
 
-## Jurisdiction & Status
+### Jurisdiction & Status
 
-## References
+### References
