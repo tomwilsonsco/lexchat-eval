@@ -98,6 +98,15 @@ def _default_workers() -> int:
         return _DEFAULT_WORKERS
 
 
+# The metrics that score against a reference answer. Their stored results are
+# only valid for the reference version they were calculated from.
+REFERENCE_METRICS = {
+    "citation_agreement",
+    "reference_answer_agreement",
+    "plan_coverage",
+}
+
+
 def _group_by_file(metrics: list[str]) -> dict[str, list[str]]:
     """Group *metrics* by their test file, preserving METRIC_FILES order."""
     grouped: dict[str, list[str]] = {}
@@ -193,11 +202,17 @@ def run_evals(
     from lex_eval.utils.db import (
         DEFAULT_DB,
         clear_eval_results,
+        clear_outdated_eval_results,
         covered_response_ids,
         get_connection,
         init_db,
         init_eval_table,
     )
+    from lex_eval.reference.store import current_reference_versions
+
+    # Scored against the reference answers, so a row is only still valid while
+    # the reference it was scored against is unchanged.
+    reference_versions = current_reference_versions()
 
     for test_file, file_metrics in grouped.items():
         conn = get_connection(DEFAULT_DB)
@@ -211,10 +226,19 @@ def run_evals(
             init_db(conn)
             for metric in file_metrics:
                 init_eval_table(conn, metric)
+                versions = reference_versions if metric in REFERENCE_METRICS else None
                 if overwrite:
                     clear_eval_results(conn, metric, llm=llm)
                 elif not append:
-                    covered[metric] = covered_response_ids(conn, metric)
+                    if versions is not None:
+                        dropped = clear_outdated_eval_results(conn, metric, versions)
+                        if dropped:
+                            print(
+                                f"ℹ️  {metric}: dropped {dropped} result(s) scored "
+                                f"against an older reference answer; they will be "
+                                f"scored again"
+                            )
+                    covered[metric] = covered_response_ids(conn, metric, versions)
             conn.commit()
         finally:
             conn.close()

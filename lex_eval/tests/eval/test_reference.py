@@ -12,9 +12,11 @@ Three metrics, all anchored to the reference answer for the same question:
                                      research plan set out to cover those same
                                      statements, before any research happens?
 
-Reference answers are drafts until a lawyer signs one off, so an unverified
-answer's scores carry a "[DRAFT REFERENCE - unverified]" note. Such a score
-measures agreement with the answer's author, not legal correctness.
+Signed and unsigned reference answers are both used. An unverified answer's
+scores carry a "[DRAFT REFERENCE - unverified]" note, because such a score
+measures agreement with the answer's author, not legal correctness. Each row
+records which version of the reference it was scored against, so a score taken
+against an answer that has since been corrected is re-run, not believed.
 """
 
 import pytest
@@ -25,8 +27,12 @@ from lex_eval.metrics import (
     PlanCoverageMetric,
     ReferenceAnswerAgreementMetric,
 )
-from lex_eval.metrics.citation_agreement import MIN_OUTPUT_CHARS, reference_acts
-from lex_eval.reference.store import load_reference_answers
+from lex_eval.metrics.citation_agreement import (
+    MIN_OUTPUT_CHARS,
+    expected_citations,
+    reference_acts,
+)
+from lex_eval.reference.store import effective_verified, load_reference_answers
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
@@ -40,6 +46,11 @@ from lex_eval.utils.test_helpers import (
 # ---------------------------------------------------------------------------
 
 _COVERAGE_THRESHOLD: float = 0.3
+# Signed-off references expect only the citations the lawyer marked required,
+# so anything short of all of them is a miss. The draft threshold above is low
+# for the opposite reason: a draft's expectation is every link in its answer,
+# background material included.
+_REQUIRED_CITATION_THRESHOLD: float = 1.0
 _AGREEMENT_THRESHOLD: float = 0.6
 # Same value as _AGREEMENT_THRESHOLD by convention ("at least 3 of 5"), kept as
 # its own constant since it's a different question (does the plan set out to
@@ -67,9 +78,9 @@ _NO_PLAN = "No research plan for this record;"
 
 records = load_records(read_only=True)
 
-# Drafts included deliberately: all six answers are unverified, so verified-only
-# loading would leave every record unscored. Their scores are stamped instead.
-references = load_reference_answers(verified_only=False)
+# Signed and unsigned references, which is the default: verified-only loading
+# would leave almost every record unscored. A draft's scores are stamped instead.
+references = load_reference_answers()
 
 _skip_no_api_key = pytest.mark.skipif(
     _judge is None,
@@ -88,7 +99,7 @@ def _stamp(reference: dict, reason: str) -> str:
     Appended rather than prefixed because the dashboard identifies rows that
     are not a real quality verdict by the start of the reason.
     """
-    if (reference.get("review") or {}).get("verified"):
+    if effective_verified(reference):
         return reason
     return f"{reason} {_DRAFT_NOTE}"
 
@@ -164,6 +175,7 @@ def _attach_not_measured(request, record, test_name, metric_name, threshold, rea
         threshold=threshold,
         passed=False,
         reason=reason,
+        reference=references.get(record["question_id"]),
     )
 
 
@@ -200,10 +212,15 @@ def test_citation_agreement(request, record):
         pytest.skip(reason)
 
     test_case: LLMTestCase = record_to_test_case(record)
+    # A signed-off reference is scored against the citations the lawyer called
+    # required; a draft against every legislation link in its answer.
+    expected, expectation = expected_citations(reference)
+    approved = expectation == "approved"
     metric = CitationAgreementMetric(
         reference_answer=reference["final_answer"],
-        threshold=_COVERAGE_THRESHOLD,
+        threshold=_REQUIRED_CITATION_THRESHOLD if approved else _COVERAGE_THRESHOLD,
         expected_acts=reference_acts(reference),
+        required_citations=expected if approved else None,
     )
     metric.measure(test_case)
 
@@ -216,6 +233,7 @@ def test_citation_agreement(request, record):
         threshold=metric.threshold,
         passed=metric.is_successful(),
         reason=_stamp(reference, metric.reason or ""),
+        reference=reference,
     )
 
     assert metric.is_successful(), (
@@ -284,6 +302,7 @@ def test_reference_answer_agreement(request, record):
         reason=_stamp(reference, metric.reason or ""),
         judge_llm=_judge.last_model,
         judge_tokens=_judge.total_usage_tokens,
+        reference=reference,
     )
 
     assert metric.is_successful(), (
@@ -355,6 +374,7 @@ def test_plan_coverage(request, record):
         reason=_stamp(reference, metric.reason or ""),
         judge_llm=_judge.last_model,
         judge_tokens=_judge.total_usage_tokens,
+        reference=reference,
     )
 
     assert (

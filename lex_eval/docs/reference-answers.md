@@ -44,8 +44,8 @@ Two consequences, so nobody misreads a number:
 
 ## The statements are written down, not re-derived
 
-`statements.json` holds the points a correct answer has to make, most important first, at most five,
-written by the author at the same time as the answer. `Reference Answer Agreement` gives the judge that
+`statements.json` holds the points a correct answer has to make, most important first, between one
+and five of them, written by the author at the same time as the answer. `Reference Answer Agreement` gives the judge that
 fixed list and asks only for a label per entry.
 
 The alternative, which is what the metric did until 14 August 2026, is to hand the judge the whole
@@ -62,9 +62,12 @@ Two consequences worth knowing:
 - **The judge never sees the reference answer.** Each statement has to stand on its own, which is
   the main thing to get right when writing them.
 
-Exactly five, so the score can only be 0.0, 0.2, 0.4, 0.6, 0.8 or 1.0 and the 0.6 threshold reads as
-"at least 3 of the 5". A longer list sampled down would need a seed, and would silently reshuffle
-which statements are checked whenever one was edited.
+The cap is five, and `read_statements()` accepts anything from one to five. Five is not a target: a
+narrow question may turn on two points, and a statement no correct answer needs to make lowers every
+score without separating a good answer from a bad one. The score is the share of the list the response
+states, so with five statements it moves in steps of 0.2 and the 0.6 threshold reads as "at least 3 of
+the 5"; with three it moves in steps of a third. A list longer than five, sampled down, would need a
+seed and would silently reshuffle which statements are checked whenever one was edited.
 
 ## Two tiers of source
 
@@ -80,10 +83,30 @@ Collapsing them would leave a citation-integrity metric unable to tell "cited wh
 
 ## Verification gates use
 
-`load_reference_answers()` defaults to `verified_only=True`, so a metric cannot silently consume
-drafts. Nothing sets `verified: true` automatically. A completed review survives a rebuild: the block
-is carried forward verbatim and only marked `stale: true` when the answer it was given against has
-changed.
+`load_reference_answers()` includes drafts by default, because excluding them would leave almost
+every question unscored while the signed set grows. A draft's scores are labelled
+`[DRAFT REFERENCE - unverified]`, and the dashboard says how many of the references in use are signed
+off. `verified_only=True` gives the signed-off-only view. Nothing sets `verified: true`
+automatically.
+
+"Verified" means `effective_verified()`, not the raw flag. A sign-off counts only when all four of
+these hold, and any one of them failing puts the record back among the drafts:
+
+- `verified: true`;
+- a reviewer and a date are recorded;
+- `citations_reviewed: true`, so the lawyer has said which citations are mandatory, or that none are;
+- `signed_reference_sha256` still equals the record's current `reference_sha256`.
+
+That last hash is the point of the fingerprint. `reference_sha256` covers everything an approval
+rests on: the question, the answer, the ordered statements the judge is shown, the approved citations
+and the retrieval evidence the answer was written from. It deliberately ignores timestamps, the
+author, reviewer notes, and how tools are displayed, because changing those does not change what was
+approved. Change anything in the first list and the record goes `Stale`: the approval is kept, but it
+no longer counts and the reviewer needs to see the new version.
+
+A decision lives in `.authored/q{id}/review.json`, which is the only place to record one. The sync
+stamps `signed_reference_sha256` when it meets an approval that has none yet, so setting that field
+back to `null` is how a maintainer records that the lawyer has confirmed a changed version.
 
 ## The Markdown is a view, not a copy
 
@@ -94,9 +117,22 @@ so a lawyer's changes reach the evaluator only by way of `.authored/q{id}/`, the
 regenerates the Markdown without calling LEX. Whether a question has been answered is decided from
 the manifest record, so deleting a Markdown file costs a re-render and not a rebuild.
 
+## What a sign-off changes for scoring
+
+A signed-off reference is not just labelled differently, it is scored differently. Citation Agreement
+expects only the citations the lawyer marked `Required` and has to find all of them (threshold 1.0),
+where a draft expects every link in the answer and has to find 30% of them. Attribution follows the
+same list. An approved but empty citation list is recorded as not measured, never as zero.
+
+Every reference-metric row records the `reference_sha256` and `reference_mode` it was scored against,
+so a score taken against an answer that has since been corrected is dropped and taken again instead of
+being averaged in beside a current one.
+
 ## Current state
 
-All six legislation questions have draft answers, **none verified**.
+Twenty questions across `questions.json` and `questions_new.json` have answers, **none verified**.
+Every one of them is a draft: researched against the live LEX corpus and written up by hand, but no
+lawyer has confirmed that any of it states the law correctly.
 
 Only `legislation_only` is supported. Case-law and hybrid modes would need the case-law tools wiring
 into `lex_client.py`.

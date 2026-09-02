@@ -51,58 +51,167 @@ def is_built(record: Optional[Dict[str, Any]]) -> bool:
 
 
 def load_reference_answers(
-    answers_dir: Path = ANSWERS_DIR, *, verified_only: bool = True
+    answers_dir: Path = ANSWERS_DIR, *, verified_only: bool = False
 ) -> Dict[int, Dict[str, Any]]:
     """Reference answers keyed by question_id, for metrics to score against.
 
-    Defaults to verified answers only. An unverified answer is a drafting aid, not a
-    ground truth, and a metric that treats it as one is measuring agreement with its
-    author rather than correctness. Pass `verified_only=False` to see drafts too.
+    Drafts are included by default. Excluding them would leave almost every
+    question unscored while the signed set grows, so evaluation uses both and
+    labels a draft's scores as agreement with its author rather than legal
+    correctness. Pass `verified_only=True` for a signed-off-only view.
+
+    "Verified" means `effective_verified()`: a complete sign-off given against
+    the version of the reference that is here now, not merely a `verified: true`
+    somebody typed in.
     """
     return {
         r["question_id"]: r
         for r in load_manifest(answers_dir)
-        if not verified_only or (r.get("review") or {}).get("verified")
+        if not verified_only or effective_verified(r)
     }
 
 
-def answer_hash(answer: str) -> str:
-    return hashlib.sha256((answer or "").encode("utf-8")).hexdigest()[:16]
+REVIEW_NAME = "review.json"
+
+# What the lawyer decides. "Approve" is the only verdict that can turn
+# `verified` on; anything else is work to do before this can be ground truth.
+APPROVE = "Approve"
+CHANGES_REQUIRED = "Changes required"
 
 
-def new_review_block(answer: str) -> Dict[str, Any]:
-    """The lawyer sign-off block. Nothing here is populated by generation."""
+def new_review_block() -> Dict[str, Any]:
+    """The lawyer decision, empty. Nothing here is populated by generation."""
     return {
         "verified": False,
         "verified_by": None,
         "verified_at": None,
         "verdict": None,
+        "citations_reviewed": False,
         "required_citations": [],
         "corrections": "",
         "notes": "",
-        "answer_sha256": answer_hash(answer),
-        "stale": False,
+        "signed_reference_sha256": None,
     }
 
 
-def carry_review_forward(
-    previous: Optional[Dict[str, Any]], record: Dict[str, Any]
-) -> None:
-    """Preserve a lawyer's review across regeneration, flagging it if the answer moved.
+def normalise_review(review: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """A review block in the current shape, whatever shape it was stored in.
 
-    Losing a sign-off because an answer was rebuilt would be the worst failure mode
-    here, so the block is carried over verbatim and only marked `stale` when the
-    answer it was given against has changed.
+    Keys the current shape does not have are dropped, which is how the old
+    answer-only `answer_sha256` and hand-set `stale` fields fall away: staleness
+    is now derived from the fingerprint, not stored and trusted.
     """
-    prior = (previous or {}).get("review")
-    if not prior:
-        return
-    carried = dict(prior)
-    if carried.get("verified"):
-        carried["stale"] = carried.get("answer_sha256") != answer_hash(
-            record["final_answer"]
-        )
-    record["review"] = carried
+    block = new_review_block()
+    for key in block:
+        value = (review or {}).get(key)
+        if value is not None:
+            block[key] = value
+    return block
+
+
+def normalise_citations(citations: Optional[List[str]]) -> List[str]:
+    """Citation URLs or ids as canonical provision ids, sorted and deduplicated."""
+    from ..metrics.structure import provision_id_from_url
+
+    return sorted(
+        {
+            provision_id_from_url(c) if "://" in c else c.strip().strip("/").lower()
+            for c in citations or []
+            if c and c.strip()
+        }
+    )
+
+
+def reference_fingerprint(record: Dict[str, Any]) -> str:
+    """A hash of everything a lawyer's approval of this reference rests on.
+
+    Covers the question, the answer, the statements the judge is shown, the
+    citations approved as required, and the retrieval evidence the answer was
+    written from. Anything else, timestamps, notes, the order tools are
+    displayed in, can change without invalidating the approval.
+    """
+    review = normalise_review(record.get("review"))
+    material = {
+        "question_id": record.get("question_id"),
+        "question": (record.get("question") or "").strip(),
+        "research_mode": record.get("research_mode"),
+        "final_answer": (record.get("final_answer") or "").strip(),
+        "statements": [s.strip() for s in record.get("statements") or []],
+        "citations_reviewed": bool(review["citations_reviewed"]),
+        "required_citations": normalise_citations(review["required_citations"]),
+        "sources_retrieved": sorted(
+            f"{s.get('legislation_id', '')} {s.get('uri', '')}"
+            for s in record.get("sources_retrieved") or []
+        ),
+        # One hash for all the retrieved text, because the record keeps the text
+        # as a flat list and not per source.
+        "retrieved_text": _sha256("\n".join(record.get("retrieval_context") or [])),
+    }
+    return _sha256(json.dumps(material, sort_keys=True, ensure_ascii=False))
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def review_state(record: Dict[str, Any]) -> str:
+    """Where this reference stands, in one phrase a reviewer can act on."""
+    review = normalise_review(record.get("review"))
+    if not review["verified"]:
+        return CHANGES_REQUIRED if review["verdict"] == CHANGES_REQUIRED else "Draft"
+    if not (
+        review["verified_by"] and review["verified_at"] and review["citations_reviewed"]
+    ):
+        return "Sign-off incomplete"
+    if review["signed_reference_sha256"] != reference_fingerprint(record):
+        return "Stale"
+    return "Verified"
+
+
+def effective_verified(record: Dict[str, Any]) -> bool:
+    """Whether this reference carries a lawyer approval that still holds.
+
+    A sign-off missing its reviewer, date or citation decision, or given
+    against a version of the answer, statements, citations or evidence that has
+    since changed, is not an approval of what is here now.
+    """
+    return review_state(record) == "Verified"
+
+
+def reference_version(record: Dict[str, Any]) -> tuple[str, str]:
+    """Which reference a metric scored against: its fingerprint and standing.
+
+    Stored on every reference-metric result, so a score calculated against an
+    answer that has since been corrected, or against a draft that has since
+    been signed off, can be told apart from a current one.
+    """
+    fingerprint = record.get("reference_sha256") or reference_fingerprint(record)
+    return fingerprint, "verified" if effective_verified(record) else "draft"
+
+
+def current_reference_versions(
+    answers_dir: Path = ANSWERS_DIR,
+) -> Dict[int, tuple[str, str]]:
+    """The current version of every reference answer, keyed by question_id."""
+    return {
+        qid: reference_version(record)
+        for qid, record in load_reference_answers(answers_dir).items()
+    }
+
+
+def apply_review(record: Dict[str, Any], review: Optional[Dict[str, Any]]) -> None:
+    """Attach a review block to a record and stamp the reference fingerprint.
+
+    A new approval, one with `verified: true` and no signed fingerprint yet, is
+    stamped with the version in front of it. Clearing `signed_reference_sha256`
+    back to null is therefore how a maintainer records that the lawyer has
+    confirmed a changed version.
+    """
+    record["review"] = normalise_review(review)
+    fingerprint = reference_fingerprint(record)
+    if record["review"]["verified"] and not record["review"]["signed_reference_sha256"]:
+        record["review"]["signed_reference_sha256"] = fingerprint
+    record["reference_sha256"] = fingerprint
 
 
 def write(records: List[Dict[str, Any]], answers_dir: Path = ANSWERS_DIR) -> Path:
@@ -158,12 +267,21 @@ def answer_section(markdown: str) -> str:
     return markdown[start + len(ANSWER_BEGIN) : end].strip()
 
 
-def review_status(review: Optional[Dict[str, Any]]) -> str:
-    """One word for where a reference stands: Draft, Verified or Stale."""
-    review = review or {}
-    if not review.get("verified"):
-        return "Draft"
-    return "Stale" if review.get("stale") else "Verified"
+# What each state means to the person opening the file.
+_STATE_NOTE = {
+    "Draft": "Nobody has reviewed this yet.",
+    CHANGES_REQUIRED: "Reviewed and not approved. The corrections are in section 5.",
+    "Verified": "Approved by the reviewer named in section 5.",
+    "Stale": (
+        "This was approved, but the answer, statements, required citations or "
+        "retrieved material have changed since. The approval no longer covers "
+        "what is in this file and the reviewer needs to see it again."
+    ),
+    "Sign-off incomplete": (
+        "This is marked approved but the reviewer, the date or the citation "
+        "decision is missing, so it is not counted as approved."
+    ),
+}
 
 
 def _fmt_plan(plan: Optional[Dict[str, Any]]) -> str:
@@ -175,13 +293,15 @@ def _fmt_plan(plan: Optional[Dict[str, Any]]) -> str:
     ).rstrip()
 
 
-def _fmt_statements(statements: Optional[List[str]]) -> str:
-    """The statements, each with a place to accept or amend it."""
+def _fmt_statements(statements: Optional[List[str]], approved: bool) -> str:
+    """The statements, each with a place to accept or amend it until approved."""
     if not statements:
         return (
             "_None recorded. Write them in `.authored/q{id}/statements.json`, then "
             "run `python -m lex_eval.reference.build --statements-only`._"
         )
+    if approved:
+        return "\n".join(f"{i + 1}. {s}" for i, s in enumerate(statements))
     return "\n\n".join(
         f"{i + 1}. {s}\n   - Accept / Amend (write the replacement here):"
         for i, s in enumerate(statements)
@@ -211,6 +331,8 @@ def _fmt_citations(record: Dict[str, Any]) -> str:
         provision_id_from_url(s.get("uri") or ""): s
         for s in (record.get("sources_retrieved") or [])
     }
+    review = normalise_review(record.get("review"))
+    required = set(normalise_citations(review["required_citations"]))
     lines = [
         "| Provision | Title | Read during research | Required / Background / Remove |",
         "| --- | --- | --- | --- |",
@@ -218,9 +340,15 @@ def _fmt_citations(record: Dict[str, Any]) -> str:
     for pid in cited:
         source = retrieved.get(pid) or {}
         title = (source.get("title") or "").replace("|", "\\|") or "_not retrieved_"
+        if pid in required:
+            mark = "**Required**"
+        elif review["citations_reviewed"]:
+            mark = "Background"
+        else:
+            mark = ""
         lines.append(
             f"| [{pid}](https://www.legislation.gov.uk/{pid}) | {title} "
-            f"| {'yes' if source else 'no'} | |"
+            f"| {'yes' if source else 'no'} | {mark} |"
         )
     return "\n".join(lines)
 
@@ -255,17 +383,15 @@ def render_markdown(record: Dict[str, Any]) -> str:
     signed off.
     """
     r = record
-    review = r.get("review", {})
-    status = review_status(review)
-    if status == "Stale":
-        status = "Stale, the answer changed after it was signed off"
+    review = normalise_review(r.get("review"))
+    state = review_state(r)
     mode = r.get("research_mode", "legislation_only")
 
     return f"""# Q{r['question_id']} reference answer for review
 
-**Status: {status}.** Written by {r.get('author', 'unknown')} against the live
-LEX legislation service, and not yet law. It becomes the yardstick LexChat is
-scored against once a lawyer approves it.
+**Status: {state}.** {_STATE_NOTE.get(state, '')} Written by
+{r.get('author', 'unknown')} against the live LEX legislation service. It is the
+yardstick LexChat is scored against once a lawyer approves it.
 
 **What we need from you:** decide whether the answer in section 2 is right,
 whether the key statements in section 3 are the points a correct answer must
@@ -296,7 +422,7 @@ the judge is shown these and the response, never the answer above, and labels
 each one stated, contradicted or missing. Editing them changes what that metric
 measures, so they need your approval as much as the answer does.
 
-{_fmt_statements(r.get('statements'))}
+{_fmt_statements(r.get('statements'), state == 'Verified')}
 
 ## 4. Citation schedule
 
@@ -308,11 +434,16 @@ belong in the answer at all.
 
 ## 5. Decision
 
-- **Approve / Changes required:**
-- **Reviewer:**
-- **Date:**
-- **What is wrong, missing or misleading:**
-- **Notes:**
+- **Approve / Changes required:** {review['verdict'] or '_not yet reviewed_'}
+- **Reviewer:** {review['verified_by'] or '_not yet reviewed_'}
+- **Date:** {review['verified_at'] or '_not yet reviewed_'}
+- **Citations in section 4 marked up:** {'yes' if review['citations_reviewed'] else 'not yet'}
+- **What is wrong, missing or misleading:** {review['corrections'] or '_nothing recorded_'}
+- **Notes:** {review['notes'] or '_none_'}
+
+A decision recorded here is copied into `.authored/q{r['question_id']}/review.json`
+by a maintainer, who then re-renders this file. Editing this file changes
+nothing that is scored.
 
 ## 6. Appendix, how this answer was researched
 
@@ -326,6 +457,8 @@ wrong can be traced back to what was read.
 | Tool calls | {' → '.join(r.get('tool_sequence') or []) or '_none_'} |
 | Full-Act fallback used | {'yes' if r.get('fallback_used') else 'no'} |
 | Provisions retrieved | {len(r.get('sources_retrieved') or [])} |
+| Reference version | `{r.get('reference_sha256') or reference_fingerprint(r)}` |
+| Version approved | `{review['signed_reference_sha256'] or 'none'}` |
 
 ### 6.1 Research plan
 

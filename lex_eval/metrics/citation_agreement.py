@@ -32,6 +32,26 @@ def cited_provisions(text: str) -> set[str]:
     }
 
 
+def expected_citations(reference: dict) -> tuple[set[str], str]:
+    """The provisions a response is expected to cite, and where they came from.
+
+    A signed-off reference expects exactly the citations the lawyer marked as
+    required. A draft has no such list, so it falls back to every legislation
+    link in its answer, background material included, which is why a draft is
+    scored against a much lower threshold.
+    """
+    from ..reference.store import (
+        effective_verified,
+        normalise_citations,
+        normalise_review,
+    )
+
+    if effective_verified(reference):
+        review = normalise_review(reference.get("review"))
+        return set(normalise_citations(review["required_citations"])), "approved"
+    return cited_provisions(reference.get("final_answer") or ""), "draft"
+
+
 def _is_covered(expected: str, actual: set[str]) -> bool:
     """Whether *expected* is cited in *actual*.
 
@@ -52,6 +72,10 @@ def act_of(provision: str) -> str:
 def reference_acts(reference: dict) -> set[str]:
     """The Acts a reference answer actually relied on, for attribution.
 
+    Once a lawyer has signed the reference off, these are the Acts of the
+    citations they marked required. Everything below applies to a draft, which
+    has no such list.
+
     An Act qualifies only if its author both pulled the text (it is in
     ``sources_retrieved``) and used it (the answer cites it). Either half alone
     is wrong, and in opposite directions:
@@ -63,17 +87,14 @@ def reference_acts(reference: dict) -> set[str]:
     - ``sources_retrieved`` alone includes law the author pulled and then chose
       not to use, sometimes to rule it out. The Transport Act 1985 in q18's
       answer is retrieved for exactly that reason.
-
-    Replace all of this with the lawyer's ``required_citations`` once the
-    reference answers are signed off.
     """
     retrieved = {
         s["legislation_id"]
         for s in (reference.get("sources_retrieved") or [])
         if s.get("legislation_id")
     }
-    cited = {act_of(p) for p in cited_provisions(reference.get("final_answer") or "")}
-    return retrieved & cited
+    expected, _mode = expected_citations(reference)
+    return retrieved & {act_of(p) for p in expected}
 
 
 # A response shorter than this is a clarification request or a capture gap, not
@@ -93,7 +114,7 @@ def attributable(reference: dict, actual_output: str) -> bool:
     """
     return (
         len((actual_output or "").strip()) > MIN_OUTPUT_CHARS
-        and bool(cited_provisions(reference.get("final_answer") or ""))
+        and bool(expected_citations(reference)[0])
         and bool(reference_acts(reference))
     )
 
@@ -165,16 +186,20 @@ class CitationAgreementMetric(BaseMetric):
     reference cites section 6 of it is a miss.
 
     Args:
-        reference_answer: The reference answer's text for this question.
-        threshold:        Minimum share of the reference's citations that the
-                          response must also cite (default 0.3).
-        expected_acts:    The Acts the reference answer relied on, for the
-                          attribution only. Never affects the score.
+        reference_answer:   The reference answer's text for this question.
+        threshold:          Minimum share of the expected citations that the
+                            response must also cite (default 0.3).
+        expected_acts:      The Acts the reference answer relied on, for the
+                            attribution only. Never affects the score.
+        required_citations: The citations a lawyer marked as required. Given,
+                            they are the whole expectation; left None, every
+                            legislation link in the reference answer is.
 
-    The threshold is deliberately low because a reference answer cites
-    everything its author consulted, including background provisions a good
-    response need not repeat. See docs/metrics.md. Replace this with the
-    lawyer's `required_citations` once the reference answers are signed off.
+    The default threshold is low because a draft reference cites everything its
+    author consulted, including background provisions a good response need not
+    repeat. A signed-off reference expects only the citations the lawyer called
+    required, so it is scored against a much higher threshold. See
+    docs/metrics.md.
     """
 
     def __init__(
@@ -182,8 +207,10 @@ class CitationAgreementMetric(BaseMetric):
         reference_answer: str,
         threshold: float = 0.3,
         expected_acts: set[str] | None = None,
+        required_citations: set[str] | None = None,
     ) -> None:
         self.reference_answer = reference_answer
+        self.required_citations = required_citations
         self.threshold = threshold
         self.expected_acts = expected_acts
         self.score = 0.0
@@ -193,7 +220,11 @@ class CitationAgreementMetric(BaseMetric):
         self.retrieved_not_cited: list[str] = []
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        expected = cited_provisions(self.reference_answer)
+        expected = (
+            self.required_citations
+            if self.required_citations is not None
+            else cited_provisions(self.reference_answer)
+        )
 
         if not expected:
             self.score = 0.0

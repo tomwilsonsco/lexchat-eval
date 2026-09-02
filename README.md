@@ -189,7 +189,9 @@ This does **not** need a running LexChat instance. It talks to the LEX API direc
 when Steps 1-2 cannot run.
 
 > Generated answers are **unverified drafts** until a lawyer returns a decision on the Markdown
-> file. `load_reference_answers()` returns only signed-off answers by default.
+> file. Evaluation uses drafts and signed-off answers alike, and labels a draft's scores
+> `[DRAFT REFERENCE - unverified]`: agreement with a draft is agreement with its author, not legal
+> correctness. Only a lawyer's approval makes it more than that.
 
 ### Building them
 
@@ -206,7 +208,9 @@ a stage, printing what it needs from you next:
 | **RETRIEVE** | Runs your searches, writes `retrieved.md` | Read it, then write `plan.json`, `answer.md` and `statements.json` |
 | **BUILT** | Writes `q{id}.md` and updates the manifest | Send it for lawyer review |
 
-`statements.json` holds the key statements a correct answer has to make, most important first, at most 5.
+`statements.json` holds the key statements a correct answer has to make, most important first,
+between one and five of them. Five is a cap, not a quota: a narrow question may only turn on two
+points, and padding the list lowers every score without telling answers apart.
 They are what `Reference Answer Agreement` scores a response against, and they are written once and
 stored with the answer so that the judge labels a fixed list instead of choosing the points again on
 every run. Each one should be a single self-contained sentence about what the law says, since the
@@ -219,6 +223,7 @@ python -m lex_eval.reference.build --question-id 7    # one question only
 python -m lex_eval.reference.build --refetch          # re-run searches after editing searches.json
 python -m lex_eval.reference.build --overwrite        # rebuild a question that already has an answer
 python -m lex_eval.reference.build --questions ...    # a different question file (see below)
+python -m lex_eval.reference.build --render-only      # offline: re-read what you wrote, regenerate q{id}.md
 ```
 
 ### A different question set
@@ -233,9 +238,10 @@ python -m lex_eval.reference.build --questions lex_eval/data/questions_new.json 
 All question files build into the same answers directory, so their ids have to be unique across
 files: an answer is matched to a response by question id.
 
-### The three files you write
+### The files you write
 
-In `lex_eval/data/reference_answers/.authored/q{id}/`:
+In `lex_eval/data/reference_answers/.authored/q{id}/`. The build script scaffolds all of them; you
+fill in the first four, and `review.json` holds what the lawyer decides later.
 
 **`searches.json`**: the LEX tool calls to make. Follow the Worker's phases: `search_legislation`
 to find the Acts, then `search_legislation_sections` to pull the provisions from each one
@@ -267,26 +273,65 @@ reviewable, not just the conclusion.
 retrieved text and cite it. Use the four headings the Worker system prompt mandates:
 **Summary Answer (BLUF)**, **Detailed Analysis**, **Jurisdiction & Status**, **References**.
 
+**`statements.json`**: the one to five points a correct answer must make, most important first, as
+described above.
+
+**`review.json`**: the lawyer's decision. Written by whoever transcribes the review, not by you when
+authoring:
+
+```json
+{
+  "verified": true,
+  "verified_by": "Name",
+  "verified_at": "2026-09-02",
+  "verdict": "Approve",
+  "citations_reviewed": true,
+  "required_citations": ["https://www.legislation.gov.uk/asp/2009/12/section/35A"],
+  "corrections": "",
+  "notes": "",
+  "signed_reference_sha256": null
+}
+```
+
+Leave `signed_reference_sha256` as `null` when recording a fresh approval: `--render-only` stamps it
+with the version the lawyer saw, and any later change to the answer, statements, required citations
+or retrieved material makes the sign-off stale until they confirm the new version.
+
 ### Output
 
 ```text
 lex_eval/data/reference_answers/
-├── q1.md                      # for review: answer, key statements, citations, decision, research appendix
-├── reference_answers.json     # machine-readable manifest, all questions
-└── .authored/q1/              # your three files, plus the generated retrieved.md
+├── q1.md                      # generated for review: answer, key statements, citations, decision, research appendix
+├── reference_answers.json     # machine-readable manifest, all questions, the only thing metrics read
+└── .authored/q1/              # what you write: searches.json, plan.json, answer.md, statements.json,
+                               # review.json, plus the generated retrieved.md
 ```
+
+The manifest is generated from `.authored/`, and `q{id}.md` is generated from the manifest. Each
+field has one owner, so nothing is edited in two places:
+
+| Material | Owned by | Copied into |
+| --- | --- | --- |
+| The answer | `.authored/q{id}/answer.md` | `final_answer`, `research_output`, section 2 of `q{id}.md` |
+| The key statements | `.authored/q{id}/statements.json` | `statements`, section 3 of `q{id}.md` |
+| The research plan and searches | `.authored/q{id}/plan.json`, `searches.json` | manifest audit fields, the Markdown appendix |
+| The retrieval evidence | the manifest, captured when the searches ran | the Markdown appendix |
+| The lawyer's decision | `.authored/q{id}/review.json` | `review`, section 5 of `q{id}.md` |
 
 Read the manifest from a test with:
 
 ```python
 from lex_eval.reference import load_reference_answers
 
-answers = load_reference_answers()                      # signed-off answers only
-answers = load_reference_answers(verified_only=False)   # including drafts
+answers = load_reference_answers()                     # signed off and drafts, the default
+answers = load_reference_answers(verified_only=True)   # signed-off answers only
 ```
 
-A completed review survives a rebuild; if the answer changes after sign-off the review is kept but
-flagged `stale: true`.
+A lawyer's decision goes in `.authored/q{id}/review.json`, and a completed review survives a
+rebuild. An answer counts as signed off only while the sign-off is complete (a reviewer, a date, and
+a decision on which citations are mandatory) and still matches the record it was given against; if
+the answer, the statements, the required citations or the retrieved material change afterwards, the
+record reads `Stale` and drops back to being a draft until the reviewer confirms the new version.
 
 `q{id}.md` is a generated view of the manifest record, not a second copy of the answer. When a lawyer
 sends changes back, edit `.authored/q{id}/answer.md` or `statements.json` and run:
@@ -373,8 +418,8 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 | Step Completion | Deep research only. Did every step of the approved research plan carry its own retrieved legal text into its own report, rather than a step that retrieved text and then reported nothing (for example, hitting a tool-call budget limit mid-step). |
 | Report Integration | Deep research only, AI as a judge metric: For every step that reported a real, cited finding of its own, does the final answer reflect it, rather than dropping it when the Manager condenses several step reports into one response. |
 | Consistency (Cosine) | Compare the answers provided when the same question is asked multiple times using TF cosine similarity. Any legislation section cited in one answer but not the other is listed for information, but does not decide pass or fail: an agent searching a live corpus twice will touch different secondary provisions each run. |
-| Citation Agreement | Of the legislation provisions the hand written reference answer cites, how many does the response cite too. No AI judge, it compares the two lists of legislation.gov.uk links. For each Act the reference answer relied on that the response does not cite, the reason says whether any search turned it up, so the reader can tell a search that missed the law from an answer that had the law and left it out. |
-| Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, at most 5 of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
+| Citation Agreement | Of the legislation provisions the reference answer expects, how many does the response cite too. No AI judge, it compares lists of legislation.gov.uk links. Once a lawyer has signed a reference off, the expected list is the citations they marked required and the threshold is 1.0; for a draft it is every link in the reference answer and the threshold is 0.3. For each Act the reference answer relied on that the response does not cite, the reason says whether any search turned it up, so the reader can tell a search that missed the law from an answer that had the law and left it out. |
+| Reference Answer Agreement | AI as a judge metric: How many of the question's key statements the response also makes, between one and five of them. The statements are written once alongside the hand written reference answer and stored with it, so the judge labels a fixed list rather than picking the points afresh on every run. A second judge call looks for contradictions and nothing else, which is what catches a long answer that makes a point correctly in one section and then undoes it in another. A statement the response contradicts fails the metric outright, since a confidently wrong statement of law is worse than a missing one. |
 | Plan Coverage | Deep research only, AI as a judge metric: Does the approved research plan set out to cover the question's key statements, before any research happens. Reuses the same fixed statement list as Reference Answer Agreement instead of a separately authored golden plan. |
 | Claim Support | AI as a judge metric: What share of the report's verifiable legal claims are backed by text the researcher actually read? Claims whose truth depends on the absence of a provision are reported separately because absence generally cannot be established from retrieved excerpts or summaries. |
 | Response Groundedness | Is the final answer to the user grounded in the research worker's summary. A near-unmodified copy is accepted automatically with no AI judge involved. Anything reworded enough to matter goes to the judge, which either passes it or fails it: it fails on any unsupported claim or meaningful misrepresentation, and passes only trivial wording differences. There is no partial credit, so the average for this metric is a pass rate. |

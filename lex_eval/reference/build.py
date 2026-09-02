@@ -34,11 +34,14 @@ from .lex_client import TOOLS, LexTools, _section_text, _sections_of
 from .store import (
     ANSWERS_DIR,
     QUESTIONS_PATH,
-    carry_review_forward,
+    REVIEW_NAME,
+    apply_review,
     is_built,
     load_manifest,
     load_questions,
     new_review_block,
+    normalise_review,
+    review_state,
     write,
 )
 
@@ -142,6 +145,31 @@ def read_statements(src: Path) -> List[str]:
     return statements
 
 
+def read_review(src: Path) -> Optional[Dict[str, Any]]:
+    """The lawyer's decision for one question, or None if none is on file yet.
+
+    `review.json` is where a decision lives. The Markdown shows it, the manifest
+    copies it, and neither is read back.
+    """
+    raw = _read(src / REVIEW_NAME)
+    return normalise_review(json.loads(raw)) if raw else None
+
+
+def write_review(src: Path, review: Dict[str, Any]) -> bool:
+    """Keep `review.json` in step with the review block in the record.
+
+    Returns True if it wrote. This is also what puts a new approval's stamped
+    fingerprint on file, so that editing the answer afterwards shows up as a
+    stale sign-off instead of being approved again on the next render.
+    """
+    if not src.is_dir() or read_review(src) == review:
+        return False
+    (src / REVIEW_NAME).write_text(
+        json.dumps(review, indent=2) + "\n", encoding="utf-8"
+    )
+    return True
+
+
 def scaffold(src: Path, question: Dict[str, Any]) -> None:
     """Stage 1, create the files the author fills in."""
     src.mkdir(parents=True, exist_ok=True)
@@ -154,6 +182,9 @@ def scaffold(src: Path, question: Dict[str, Any]) -> None:
     (src / "statements.json").write_text(
         json.dumps(_STATEMENTS_TEMPLATE, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
+    )
+    (src / REVIEW_NAME).write_text(
+        json.dumps(new_review_block(), indent=2) + "\n", encoding="utf-8"
     )
     (src / "answer.md").write_text(
         f"# {question['question']}\n\n{_TODO}\n\n"
@@ -281,8 +312,8 @@ def build(
             "lex_api_calls": len(tools.api_calls),
         }
 
-    record["review"] = new_review_block(answer)
-    carry_review_forward(previous, record)
+    apply_review(record, read_review(src) or (previous or {}).get("review"))
+    write_review(src, record["review"])
     return record
 
 
@@ -303,6 +334,7 @@ def resync(record: Dict[str, Any], src: Path) -> Dict[str, Any]:
     updated["final_answer"] = answer
     updated["research_output"] = answer
     updated["statements"] = statements
+    apply_review(updated, read_review(src) or record.get("review"))
     return updated
 
 
@@ -383,6 +415,7 @@ def attach_statements(
 
     record = dict(previous)
     record["statements"] = read_statements(src)
+    apply_review(record, read_review(src) or record.get("review"))
     return (f"STATEMENTS  q{qid}.md, {len(record['statements'])} statements", record)
 
 
@@ -407,8 +440,10 @@ def render_only(answers_dir: Path, question_id: Optional[int]) -> int:
     failures = 0
     for record in records:
         qid = record["question_id"]
+        src = authored_dir(answers_dir, qid)
         try:
-            new = resync(record, authored_dir(answers_dir, qid))
+            new = resync(record, src)
+            rewrote = write_review(src, new["review"])
         except Exception as exc:
             logger.debug("Q%s failed", qid, exc_info=True)
             print(f"  Q{qid}  FAILED      {type(exc).__name__}: {exc}")
@@ -417,7 +452,12 @@ def render_only(answers_dir: Path, question_id: Optional[int]) -> int:
         changed = new["final_answer"] != record.get("final_answer") or new[
             "statements"
         ] != record.get("statements")
-        print(f"  Q{qid}  {'RESYNCED    ' if changed else 'RENDERED    '}q{qid}.md")
+        note = review_state(new)
+        if rewrote:
+            note += f", wrote {src.name}/{REVIEW_NAME}"
+        print(
+            f"  Q{qid}  {'RESYNCED    ' if changed else 'RENDERED    '}q{qid}.md, {note}"
+        )
         updated.append(new)
 
     if updated:

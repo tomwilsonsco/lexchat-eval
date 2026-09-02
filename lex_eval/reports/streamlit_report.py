@@ -16,7 +16,9 @@ if _REPO_ROOT not in sys.path:
 from lex_eval.reference.store import (
     ANSWERS_DIR,
     MANIFEST_NAME,
+    effective_verified,
     load_reference_answers,
+    reference_version,
 )
 from lex_eval.reports.attribution import caveat, worst_attribution
 from lex_eval.utils.db import (
@@ -595,6 +597,8 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
     )
 
     meta_bits = []
+    if not _reference_is_current(r):
+        meta_bits.append("reference answer changed since, re-run to update")
     if r.get("run_at"):
         meta_bits.append(f"scored {r['run_at'][:19]}")
     if r.get("judge_llm"):
@@ -934,13 +938,31 @@ _ATTRIBUTION_STYLE = {
 def _reference_answers(_mtime: float = 0.0) -> dict:
     """Reference answers keyed by question_id.
 
-    Drafts included, matching tests/eval/test_reference.py: excluding them
-    would leave every question unattributable until sign off.
+    Signed and unsigned, matching tests/eval/test_reference.py: excluding
+    drafts would leave every question unattributable until sign off.
 
     ``_mtime`` busts the cache when the manifest is rewritten, the same way
     ``load_eval_results`` and ``load_responses`` do for the database.
     """
-    return load_reference_answers(verified_only=False)
+    return load_reference_answers()
+
+
+def _reference_is_current(r: dict) -> bool:
+    """Whether a stored metric row was scored against the reference in use now.
+
+    A row scored against an answer that has since been corrected, or against a
+    draft since signed off, is not comparable with the attribution shown beside
+    it, so it is labelled rather than quietly averaged in.
+    """
+    if not r.get("reference_sha256"):
+        return True
+    reference = _reference_answers(_reference_manifest_mtime()).get(r["question_id"])
+    if not reference:
+        return False
+    return reference_version(reference) == (
+        r["reference_sha256"],
+        r.get("reference_mode"),
+    )
 
 
 def _reference_manifest_mtime() -> float:
@@ -976,6 +998,25 @@ def _render_attribution_flag(response_records: list[dict]) -> None:
     note = caveat(verdict["stage"])
     if note:
         st.caption(note)
+
+
+def _reference_status_line() -> str:
+    """How many reference answers a lawyer has signed off, and how many are drafts.
+
+    The three reference metrics score against both, so the reader needs to know
+    how much of what they are looking at is measured against lawyer-approved
+    law and how much against a draft.
+    """
+    references = _reference_answers(_reference_manifest_mtime())
+    if not references:
+        return "No reference answers yet, so the reference metrics score nothing."
+    verified = sum(1 for r in references.values() if effective_verified(r))
+    drafts = len(references) - verified
+    return (
+        f"Reference answers in use: {verified} signed off by a lawyer, "
+        f"{drafts} unverified draft(s). A draft's scores measure agreement with "
+        "its author, not legal correctness."
+    )
 
 
 def _render_question_block(
@@ -1107,6 +1148,8 @@ def main() -> None:
     st.markdown("[LexChat](https://github.com/delphium226/lexchat) testing metric \
     results exploration. Explore LLM responses to a set of legal queries.   \
     Currently under development.")
+
+    st.caption(_reference_status_line())
 
     st.divider()
 

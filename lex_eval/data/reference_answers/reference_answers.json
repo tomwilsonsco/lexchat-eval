@@ -599,17 +599,18 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "94e2b7b5bda51394",
-      "stale": false
+      "signed_reference_sha256": null
     },
     "statements": [
       "Section 6 of the Data Protection Act 2018 is headed \"Meaning of 'controller'\" and qualifies the definition of \"controller\" in Article 4(1)(7) of the UK GDPR rather than creating a free-standing definition.",
       "Section 6(2) provides that where personal data is processed only for purposes, and by means, required by an enactment, the person on whom the obligation to process the data is imposed by that enactment is the controller.",
       "Section 6(1) makes the UK GDPR definition of \"controller\" have effect subject to section 6(2), section 209 and section 210 of the Act."
-    ]
+    ],
+    "reference_sha256": "f19f84c4e2b91cde"
   },
   {
     "question_id": 2,
@@ -1119,11 +1120,11 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "19e305613da68306",
-      "stale": false
+      "signed_reference_sha256": null
     },
     "statements": [
       "Section 2(5) of the National Health Service (Scotland) Act 1978 gives the Scottish Ministers a general power of direction, under which each Health Board shall act subject to, and in accordance with, such regulations as may be made and such directions as may be given.",
@@ -1131,7 +1132,8 @@
       "The section 2(5) power reaches both the purposes for which a Health Board was constituted and any function otherwise conferred on the Board by or under the 1978 Act or the 2021 Act.",
       "Section 78A allows the Scottish Ministers to direct that specified functions be performed by another body or person where a service is failing.",
       "Section 105(6) and (7) provide that a direction may be varied or revoked by subsequent directions made in like manner, and may be given either generally or in specified cases subject to exceptions and conditions."
-    ]
+    ],
+    "reference_sha256": "a5e7afc7ba113219"
   },
   {
     "question_id": 3,
@@ -1702,11 +1704,11 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "61acb287f87c9eae",
-      "stale": false
+      "signed_reference_sha256": null
     },
     "statements": [
       "The making and reviewing of an integration joint board's strategic plan is governed by Part 2 of the Public Bodies (Joint Working) (Scotland) Act 2014, sections 29 to 38.",
@@ -1714,7 +1716,8 @@
       "Section 33 prescribes a three-stage consultative sequence with the strategic planning group and wider consultees, proposals then a first draft then a second draft, before the plan may be finalised.",
       "Section 37(1)(a) requires the board to review the effectiveness of the strategic plan before the expiry of each three-year relevant period, and section 37(1)(b) permits a review at any other time.",
       "Section 38 allows the constituent authorities acting jointly to direct the board to prepare a replacement strategic plan, and the board must comply with such a direction."
-    ]
+    ],
+    "reference_sha256": "7fd4a09c7d3a14fb"
   },
   {
     "question_id": 4,
@@ -2254,11 +2257,11 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "999a6c9b3793eae2",
-      "stale": false
+      "signed_reference_sha256": null
     },
     "statements": [
       "The Information Commissioner's power to impose a financial penalty for breach of data protection duties is the penalty notice under section 155 of the Data Protection Act 2018.",
@@ -2266,7 +2269,8 @@
       "Section 115(9) makes the section 155 penalty notice the only route by which the administrative fine powers in Articles 58(2)(i) and 83 of the UK GDPR may be exercised.",
       "Schedule 16 imposes a mandatory procedure: a notice of intent must be given first, allowing not less than 21 days for written representations, and the penalty notice must follow within 6 months of the notice of intent.",
       "A penalty notice may be appealed to the Tribunal, including against the amount alone under section 162(3), and the Tribunal may substitute its own decision under section 163(3)."
-    ]
+    ],
+    "reference_sha256": "6639fe39f0f1bfc0"
   },
   {
     "question_id": 5,
@@ -2699,18 +2703,19 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "db7bf838069bfb6e",
-      "stale": false
+      "signed_reference_sha256": null
     },
     "statements": [
       "The chair of Food Standards Scotland is appointed by the Scottish Ministers under section 6(1)(a) of the Food (Scotland) Act 2015.",
       "The Food (Scotland) Act 2015 requires no approval or confirmation of the chair's appointment by the Scottish Parliament.",
       "The Act fixes no term of office for the chair: under section 6(5) membership is for such period and on such terms and conditions as the Scottish Ministers may determine.",
       "The appointment is a regulated public appointment under the Public Appointments and Public Bodies etc. (Scotland) Act 2003, so it is governed by the code of practice of the Commissioner for Ethical Standards in Public Life in Scotland, who may under section 2(8) direct the Ministers to delay the appointment, and the Ministers must comply."
-    ]
+    ],
+    "reference_sha256": "3158a5edb722ef36"
   },
   {
     "question_id": 6,
@@ -3074,11 +3079,11 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "7e43c5a7e680eedb",
-      "stale": false
+      "signed_reference_sha256": null
     },
     "statements": [
       "Regulation of the health professions is a reserved matter under Section G2 of Part II of Schedule 5 to the Scotland Act 1998, and so is generally outside the legislative competence of the Scottish Parliament.",
@@ -3086,7 +3091,8 @@
       "\"The health professions\" is defined for Section G2 by a closed, exhaustive list of nine regulating enactments, so a profession not regulated by one of those Acts is not within the reservation.",
       "Section G2 contains express exceptions carving out the subject-matter of section 21 of the National Health Service (Scotland) Act 1978, and of section 25 of that Act so far as it relates to vocational training and disciplinary proceedings.",
       "Whether a provision relates to a reserved matter is determined by the purpose test in section 29(3), judged by reference to the provision's purpose and having regard among other things to its effect in all the circumstances."
-    ]
+    ],
+    "reference_sha256": "95459f642333f1b2"
   },
   {
     "question_id": 7,
@@ -3621,12 +3627,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "9b9a05da65920727",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "9e2fdbf86e68ae54"
   },
   {
     "question_id": 10,
@@ -3961,12 +3968,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "cf4d4de9cb733f57",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "bdba1cd4d783e37f"
   },
   {
     "question_id": 14,
@@ -4481,12 +4489,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "2094b12d27977087",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "0e78dbdc51b1fcd5"
   },
   {
     "question_id": 15,
@@ -5152,12 +5161,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "34665db1452a795f",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "9d84d9c3392fa75f"
   },
   {
     "question_id": 17,
@@ -5890,12 +5900,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "545efc79f67a1c26",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "cbc0ba6c41d9bff3"
   },
   {
     "question_id": 18,
@@ -6664,12 +6675,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "ef22b670d089504c",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "e50adf9a95c82da3"
   },
   {
     "question_id": 19,
@@ -7040,12 +7052,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "56e41436bbbce02f",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "a95e7ecd795c538c"
   },
   {
     "question_id": 20,
@@ -7366,12 +7379,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "51735dd4c7306048",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "398338e58b09f17d"
   },
   {
     "question_id": 21,
@@ -7801,12 +7815,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "8bffa073e3e70e38",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "8f0d6d56fcdd74d8"
   },
   {
     "question_id": 26,
@@ -8551,12 +8566,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "e1516f1133928f83",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "25f9944e18f7628e"
   },
   {
     "question_id": 27,
@@ -8983,12 +8999,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "7d2160201cebe90a",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "861d37222a930bea"
   },
   {
     "question_id": 28,
@@ -9447,12 +9464,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "1cb44aef5912fdf6",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "700ca8ff6ab185bc"
   },
   {
     "question_id": 29,
@@ -9826,12 +9844,13 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "11bbfff09a0145db",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "67034ab004c67e03"
   },
   {
     "question_id": 30,
@@ -10177,11 +10196,12 @@
       "verified_by": null,
       "verified_at": null,
       "verdict": null,
+      "citations_reviewed": false,
       "required_citations": [],
       "corrections": "",
       "notes": "",
-      "answer_sha256": "efee8153b19a286f",
-      "stale": false
-    }
+      "signed_reference_sha256": null
+    },
+    "reference_sha256": "ca162201d4284391"
   }
 ]

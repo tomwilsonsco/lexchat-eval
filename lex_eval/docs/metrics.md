@@ -220,10 +220,24 @@ the response being scored. Catches an answer that reaches a plausible-sounding c
 citing the provisions the question actually turns on. It does not check whether the response uses those
 citations correctly; that's Reference Answer Agreement's job.
 
-**How.** Deterministic, no judge. Extracts legislation.gov.uk section-level citations from both the
-reference answer and the response, then checks whether the response cites *something* within each Act
-the reference cites (section-level matching, not just Act-level). Score is the fraction of the
-reference's cited Acts covered.
+**How.** Deterministic, no judge. Score is the fraction of the reference's expected citations the
+response also cites, with section-level matching (citing section 3 when the reference cites section 6
+is a miss, but citing any section of an Act does cite that Act).
+
+**What counts as expected depends on whether a lawyer has signed the reference off**, and so does the
+threshold:
+
+| Reference | Expected citations | Threshold |
+| --- | --- | ---: |
+| Draft, or a sign-off that has gone stale | Every legislation.gov.uk link in the reference answer | 0.3 |
+| Signed off by a lawyer | Only the citations the lawyer marked `Required` in `review.json` | 1.0 |
+
+The two thresholds mean different things, which is why they are far apart. A draft's expected list is
+whatever its author linked, background provisions included, so most of a low score is noise and 0.3 is
+about as much as it can carry. An approved list contains only citations a lawyer said a correct answer
+must contain, so anything less than all of them is a real miss and 1.0 is the only threshold that
+matches the word "required". A signed-off reference whose approved list is empty, meaning the lawyer
+decided no citation is mandatory, is recorded as not measured rather than scored zero.
 
 **The reason says where the blame lies**, in two plain sentences: "No search turned up: ..." and
 "Turned up by a search but not cited: ...". The first means no tool call in the run surfaced that Act.
@@ -232,10 +246,10 @@ granularity the retrieval tools are called at, and it never moves the score. `re
 turns this into the flag above each question's metric rows, and carries the evidence for calling the
 first case a search failure rather than a corpus gap.
 
-**Attribution uses a narrower list than the score does.** The score counts every legislation link in
-the reference answer, which includes the sources its author looked at and set aside under "Identified
-but not retrieved". That noise is what the 0.3 threshold exists to absorb, and it is tolerable in a
-score. It is not tolerable in a blame flag, which reads as a verdict, so attribution uses the answer's
+**Attribution uses a narrower list than a draft's score does.** A draft's score counts every
+legislation link in the reference answer, which includes the sources its author looked at and set
+aside under "Identified but not retrieved". That noise is what the 0.3 threshold exists to absorb, and
+it is tolerable in a score. It is not tolerable in a blame flag, which reads as a verdict, so attribution uses the answer's
 own `sources_retrieved` instead. Without that field no attribution is produced at all: saying nothing
 beats blaming a response for not citing something the author only skimmed.
 
@@ -245,9 +259,9 @@ in conversational mode, where the Manager routinely drops the Worker's URLs, and
 separates by chat mode more sharply than any other. Read a low score alongside Reference Links before
 concluding the response missed the law.
 
-**Why.** The threshold is set low, 0.3, deliberately: a reference answer cites everything its author
-consulted while researching, including background provisions a good response doesn't need to repeat.
-Measured over 24 responses, scores ranged 0.00-0.65. This metric, along with Reference Answer Agreement
+**Why.** The draft threshold is set low, 0.3, deliberately: a draft reference cites everything its
+author consulted while researching, including background provisions a good response doesn't need to
+repeat. This metric, along with Reference Answer Agreement
 and Claim Support, exists because `docs/eval-gap-analysis.md` identified that nothing in the harness
 compared a response to a known-correct answer, only to its own retrieval.
 
@@ -258,8 +272,8 @@ answer, the response also makes, and whether it contradicts any of them. This is
 compares a response against material a person researched, so it's the only one that can catch a
 response that is faithful to its own retrieval but wrong about the law.
 
-**How.** Judge-based, in two calls. The first gives the judge the statements (at most 5, most
-important first) as a fixed numbered list and asks it to label each `stated`, `contradicted`, or
+**How.** Judge-based, in two calls. The first gives the judge the statements (one to five of them,
+most important first) as a fixed numbered list and asks it to label each `stated`, `contradicted`, or
 `missing`, quoting the response. The second asks about nothing but contradictions. Score is the
 fraction of statements stated. A contradiction found by either call fails the metric outright
 regardless of score, since a confidently wrong statement of law is worse than an omitted one. Both
@@ -277,8 +291,8 @@ in 5, with no false positives on two answers that get the same point right.
 letting the judge pick its own points was measured to disagree with itself 48% of the time run to run;
 labelling a fixed list cut that to 7%.
 
-**Reading it.** A contradiction is measured against a reference answer that a lawyer has not yet
-signed off, so it means "contradicts the draft reference", not "wrong in law". Treat a flagged
+**Reading it.** While a reference answer is still a draft, a contradiction means "contradicts the
+draft reference", not "wrong in law"; only a lawyer's approval makes it the latter. Treat a flagged
 contradiction as a prompt to read the two texts side by side. Across the 43 stored responses, 10 were
 flagged; the four checked by hand were all genuine, including an answer that put a strategic plan in
 the wrong Part of an Act and one that turned the s.29(3) purpose test into "purpose or effect".
