@@ -215,7 +215,9 @@ lex_eval/data/responses.db
 lex_eval/data/debug_events.jsonl
 lex_eval/data/verbose_logs/
 
-lex_eval/data/session-transcripts-*.csv
+# Session transcript exports, the categorized copies, and the consistency review
+# that the feedback notebook reads and writes.
+lex_eval/notebooks/data/
 
 # Python build
 dist/
