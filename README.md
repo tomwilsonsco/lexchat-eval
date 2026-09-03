@@ -222,7 +222,7 @@ Useful flags:
 
 ```bash
 python -m lex_eval.reference.build --question-id 7    # one question only
-python -m lex_eval.reference.build --refetch          # re-run searches after editing searches.json
+python -m lex_eval.reference.build --refetch          # re-run searches after editing searches.json, and rebuild
 python -m lex_eval.reference.build --overwrite        # rebuild a question that already has an answer
 python -m lex_eval.reference.build --questions ...    # a different question file (see below)
 python -m lex_eval.reference.build --render-only      # offline: re-read what you wrote, regenerate q{id}.md
@@ -259,7 +259,9 @@ to find the Acts, then `search_legislation_sections` to pull the provisions from
 ```
 
 You will usually run the build twice here: once with the Phase 1 searches to find the
-`legislation_id`s, then again after adding the Phase 2 section searches (`--refetch`).
+`legislation_id`s, then again after adding the Phase 2 section searches (`--refetch`). Once the
+answer itself is written, `--refetch` replays the searches and rebuilds the answer against them in
+the same run, so editing `searches.json` is one command and not two.
 
 **`plan.json`**: how the question breaks down. Recorded so the reasoning behind the answer is
 reviewable, not just the conclusion.

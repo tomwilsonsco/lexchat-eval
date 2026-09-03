@@ -468,15 +468,26 @@ def process(
     if not searches:
         return (f"WAITING     {src}/searches.json lists no searches", None)
 
-    retrieved = src / "retrieved.md"
-    if refetch or not retrieved.is_file():
-        n = retrieve(src, searches, question.get("research_mode", "legislation_only"))
-        return (
-            f"RETRIEVED   {n} call(s) -> {retrieved}; write plan.json and answer.md, then re-run",
-            None,
-        )
+    answer_pending = _is_template(_read(src / "answer.md"))
 
-    if _is_template(_read(src / "answer.md")):
+    retrieved = src / "retrieved.md"
+    calls = None
+    if refetch or not retrieved.is_file():
+        calls = retrieve(
+            src, searches, question.get("research_mode", "legislation_only")
+        )
+        if answer_pending:
+            return (
+                f"RETRIEVED   {calls} call(s) -> {retrieved}; "
+                "write plan.json and answer.md, then re-run",
+                None,
+            )
+        # The answer is already written, so this is a re-research of an existing
+        # one rather than the next stage of a new one. Carry on and rebuild it
+        # against what was just retrieved, instead of stopping here and making
+        # the author re-run the command to get the same result.
+
+    if answer_pending:
         return (f"WAITING     {src}/answer.md is still the template", None)
     if _is_template(_read(src / "plan.json")):
         return (f"WAITING     {src}/plan.json is still the template", None)
@@ -484,8 +495,10 @@ def process(
         return (f"WAITING     {src}/statements.json is still the template", None)
 
     record = build(question, src, searches, author, previous)
+    refreshed = f"re-researched in {calls} call(s), " if calls is not None else ""
     return (
-        f"BUILT       q{qid}.md, {len(record['sources_retrieved'])} provisions, "
+        f"BUILT       q{qid}.md, {refreshed}"
+        f"{len(record['sources_retrieved'])} provisions, "
         f"{len(record['cases_retrieved'])} judgments, "
         f"{len(record['tool_sequence'])} tool calls",
         record,
@@ -591,7 +604,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--refetch",
         action="store_true",
-        help="Re-run the searches even if retrieved.md exists (after editing searches.json).",
+        help=(
+            "Re-run the searches even if retrieved.md exists (after editing "
+            "searches.json). On a question that already has an answer this "
+            "rebuilds it from the new retrieval in the same run."
+        ),
     )
     parser.add_argument(
         "--render-only",
@@ -657,8 +674,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     for question in questions:
         qid = question["id"]
+        # `--refetch` is a request to re-run the searches, which only means
+        # anything for a question that already has an answer, so it has to open
+        # this guard as `--overwrite` does.
         if (
             not args.overwrite
+            and not args.refetch
             and not args.statements_only
             and is_built(previous.get(qid))
         ):

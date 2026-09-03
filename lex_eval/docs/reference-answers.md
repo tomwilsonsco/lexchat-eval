@@ -46,7 +46,8 @@ Consequences worth stating outright:
 - **`--render-only` never calls LEX.** It re-reads the answer, statements and decision, recalculates
   the fingerprint, and rewrites the manifest and Markdown together, leaving the retrieval evidence
   exactly as captured. Research is refreshed only by an explicit `--refetch` or `--overwrite`, which
-  replays the searches.
+  replays the searches. `--refetch` on a question whose answer is already written replays them and
+  rebuilds against the result in one run, so the fingerprint moves and any sign-off goes `Stale`.
 - **Whether a question is answered is decided from the manifest record**, not from whether `q{id}.md`
   exists, so deleting a Markdown file costs a re-render and not a rebuild.
 - A record that fails validation is left alone in **both** outputs rather than half-written.
