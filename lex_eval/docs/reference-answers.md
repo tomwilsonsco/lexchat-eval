@@ -165,13 +165,16 @@ records that a changed version has been re-confirmed.
 - `citations_reviewed: true`;
 - every entry in `required_citations` is a legislation.gov.uk provision, is cited in the answer, and is
   supported by the retrieval evidence;
+- every Find Case Law judgment the answer cites appears in `cases_retrieved`;
 - `signed_reference_sha256` still equals the record's current `reference_sha256`.
 
 Anything else is a draft. `review_state()` says which of `Draft`, `Changes required`, `Stale`,
 `Sign-off unusable` or `Verified` applies, `review_problems()` lists in plain words what is stopping an
 approval from counting, and both the generated document and `--render-only` show that list. The
 citation rules are there because an approved citation is a scoring baseline: one that the answer never
-makes, or that nobody read, would hold LexChat to something the reference cannot support.
+makes, or that nobody read, would hold LexChat to something the reference cannot support. The judgment
+rule is there for the opposite reason: no metric scores a case citation, so sign-off is the only place
+an unread case can be caught.
 
 ### The fingerprint
 
@@ -185,6 +188,19 @@ Change anything in the first list and the record reads `Stale`: the approval is 
 counting, and the reviewer has to see the new version. Refreshing the research counts, which is why
 `--render-only` exists as the route for a review that should not disturb the evidence.
 
+## What the research tools cannot reach
+
+Find Case Law does not index the Court of Session or the sheriff courts, and its coverage of older
+judgments is patchy. Because the reference process uses the same tools LexChat uses, "no authority
+found" in a reference answer can mean "not indexed" rather than "not the law", and an answer written
+from that silence would score a better-informed LexChat response as wrong.
+
+There is no independent second source to check against, so this is handled by telling the reviewer
+rather than by a gate. Every reviewer document for a `case_law_only` or `legislation_and_case_law`
+question carries a standing note saying what the database does not index, and asking the reviewer to
+check anything the answer states is **not** the law. The drafting rule that goes with it: a reference
+answer records an absence of coverage as an open question, never as a finding.
+
 ## Verified and draft references are both used
 
 `load_reference_answers()` returns both by default. Excluding drafts would leave almost every question
@@ -192,7 +208,9 @@ unscored while the signed set grows. `verified_only=True` gives the signed-off-o
 `effective_verified()`, so a stale or unusable approval is never returned as verified.
 
 A draft's scores are labelled `[DRAFT REFERENCE - unverified]` in every metric reason, and the
-dashboard says how many of the references in use are signed off. A missing answer, missing statements,
+dashboard says how many of the references in use are signed off. That labelling is what makes using
+drafts defensible, and it is also why the coverage note above matters: an unreviewed draft is the
+most likely place for a blind spot to survive. A missing answer, missing statements,
 or an approved-but-empty citation list is recorded as not measured, never as a zero.
 
 ## What a sign-off changes for scoring
@@ -219,7 +237,8 @@ attribution flag above it can never quietly come from different versions.
 
 ## Current state
 
-Twenty questions across `questions.json` and `questions_new.json` have answers. **None is verified**:
+Twenty-five questions across `questions.json` and `questions_new.json` have answers, including all five
+whose research mode involves case law (9, 11, 12, 16 and 24, built 2 Sep 2026). **None is verified**:
 every one is an unapproved draft.
 
 All three research modes are supported. `TOOLS_BY_MODE` in `lex_client.py` sets which tools each mode

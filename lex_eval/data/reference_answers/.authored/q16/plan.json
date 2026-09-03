@@ -1,0 +1,25 @@
+{
+  "scope_note": "Covers the levers available to the Scottish Government to reduce what a single local authority must do to accommodate homeless households, and the tangential measures that free up local authority housing supply or budgets. Limited to the statutory framework in Part II of the Housing (Scotland) Act 1987 and the orders made under it. Whether any of these changes would be desirable as policy, and their compatibility with the ECHR, are out of scope.",
+  "steps": [
+    {
+      "title": "Map the duty being lessened",
+      "detail": "Retrieve the homelessness duties in Part II of the Housing (Scotland) Act 1987, distinguishing the interim duty from the permanent accommodation duty, and identify each point in the scheme where the duty can be discharged, deferred, transferred or ended."
+    },
+    {
+      "title": "Find the ministerial powers over the duties themselves",
+      "detail": "Search Part II for provisions empowering the Scottish Ministers to modify the application of the homelessness duties, rather than assuming that anything written on the face of the Act needs an Act to change."
+    },
+    {
+      "title": "Identify which levers are ministerial and which need primary legislation",
+      "detail": "For each provision, establish whether change requires an Act of the Scottish Parliament or can be done by order or regulations, by retrieving the regulation-making powers in the Act and the orders already made under them."
+    },
+    {
+      "title": "Check the current state of the local connection referral route",
+      "detail": "Retrieve the Homeless Persons (Suspension of Referrals between Local Authorities) (Scotland) Order 2022 and establish whether the section 33 referral power is currently available between Scottish authorities."
+    },
+    {
+      "title": "Check the case law constraint on the interim standard",
+      "detail": "Retrieve the Supreme Court decision on the interim duty and the Unsuitable Accommodation Order and establish what it settles about how far needs must be met at the interim stage."
+    }
+  ]
+}

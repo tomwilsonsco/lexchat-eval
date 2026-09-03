@@ -23,7 +23,7 @@ import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import httpx
@@ -285,6 +285,21 @@ class ApiCall:
     response: Any
 
 
+@dataclass
+class ToolRun:
+    """One tool execution: what was asked, what came back, and the request made.
+
+    `call` is None when the request never completed, so the run has an output
+    but no HTTP exchange of its own. Pairing them here is what stops a failed
+    call shifting every later output onto the wrong request.
+    """
+
+    name: str
+    args: Dict[str, Any]
+    output: str
+    call: Optional[ApiCall]
+
+
 class LexTools:
     """Executes the legislation tools and records everything it did."""
 
@@ -298,7 +313,7 @@ class LexTools:
         self.base_url = base_url.rstrip("/")
         self._client = httpx.Client(timeout=timeout, verify=verify)
         self.api_calls: List[ApiCall] = []
-        self.outputs: List[str] = []
+        self.runs: List[ToolRun] = []
 
     def close(self) -> None:
         self._client.close()
@@ -389,12 +404,16 @@ class LexTools:
 
     def execute(self, name: str, args: Dict[str, Any]) -> str:
         """Run one tool and return the JSON string LexChat would hand to the model."""
+        before = len(self.api_calls)
         try:
             result = self._execute(name, args)
         except Exception as exc:
             logger.warning("[LEX] %s failed: %r", name, exc)
             result = json.dumps({"error": f"{type(exc).__name__}: {exc}"})
-        self.outputs.append(result)
+        # A request that never completed records no ApiCall, so the run is kept
+        # with None rather than borrowing the next tool's call.
+        call = self.api_calls[before] if len(self.api_calls) > before else None
+        self.runs.append(ToolRun(name, args, result, call))
         return result
 
     def _execute(self, name: str, args: Dict[str, Any]) -> str:
@@ -485,18 +504,26 @@ class LexTools:
     # -- Derived audit fields --------------------------------------------
 
     def tool_sequence(self) -> List[str]:
-        """Ordered tool names, prefixed as `utils/audit_capture.py` prefixes them."""
-        return [f"Worker: {c.tool}" for c in self.api_calls]
+        """Ordered tool names, prefixed as `utils/audit_capture.py` prefixes them.
+
+        Read from the runs, not the requests, so a tool whose request failed
+        outright still appears in the sequence it was called in.
+        """
+        return [f"Worker: {r.name}" for r in self.runs]
 
     def tools_called(self) -> List[Dict[str, Any]]:
-        """The `tools_called` list, shaped as the `responses` table shapes it."""
+        """The `tools_called` list, shaped as the `responses` table shapes it.
+
+        Each output stays with the request that produced it. Where the request
+        never completed, the tool's own arguments stand in for the payload.
+        """
         return [
             {
-                "name": f"Worker: {call.tool}",
-                "input_parameters": call.payload,
-                "output": output,
+                "name": f"Worker: {run.name}",
+                "input_parameters": run.call.payload if run.call else run.args,
+                "output": run.output,
             }
-            for call, output in zip(self.api_calls, self.outputs)
+            for run in self.runs
         ]
 
     def retrieval_context(self) -> List[str]:

@@ -1,0 +1,41 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scotland Act 1998"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/1998/46",
+      "query": "commencement short title extent coming into force"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scotland Act 1998 Commencement Order"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/1998/3178",
+      "query": "appointed days principal appointed day provisions come into force"
+    }
+  },
+  {
+    "tool": "search_case_law",
+    "args": {
+      "query": "Scotland Act 1998 legislative competence",
+      "court": "uksc"
+    }
+  },
+  {
+    "tool": "get_case_law_text",
+    "args": {
+      "url": "https://caselaw.nationalarchives.gov.uk/uksc/2025/16"
+    }
+  }
+]

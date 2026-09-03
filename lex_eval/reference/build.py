@@ -323,7 +323,15 @@ def retrieve(src: Path, searches: List[Dict[str, Any]], mode: str) -> int:
                         f"<{case.get('url', '')}>"
                     )
                 if not results:
-                    lines.append("_No judgments matched._")
+                    # A failed request must not read as a search that found
+                    # nothing: an author who takes it that way writes an answer
+                    # resting on a false absence of case law.
+                    lines.append(
+                        "_No judgments matched._"
+                        if call.status == 200
+                        else f"_This search failed with HTTP {call.status}; "
+                        "it did not run, so nothing can be read into it._"
+                    )
                 lines.append("")
             elif call.tool == "get_case_law_text":
                 judgment = call.response or {}

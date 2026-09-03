@@ -128,3 +128,63 @@ class TestScaffold:
         from lex_eval.reference.build import SUPPORTED_MODES, _SEARCHES_BY_MODE
 
         assert set(_SEARCHES_BY_MODE) == SUPPORTED_MODES
+
+
+class TestRetrievedDump:
+    """What the author reads before writing the answer."""
+
+    def _dump(self, tmp_path, monkeypatch, status):
+        """Render retrieved.md for one search_case_law call that returned *status*."""
+        from lex_eval.reference import build as build_mod
+        from lex_eval.reference.lex_client import ApiCall
+
+        class _StubTools:
+            def __init__(self):
+                self.api_calls = [
+                    ApiCall(
+                        "search_case_law",
+                        "https://caselaw.nationalarchives.gov.uk/atom.xml",
+                        {"query": "privilege", "court": "csih"},
+                        status,
+                        10,
+                        {},
+                    )
+                ]
+
+            def execute(self, name, args):
+                return "{}"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return None
+
+        monkeypatch.setattr(build_mod, "LexTools", _StubTools)
+        build_mod.retrieve(
+            tmp_path,
+            [{"tool": "search_case_law", "args": {"query": "privilege"}}],
+            "case_law_only",
+        )
+        return (tmp_path / "retrieved.md").read_text()
+
+    def test_a_failed_search_is_not_reported_as_no_judgments(
+        self, tmp_path, monkeypatch
+    ):
+        """A dead service must not read as a search that found nothing.
+
+        An author who takes it that way writes a reference answer resting on a
+        false absence of case law.
+        """
+        dump = self._dump(tmp_path, monkeypatch, 400)
+
+        assert "failed with HTTP 400" in dump
+        assert "No judgments matched" not in dump
+
+    def test_a_successful_search_with_no_hits_still_says_so(
+        self, tmp_path, monkeypatch
+    ):
+        dump = self._dump(tmp_path, monkeypatch, 200)
+
+        assert "No judgments matched" in dump
+        assert "failed with HTTP" not in dump

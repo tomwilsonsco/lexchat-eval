@@ -1,0 +1,17 @@
+{
+  "scope_note": "Covers whether the Scotland Act 1998 is in force, and how that is established: the Act's own commencement provision and the commencement order made under it. The current content of the Act as amended, and the many later Acts that have amended it, are out of scope.",
+  "steps": [
+    {
+      "title": "Find the Act's own commencement provision",
+      "detail": "Retrieve the commencement, extent and short title provisions of the Scotland Act 1998 and establish which provisions came into force on Royal Assent and which needed an appointed day."
+    },
+    {
+      "title": "Find the commencement instrument",
+      "detail": "Identify and retrieve the commencement order made under the Act's commencement power, and establish the appointed days for every provision that needed one."
+    },
+    {
+      "title": "Check what a case law search adds, and what it cannot",
+      "detail": "Search for a Supreme Court judgment applying the Act. Record whether case law can establish in-force status or only corroborate it."
+    }
+  ]
+}

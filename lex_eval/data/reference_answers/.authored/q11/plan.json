@@ -1,0 +1,17 @@
+{
+  "scope_note": "Covers what \"occupier\" means where a notice-giving power does not define it: the statutory formulations that exist, the common law test that supplies the meaning, and how to apply that to identifying the right recipient of a notice. It does not advise on any particular notice power, and it does not cover the separate question of how a notice must be served.",
+  "steps": [
+    {
+      "title": "Establish whether the occupiers' liability statutes define the term",
+      "detail": "Retrieve the operative provisions of the Occupiers' Liability Act 1957, the Occupiers' Liability (Scotland) Act 1960 and the Occupiers' Liability Act 1984, and establish whether each defines \"occupier\" or leaves it to the common law."
+    },
+    {
+      "title": "Find the common law test",
+      "detail": "Search Find Case Law for the control test in Wheat v E Lacon & Co Ltd and retrieve modern judgments that state and apply it, since the 1966 decision itself predates the database."
+    },
+    {
+      "title": "Draw out what governs the meaning in a notice context",
+      "detail": "Identify from the retrieved material the features of the test that matter to an adviser choosing a recipient: degree of control, whether occupation must be exclusive, and whether there can be more than one occupier."
+    }
+  ]
+}

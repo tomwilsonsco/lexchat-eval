@@ -112,7 +112,13 @@ def normalise_review(review: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 # A provision id: a legislation type, a year, a number, then any provision path
 # below it, e.g. ukpga/2018/12 or asp/2009/12/section/35a.
-_PROVISION_ID_RE = re.compile(r"^[a-z]{2,10}/\d{4}/[A-Za-z0-9.\-]+(/[A-Za-z0-9.\-]+)*$")
+# Modern ids date the Act by calendar year (`ukpga/2018/12`). Acts before 1963
+# are dated by regnal year instead, which takes two segments
+# (`ukpga/eliz2/5-6/31`), so both shapes have to be accepted or no provision
+# of the Occupiers' Liability Act 1957 can ever be marked Required.
+_PROVISION_ID_RE = re.compile(
+    r"^[a-z]{2,10}/(\d{4}|[a-z]{2,10}\d*/[0-9\-]+)/[A-Za-z0-9.\-]+(/[A-Za-z0-9.\-]+)*$"
+)
 
 
 def citation_id(citation: str) -> Optional[str]:
@@ -196,6 +202,10 @@ def citation_problems(record: Dict[str, Any]) -> List[str]:
     in the answer, and has to be one the research actually read. A citation
     failing any of those would make the scored expectation something the
     reference cannot support.
+
+    Every judgment the answer cites has to have been read too. Nothing scores a
+    case citation, so a case the research never opened would otherwise pass
+    sign-off unchallenged.
     """
     from ..metrics.citation_agreement import _is_covered, cited_provisions
 
@@ -215,6 +225,13 @@ def citation_problems(record: Dict[str, Any]) -> List[str]:
             problems.append(f"required but not cited in the answer: {identifier}")
         elif not _is_covered(identifier, retrieved):
             problems.append(f"required but never retrieved: {identifier}")
+
+    read = {
+        (c.get("url") or "").rstrip("/") for c in record.get("cases_retrieved") or []
+    }
+    for url in cited_judgments(record.get("final_answer") or ""):
+        if url not in read:
+            problems.append(f"cited in the answer but never read: {url}")
     return problems
 
 
@@ -412,12 +429,17 @@ def _fmt_statements(statements: Optional[List[str]], approved: bool) -> str:
 
 
 def cited_judgments(text: str) -> List[str]:
-    """Find Case Law judgment links in *text*, deduplicated and sorted."""
+    """Find Case Law judgment links in *text*, deduplicated and sorted.
+
+    Sentence punctuation is stripped along with the trailing slash: the URL
+    pattern stops at a bracket but not at a full stop, so a judgment cited at
+    the end of a sentence would otherwise never match one that was read.
+    """
     from ..metrics.structure import _CASE_LAW_DOMAIN, _URL_RE
 
     return sorted(
         {
-            url.rstrip("/")
+            url.rstrip("/.,;:")
             for url in _URL_RE.findall(text or "")
             if _CASE_LAW_DOMAIN in url.lower()
         }
@@ -582,6 +604,17 @@ _PROVENANCE = {
     ),
 }
 
+# What the case law tools cannot reach, shown to any reviewer whose question was
+# researched with them. Without it a reference answer can inherit AILA's own
+# retrieval blind spot, be signed off, and then be used to score AILA.
+_COVERAGE_NOTE = (
+    "\n\n**What these tools cannot see:** Find Case Law does not index the Court\n"
+    "of Session or the sheriff courts, and its coverage of older judgments is\n"
+    "patchy. An answer saying a point could not be found may only mean it could\n"
+    "not be found here, so please check anything the answer states is not the law."
+)
+
+
 # What section 4 asks of the reviewer, which is not the same job in every mode.
 # Judgments are shown to be checked, not marked up: no metric scores a case
 # citation, so asking for Required/Background/Remove against them would be
@@ -711,7 +744,7 @@ def render_markdown(record: Dict[str, Any]) -> str:
 
 **How this was produced:** {_PROVENANCE.get(mode, _PROVENANCE['legislation_only'])}
 The answer was drafted from that retrieved text by {r.get('author', 'unknown')}.
-Nobody legally qualified has checked it.
+Nobody legally qualified has checked it.{_COVERAGE_NOTE if mode in _SHOWS_CASE_LAW else ''}
 
 **Why this is required:** We test AILA by asking it the same questions over and
 over and comparing what it says against a fixed expected answer, which is the

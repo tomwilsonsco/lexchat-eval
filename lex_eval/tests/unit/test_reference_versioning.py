@@ -315,6 +315,57 @@ def test_a_required_citation_the_research_never_read_blocks_the_approval():
     assert "never retrieved" in review_problems(record)[0]
 
 
+JUDGMENT = "https://caselaw.nationalarchives.gov.uk/ewca/crim/2025/1150"
+
+
+def test_a_judgment_the_research_never_read_blocks_the_approval():
+    """No metric scores a case citation, so sign-off is the only place to catch one.
+
+    A case the author never opened, cited as if it had been, would otherwise
+    reach the eval as part of an approved reference answer.
+    """
+    record = _reference(
+        research_mode="legislation_and_case_law",
+        final_answer=f"See {SECTION_6} and {JUDGMENT}.",
+    )
+    apply_review(
+        record,
+        {
+            "verified": True,
+            "verified_by": "A Lawyer",
+            "verified_at": "2026-02-01",
+            "verdict": "Approve",
+            "citations_reviewed": True,
+            "required_citations": [SECTION_6],
+        },
+    )
+
+    assert not effective_verified(record)
+    assert "never read" in review_problems(record)[0]
+
+
+def test_a_judgment_the_research_read_does_not_block_the_approval():
+    record = _reference(
+        research_mode="legislation_and_case_law",
+        final_answer=f"See {SECTION_6} and {JUDGMENT}.",
+        cases_retrieved=[{"ncn": "[2025] EWCA Crim 1150", "url": JUDGMENT}],
+    )
+    apply_review(
+        record,
+        {
+            "verified": True,
+            "verified_by": "A Lawyer",
+            "verified_at": "2026-02-01",
+            "verdict": "Approve",
+            "citations_reviewed": True,
+            "required_citations": [SECTION_6],
+        },
+    )
+
+    assert review_problems(record) == []
+    assert effective_verified(record)
+
+
 def test_an_act_level_requirement_is_met_by_a_section_of_that_act():
     """Requiring the Act does not require a link to the Act's own front page."""
     record = _approved(required_citations=["ukpga/2018/12"])
@@ -353,3 +404,19 @@ def test_a_draft_document_tells_the_reviewer_who_drafted_it_and_why_they_matter(
     assert (
         "Your sign-off is what turns this from a draft into a legal benchmark" in text
     )
+
+
+def test_a_regnal_year_provision_can_be_marked_required():
+    """Acts before 1963 are dated by regnal year, not by calendar year.
+
+    Rejecting that id shape would stop a lawyer requiring any provision of, say,
+    the Occupiers' Liability Act 1957.
+    """
+    from lex_eval.reference.store import citation_id
+
+    assert citation_id("ukpga/Eliz2/5-6/31/section/1") == "ukpga/eliz2/5-6/31/section/1"
+    assert (
+        citation_id("http://www.legislation.gov.uk/id/ukpga/Eliz2/8-9/30")
+        == "ukpga/eliz2/8-9/30"
+    )
+    assert citation_id("not/a/thing") is None

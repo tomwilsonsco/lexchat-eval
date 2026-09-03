@@ -646,3 +646,39 @@ def test_a_legislation_answer_still_asks_for_citation_markup():
     markdown = render_markdown(_record())
 
     assert "each one Required, Background or Remove" in markdown
+
+
+def test_a_case_law_reviewer_is_told_what_the_database_does_not_index():
+    """Otherwise a reference answer inherits AILA's own blind spot and is signed off."""
+    from lex_eval.reference.store import render_markdown
+
+    rendered = render_markdown(
+        {
+            "question_id": 1,
+            "question": "Is it the law in Scotland?",
+            "research_mode": "case_law_only",
+            "generated_at": "2026-01-01T00:00:00+00:00",
+            "final_answer": "No judgment says so.",
+            "statements": ["Nothing was found."],
+        }
+    )
+
+    assert "does not index the Court" in rendered
+    assert "of Session" in rendered
+
+
+def test_a_legislation_reviewer_is_not_shown_the_case_law_coverage_note():
+    from lex_eval.reference.store import render_markdown
+
+    rendered = render_markdown(
+        {
+            "question_id": 1,
+            "question": "Does the duty apply?",
+            "research_mode": "legislation_only",
+            "generated_at": "2026-01-01T00:00:00+00:00",
+            "final_answer": "It does.",
+            "statements": ["The duty applies."],
+        }
+    )
+
+    assert "Find Case Law" not in rendered

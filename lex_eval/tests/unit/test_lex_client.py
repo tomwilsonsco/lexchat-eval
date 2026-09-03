@@ -113,7 +113,7 @@ def _tools_with_case_calls():
 
     tools = LexTools.__new__(LexTools)
     tools.api_calls = []
-    tools.outputs = []
+    tools.runs = []
     results = parse_case_law_atom(_ATOM) + [
         {
             "title": "Some Other Case",
@@ -212,7 +212,7 @@ def _tools_on(handler, monkeypatch):
     tools.base_url = LEX_API_URL
     tools._client = httpx.Client(transport=httpx.MockTransport(handler))
     tools.api_calls = []
-    tools.outputs = []
+    tools.runs = []
     return tools
 
 
@@ -297,3 +297,34 @@ def test_an_unfetched_judgment_is_not_counted_as_read(monkeypatch):
 
     assert tools.cases_retrieved() == []
     assert tools.retrieval_context() == []
+
+
+def test_a_network_failure_does_not_shift_later_outputs_onto_the_wrong_call(
+    monkeypatch,
+):
+    """A search that never reached the service must not steal the next one's result.
+
+    The failed run records no request, so pairing outputs to requests by
+    position would file the second search's result against the first search
+    and drop the second, misrepresenting which search found what.
+    """
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        if len(calls) <= 4:  # one attempt plus three retries, all refused
+            raise httpx.ConnectError("no route to host")
+        return httpx.Response(200, text=_ATOM)
+
+    tools = _tools_on(handler, monkeypatch)
+    tools.execute("search_case_law", {"query": "first"})
+    tools.execute("search_case_law", {"query": "second"})
+
+    called = tools.tools_called()
+    assert [t["input_parameters"]["query"] for t in called] == ["first", "second"]
+    assert "ConnectError" in called[0]["output"]
+    assert "Evans" in called[1]["output"]
+    assert tools.tool_sequence() == [
+        "Worker: search_case_law",
+        "Worker: search_case_law",
+    ]
