@@ -596,3 +596,190 @@ class TestTurnCapHalt:
         result = audit_capture(_MockClient(_sse_lines(audit)), "q", "test-model")
         assert result["max_turns_halted"] is None
         assert result["react_turns_max"] is None
+
+
+# ---------------------------------------------------------------------------
+# Tests, case law tools
+# ---------------------------------------------------------------------------
+
+# The National Archives returns Atom XML and LegalDocML, not JSON, so LexChat
+# records only a 300-character preview of the raw response under api_calls and
+# puts the parsed results in the tool's own raw_result. This fixture keeps that
+# shape: the api_call carries nothing usable, the tool result carries everything.
+AUDIT_CASE_LAW = {
+    "type": "audit",
+    "schema_version": 1,
+    "request_id": "c0c0c0c0",
+    "chat_mode": "research",
+    "research_mode": "case_law_only",
+    "provider": "openrouter",
+    "model": "openai/gpt-4o",
+    "answer": "The Court of Appeal held...",
+    "delegations": [
+        {
+            "id": "d1",
+            "kind": "delegation",
+            "step": None,
+            "title": None,
+            "brief": "Find case law on unlawful detention",
+            "report": "**Summary Answer (BLUF):**\nSee Burgin.",
+            "reformatted": False,
+            "error": None,
+            "started_at": 0.5,
+            "duration_s": 9.0,
+            "tools": [
+                {
+                    "id": "t1",
+                    "name": "search_case_law",
+                    "args": {"query": "unlawful detention"},
+                    "raw_result": json.dumps(
+                        {
+                            "results": [
+                                {
+                                    "title": "Burgin & Anor v Commission of Police",
+                                    "ncn": "[2011] EWHC 1835 (Admin)",
+                                    "court": "ewhc/admin",
+                                    "date": "2011-07-13",
+                                    "url": "https://caselaw.nationalarchives.gov.uk/ewhc/admin/2011/1835",
+                                }
+                            ],
+                            "total": 1,
+                            "query": "unlawful detention",
+                        }
+                    ),
+                    "final_result": "...",
+                    "summarised": False,
+                    "local_cache_hit": False,
+                    "memo_hit": False,
+                    "api_calls": [
+                        {
+                            "url": "https://caselaw.nationalarchives.gov.uk/atom.xml",
+                            "method": "GET",
+                            "request": {},
+                            "status": 200,
+                            "response": {"preview": '<?xml version="1.0"?><feed'},
+                        }
+                    ],
+                },
+                {
+                    "id": "t2",
+                    "name": "search_case_law",
+                    "args": {"query": "false imprisonment"},
+                    "raw_result": json.dumps(
+                        {
+                            "results": [
+                                {
+                                    "title": "Burgin & Anor v Commission of Police",
+                                    "ncn": "[2011] EWHC 1835 (Admin)",
+                                    "court": "ewhc/admin",
+                                    "date": "2011-07-13",
+                                    "url": "https://caselaw.nationalarchives.gov.uk/ewhc/admin/2011/1835",
+                                }
+                            ],
+                            "total": 1,
+                            "query": "false imprisonment",
+                        }
+                    ),
+                    "final_result": "...",
+                    "summarised": False,
+                    "local_cache_hit": False,
+                    "memo_hit": False,
+                    "api_calls": [],
+                },
+                {
+                    "id": "t3",
+                    "name": "get_case_law_text",
+                    "args": {
+                        "url": "https://caselaw.nationalarchives.gov.uk/ewhc/admin/2011/1835"
+                    },
+                    "raw_result": json.dumps(
+                        {
+                            "url": "https://caselaw.nationalarchives.gov.uk/ewhc/admin/2011/1835",
+                            "title": "Burgin & Anor v Commission of Police",
+                            "ncn": "[2011] EWHC 1835 (Admin)",
+                            "text": "The claimants were detained for six hours.",
+                        }
+                    ),
+                    "final_result": "...",
+                    "summarised": False,
+                    "local_cache_hit": False,
+                    "memo_hit": False,
+                    "api_calls": [
+                        {
+                            "url": "https://caselaw.nationalarchives.gov.uk/ewhc/admin/2011/1835/data.xml",
+                            "method": "GET",
+                            "request": {},
+                            "status": 200,
+                            "response": {"preview": "The claimants were detained"},
+                        }
+                    ],
+                },
+            ],
+        }
+    ],
+    "timings": {"total_ms": 9000, "llm_calls": 2, "total_cost_usd": 0.03},
+    "error": None,
+}
+
+
+class TestCaseLaw:
+    """Case law tools populate case_law_context and retrieval_context."""
+
+    def test_case_law_context_from_search(self):
+        """search_case_law results become case_law_context entries."""
+        lines = _sse_lines(AUDIT_CASE_LAW)
+        result = audit_capture(
+            _MockClient(lines), "test question", "test-model", "case_law_only"
+        )
+        assert result["case_law_context"] == [
+            {
+                "title": "Burgin & Anor v Commission of Police",
+                "ncn": "[2011] EWHC 1835 (Admin)",
+                "court": "ewhc/admin",
+                "date": "2011-07-13",
+                "url": "https://caselaw.nationalarchives.gov.uk/ewhc/admin/2011/1835",
+            }
+        ]
+
+    def test_same_case_from_two_searches_appears_once(self):
+        """A judgment returned by several searches is recorded once."""
+        lines = _sse_lines(AUDIT_CASE_LAW)
+        result = audit_capture(
+            _MockClient(lines), "test question", "test-model", "case_law_only"
+        )
+        assert len(result["case_law_context"]) == 1
+
+    def test_retrieval_context_has_case_summary_and_judgment_text(self):
+        """Both the search hit and the fetched judgment text are retrievable."""
+        lines = _sse_lines(AUDIT_CASE_LAW)
+        result = audit_capture(
+            _MockClient(lines), "test question", "test-model", "case_law_only"
+        )
+        ctx_str = " ".join(result["retrieval_context"])
+        assert "[2011] EWHC 1835 (Admin)" in ctx_str
+        assert "The claimants were detained for six hours." in ctx_str
+
+    def test_case_law_does_not_set_fallback_used(self):
+        """fallback_used tracks get_legislation_text only."""
+        lines = _sse_lines(AUDIT_CASE_LAW)
+        result = audit_capture(
+            _MockClient(lines), "test question", "test-model", "case_law_only"
+        )
+        assert result["fallback_used"] is False
+
+    def test_search_returning_no_results_adds_nothing(self):
+        """A zero-result search leaves case_law_context empty."""
+        audit = copy.deepcopy(AUDIT_CASE_LAW)
+        tools = audit["delegations"][0]["tools"]
+        for tool in tools:
+            if tool["name"] == "search_case_law":
+                tool["raw_result"] = json.dumps(
+                    {"results": [], "total": 0, "query": "nothing"}
+                )
+        del tools[2]  # the get_case_law_text call that followed the hit
+        lines = _sse_lines(audit)
+        result = audit_capture(
+            _MockClient(lines), "test question", "test-model", "case_law_only"
+        )
+        assert result["case_law_context"] == []
+        assert result["retrieval_context"] == []

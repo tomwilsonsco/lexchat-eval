@@ -1,9 +1,21 @@
 {
-  "scope_note": "REPLACE ME, 1-2 sentences on what this answer covers and what it deliberately excludes.",
+  "scope_note": "Covers whether the Care Reform (Scotland) Act 2025 is in force, distinguishing the provisions commenced by the Act itself from those left to commencement regulations. Covers whether commencement regulations have been made. Limited to legislation.",
   "steps": [
     {
-      "title": "REPLACE ME, short imperative title for the step",
-      "detail": "REPLACE ME, what exactly to find, in domain terms (Acts, provisions, duties)."
+      "title": "Read the Act's own commencement provision",
+      "detail": "Retrieve the commencement section of the Care Reform (Scotland) Act 2025 and record which provisions it brings into force automatically and which it leaves to regulations."
+    },
+    {
+      "title": "Establish the Royal Assent date",
+      "detail": "Retrieve the Act's enactment date so that any 'day after Royal Assent' commencement can be stated as an actual date."
+    },
+    {
+      "title": "Search for commencement regulations made under the power",
+      "detail": "Search for commencement instruments made under the Act's commencement power, by full title, short title and subject, and record what was and was not found."
+    },
+    {
+      "title": "Distinguish not found from not made",
+      "detail": "Before reporting that no commencement regulations exist, check whether the search tool returns commencement instruments for comparable Acts of the same year, and report a retrieval failure as a retrieval failure rather than as an absence."
     }
   ]
 }

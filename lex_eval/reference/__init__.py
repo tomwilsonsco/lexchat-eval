@@ -2,7 +2,7 @@
 
 Answers are researched against the live LEX API using LexChat's own legislation
 tools, so they rest on exactly the material LexChat would have retrieved, and are
-written by hand. Build them with:
+written up from that retrieved text by their recorded author. Build them with:
 
     python -m lex_eval.reference.build
 

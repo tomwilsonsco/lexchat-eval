@@ -23,6 +23,16 @@ correctly before search_legislation_sections's first call. This catches
 interleaved, multi-round re-querying that a first-occurrence-only check
 would miss entirely.
 
+The loop-back rule applies to single-shot ``research`` mode only.
+
+For ``chat_mode == "conversational"`` it is not applied either. A single
+conversational turn routinely asks about several instruments ("list the SSIs
+made under this section"), and answering one means going back to search after
+reading the first Act's sections. That is the same multi-Act interleaving the
+deep-research exemption below was written for, and it accounted for 16 of the
+22 order failures in the August 2026 question set, none of which was a
+research fault.
+
 For ``chat_mode == "deep_research"``, the loop-back rule is not applied: it
 is checked per plan step instead of per run, and only for first-occurrence
 order, not the no-revisit rule, since a single deep-research step routinely
@@ -204,6 +214,9 @@ def _check_tool_order(
     order_ok, detail, present = _check_first_occurrence_order(worker_seq)
     if not order_ok:
         return False, detail
+
+    if chat_mode == "conversational":
+        return True, " → ".join(name for name, _ in present)
 
     # First occurrences are in order. Now check the Worker didn't loop back to
     # an earlier phase after a later phase had already started, e.g. calling

@@ -139,6 +139,19 @@ class ConsistencyMetric(BaseMetric):
             f"(across {len(all_texts)} responses, "
             f"threshold: {self.threshold})"
         )
+
+        # A run that produced nothing scores 0.000 against this one by
+        # construction, not by measurement, and the score alone reads as two
+        # answers that disagree. Say which it is. The score still stands: a
+        # model that answers once and not the next time is inconsistent, and
+        # that is the result, not an artefact to be filtered away.
+        empty_refs = sum(1 for r in refs if not r)
+        if empty_refs:
+            self.reason += (
+                f". {empty_refs} of {len(refs)} comparison run(s) produced no "
+                "answer to compare against, so the similarity to those is 0.000 "
+                "because they are empty, not because the answers differ"
+            )
         if citation_mismatch is not None:
             self.reason += (
                 f". For information, section citations differ from a reference "

@@ -246,6 +246,27 @@ def test_reference_citing_nothing_is_not_scored():
     assert not metric.is_successful()
 
 
+def test_a_case_law_reference_expects_no_legislation_citations():
+    """The condition tests/eval/test_reference.py gates on for a case law question.
+
+    This metric reads legislation.gov.uk provisions only, so a reference whose
+    answer cites judgments has nothing for it to expect. The gate turns that
+    into a "not measured" row; without it the score would be 0.0 and read as
+    the response citing the wrong law.
+    """
+    from lex_eval.metrics.citation_agreement import expected_citations
+
+    reference = {
+        "research_mode": "case_law_only",
+        "final_answer": (
+            "The appeal was dismissed, see [Evans v R]"
+            "(https://caselaw.nationalarchives.gov.uk/ewca/crim/2025/1150)."
+        ),
+    }
+
+    assert expected_citations(reference) == (set(), "draft")
+
+
 # ---------------------------------------------------------------------------
 # Reference Answer Agreement
 # ---------------------------------------------------------------------------

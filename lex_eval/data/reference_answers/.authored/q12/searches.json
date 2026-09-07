@@ -1,0 +1,10 @@
+[
+  {
+    "tool": "search_case_law",
+    "args": {"query": "Graham Evans", "court": "ewca/crim"}
+  },
+  {
+    "tool": "get_case_law_text",
+    "args": {"url": "https://caselaw.nationalarchives.gov.uk/ewca/crim/2025/1150"}
+  }
+]

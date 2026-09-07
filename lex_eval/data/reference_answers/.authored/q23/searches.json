@@ -1,20 +1,7 @@
 [
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Social Security (Amendment) (Scotland) Act 2025"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Social Security (Amendment) (Scotland) Act 2025 Commencement No. 1 and Saving and Transitional Provisions Regulations 2025"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Social Security (Amendment) (Scotland) Act 2025 Commencement No. 2 Regulations 2025"
-    }
-  }
+  {"tool": "search_legislation", "args": {"query": "Social Security (Amendment) (Scotland) Act 2025"}},
+  {"tool": "search_legislation", "args": {"query": "Social Security (Amendment) (Scotland) Act 2025 Commencement Regulations"}},
+  {"tool": "search_legislation_sections", "args": {"query": "commencement coming into force short title", "legislation_id": "asp/2025/2"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "ssi/2025/119"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "ssi/2025/377"}}
 ]

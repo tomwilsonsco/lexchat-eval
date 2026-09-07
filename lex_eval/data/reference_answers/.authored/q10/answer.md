@@ -1,6 +1,4 @@
-# What makes up the Scottish Administration, as defined by section 126
-
-## 1. Summary Answer (BLUF)
+### 1. Summary Answer (BLUF)
 
 Section 126(6) of the Scotland Act 1998 defines the Scottish Administration as **the office-holders in the Scottish Administration and the members of the staff of the Scottish Administration**.
 
@@ -12,9 +10,9 @@ The non-ministerial offices are where the difficulty lies. Section 126(8) names 
 
 ---
 
-## 2. Detailed Analysis
+### 2. Detailed Analysis
 
-### 2.1 The definition
+#### 2.1 The definition
 
 > **Section 126 - Interpretation**
 > (6) References in this Act and in any other enactment to the Scottish Administration are to **the office-holders in the Scottish Administration and the members of the staff of the Scottish Administration**.
@@ -33,7 +31,7 @@ Note that the Scottish Administration is defined as a body of **persons**, offic
 
 Related provisions: section 44 constitutes the Scottish Government ([s.44](http://www.legislation.gov.uk/id/ukpga/1998/46/section/44)), section 48 deals with the Scottish Law Officers ([s.48](http://www.legislation.gov.uk/id/ukpga/1998/46/section/48)), and section 51 with the Civil Service ([s.51](http://www.legislation.gov.uk/id/ukpga/1998/46/section/51)).
 
-### 2.2 The three offices named in the Act
+#### 2.2 The three offices named in the Act
 
 Section 126(8)(a) names, exhaustively for that paragraph:
 
@@ -41,7 +39,7 @@ Section 126(8)(a) names, exhaustively for that paragraph:
 2. the Keeper of the Registers of Scotland
 3. the Keeper of the Records of Scotland
 
-### 2.3 The open-ended limb, and two worked examples
+#### 2.3 The open-ended limb, and two worked examples
 
 Section 126(8)(b) is the reason the list cannot be closed from the Act. Offices are added by Order in Council, each specifying further offices. Two retrieved examples show the mechanism:
 
@@ -60,7 +58,7 @@ Section 126(8)(b) is the reason the list cannot be closed from the Act. Offices 
 
 The 2012 Order also contains its own revocation provisions (articles 3 and 4), which is a reminder that the set of specified offices changes over time: later Orders both add and remove.
 
-### 2.4 Why a complete list cannot be given here
+#### 2.4 Why a complete list cannot be given here
 
 Three features combine:
 
@@ -74,7 +72,7 @@ Presenting the two Orders above as if they were the whole set would be wrong. Th
 
 ---
 
-## 3. Jurisdiction & Status
+### 3. Jurisdiction & Status
 
 - **Extent.** The Scotland Act 1998 extends to the United Kingdom and was returned in revised form.
 - **Limit of this answer.** The list of section 126(8)(b) offices is **incomplete by acknowledgement**, not by oversight. Two Orders were retrieved out of an unknown larger number, and no attempt is made here to state the current consolidated position.
@@ -82,7 +80,7 @@ Presenting the two Orders above as if they were the whole set would be wrong. Th
 
 ---
 
-## 4. References
+### 4. References
 
 - [Scotland Act 1998, s.126 - Interpretation](http://www.legislation.gov.uk/id/ukpga/1998/46/section/126)
 - [Scotland Act 1998, s.44 - The Scottish Government](http://www.legislation.gov.uk/id/ukpga/1998/46/section/44)

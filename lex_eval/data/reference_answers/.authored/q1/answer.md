@@ -1,14 +1,12 @@
-# Section 6, Data Protection Act 2018 — Meaning of "controller"
-
-## 1. Summary Answer (BLUF)
+### 1. Summary Answer (BLUF)
 
 Section 6 of the Data Protection Act 2018 (c. 12) is a short interpretive provision headed **"Meaning of 'controller'"**. It does **not** create a free-standing definition; instead it qualifies the definition of "controller" in Article 4(1)(7) of the UK GDPR, making it subject to subsection (2), section 209 and section 210, and it provides that where personal data is processed **only** for purposes, and by means, *required by an enactment*, the person on whom that statutory obligation falls is the controller. It sits in **Part 2 (general processing), Chapter 2** of the Act (Chapter 2 now headed "The UK GDPR"), and is in force as amended by the EU Exit Regulations 2019 and, in consequence, the Data (Use and Access) Act 2025.
 
 ---
 
-## 2. Detailed Analysis
+### 2. Detailed Analysis
 
-### 2.1 Full text of section 6 (as retrieved in current revised form)
+#### 2.1 Full text of section 6 (as retrieved in current revised form)
 
 > **Section 6 — Meaning of "controller"**
 >
@@ -24,7 +22,7 @@ Section 6 of the Data Protection Act 2018 (c. 12) is a short interpretive provis
 
 ([Data Protection Act 2018, s.6](http://www.legislation.gov.uk/id/ukpga/2018/12/section/6))
 
-### 2.2 Effect
+#### 2.2 Effect
 
 **(a) A modifier, not a definition.** Section 6 operates only on the UK GDPR's own definition of "controller" (Art. 4(1)(7)). This reciprocal relationship is confirmed on the UK GDPR side: the EU Exit Regulations amended Article 4(7) so that, after "determined", the words referring to Union/Member State law were replaced with "**(but see section 6 of the 2018 Act)**" ([SI 2019/419, Sch. 1, para. 6(3)](http://www.legislation.gov.uk/id/uksi/2019/419/schedule/1)).
 
@@ -34,7 +32,7 @@ Section 6 of the Data Protection Act 2018 (c. 12) is a short interpretive provis
 
 **(c) Section 6 is subject to ss.209 and 210.** Subsection (1)(b)–(c) subordinates the definition to those two sections. Note: the retrieval did not return the text of ss.209–210, and the available database extract therefore does not confirm their subject-matter beyond the fact that both were amended by SI 2019/419 (Sch. 2, paras. 88–89) to substitute "UK GDPR" for "GDPR" in s.209(2)–(4) and s.210(2)–(3). **The available database does not contain, in the material retrieved, the operative text of sections 209 and 210.**
 
-### 2.3 Definitions established / interaction with other definitions
+#### 2.3 Definitions established / interaction with other definitions
 
 Section 6 is one of four controllership provisions signposted by the Act's central definitions section:
 
@@ -47,7 +45,7 @@ Related definitional architecture:
 - **s.206** — index of defined expressions (s.3(15)).
 - Note s.6 defines *only* "controller"; there is no "processor" limb in Part 2 (contrast s.32(3) and s.83(3), which each define "processor" for Parts 3 and 4 respectively).
 
-### 2.4 Place within the structure of the Act
+#### 2.4 Place within the structure of the Act
 
 | Level | Location |
 |---|---|
@@ -60,7 +58,7 @@ The structural evidence comes from the amending instrument: SI 2019/419, Sch. 2,
 
 Note also that Chapter 3 of Part 2 (the "applied GDPR" regime, ss.21–28) was substantially dismantled by the same Regulations, and Schedule 6 (which had applied the GDPR to non-EU-law processing) was omitted (SI 2019/419, Sch. 2, paras. 27–36, 96; and see [Sch. 6 DPA 2018](http://www.legislation.gov.uk/id/ukpga/2018/12/schedule/6), now shown as repealed).
 
-### 2.5 Amendments since enactment
+#### 2.5 Amendments since enactment
 
 **(1) SI 2019/419 — the EU Exit Regulations (in force IP completion day)**
 
@@ -85,13 +83,13 @@ This is purely consequential on s.67(1)(a) restructuring Article 4 of the UK GDP
 
 These do not alter the text of s.6 but affect the surrounding definitional context.
 
-### 2.6 Case law interpreting section 6
+#### 2.6 Case law interpreting section 6
 
 **The available database does not contain information on this specific issue.** The LEX tools accessible here index UK primary and secondary legislation only; they do not return judicial decisions. No case law interpreting s.6 can be verified from the retrieved data, and no citations are supplied from outside the tool output.
 
 ---
 
-## 3. Jurisdiction & Status
+### 3. Jurisdiction & Status
 
 - **Extent:** United Kingdom. The metadata for both the Act and s.6 records `extent: ["United Kingdom"]`.
 - **Status of the Act:** `revised` (i.e. the text held incorporates effected amendments) — [ukpga/2018/12](http://www.legislation.gov.uk/id/ukpga/2018/12).
@@ -101,7 +99,7 @@ These do not alter the text of s.6 but affect the surrounding definitional conte
 
 ---
 
-## 4. References
+### 4. References
 
 **Primary provision**
 - [Data Protection Act 2018, s.6 — Meaning of "controller"](http://www.legislation.gov.uk/id/ukpga/2018/12/section/6)

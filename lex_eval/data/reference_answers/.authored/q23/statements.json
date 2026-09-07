@@ -1,10 +1,9 @@
 {
-  "_comment": "The statements Reference Answer Agreement scores a response against. Write only the points a correct answer MUST make, at most 5, most important first. Do not pad the list to reach 5: a statement no correct answer needs to make just lowers every score. Each must be one sentence, must stand on its own (the judge is shown these and the response under test, never the reference answer), and must say what the law is rather than what this document does. Delete the unused entries and this _comment key.",
   "statements": [
-    "REPLACE ME, statement 1, the most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 2, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 3, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 4, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 5, the next most important thing a correct answer must say (delete if not needed)."
+    "The Social Security (Amendment) (Scotland) Act 2025 (2025 asp 2) exists and is partly in force, so an answer that the Act cannot be found, or that it is wholly in force, or that it is wholly uncommenced, is wrong.",
+    "The Social Security (Amendment) (Scotland) Act 2025 (Commencement No. 1 and Saving and Transitional Provisions) Regulations 2025 (SSI 2025/119) brought sections 2, 9, 17, 20, 21, 22 and 23 of the Act into force on 10 May 2025.",
+    "Section 27 of the Act brings section 27 itself and sections 24, 25, 26 and 28 into force the day after Royal Assent, and leaves the remaining provisions to come into force on days appointed by the Scottish Ministers by regulations.",
+    "More than one commencement instrument has been made under section 27, so SSI 2025/119 must not be presented as the only or final commencement of the Act.",
+    "Regulations under section 27 may make different provision for different purposes, so a provision can be in force for some purposes and not others."
   ]
 }

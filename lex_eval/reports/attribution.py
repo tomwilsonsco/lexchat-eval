@@ -114,7 +114,7 @@ def attribution_for_record(
         return {"stage": TECH, "detail": detail, "ids": []}
 
     if references is None:
-        references = load_reference_answers(verified_only=False)
+        references = load_reference_answers()
     reference = references.get(record.get("question_id"))
     if not reference:
         return {

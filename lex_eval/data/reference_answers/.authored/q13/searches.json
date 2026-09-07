@@ -1,26 +1,8 @@
 [
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Education (Scotland) Act 1962"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Education (Scotland) Act 1962 section 117 regulations"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Education (Scotland) Act 1962 consolidation"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Education (Scotland) Act 1962 section 117 expenses regulations"
-    }
-  }
+  {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1962"}},
+  {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1962 section 117 regulations"}},
+  {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1962 consolidation"}},
+  {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1980 section 117"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "ukpga/1962/47"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "ukpga/Eliz2/10-11/47"}}
 ]

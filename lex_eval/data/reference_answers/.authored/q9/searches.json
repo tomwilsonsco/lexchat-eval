@@ -1,0 +1,69 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Freedom of Information (Scotland) Act 2002"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2002/13",
+      "query": "confidentiality of communications legal professional privilege exemption"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "asp/2002/13",
+      "query": "effect of exemptions public interest test absolute exemptions environmental information"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Environmental Information (Scotland) Regulations 2004"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2004/520",
+      "query": "exceptions confidentiality of proceedings internal communications course of justice"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/2000/36",
+      "query": "legal professional privilege exemption; effect of the exemptions in Part II absolute exemption public interest; environmental information"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2004/3391",
+      "query": "exceptions to the duty to disclose environmental information; course of justice; internal communications; presumption in favour of disclosure; emissions"
+    }
+  },
+  {
+    "tool": "search_case_law",
+    "args": {
+      "query": "Prudential legal advice privilege accountants",
+      "court": "uksc"
+    }
+  },
+  {
+    "tool": "get_case_law_text",
+    "args": {
+      "url": "https://caselaw.nationalarchives.gov.uk/uksc/2013/1"
+    }
+  },
+  {
+    "tool": "search_case_law",
+    "args": {
+      "query": "legal professional privilege",
+      "court": "csih"
+    }
+  }
+]

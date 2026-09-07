@@ -1,14 +1,7 @@
 [
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Social Security (Scotland) Act 2018"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Disability Assistance Scottish Adult Disability Living Allowance Consequential Amendment Revocation and Saving Provision Regulations 2024"
-    }
-  }
+  {"tool": "search_legislation", "args": {"query": "Social Security (Scotland) Act 2018"}},
+  {"tool": "search_legislation", "args": {"query": "Social Security (Scotland) Act 2018 section 95 ancillary provision regulations"}},
+  {"tool": "search_legislation", "args": {"query": "Disability Assistance Scottish Adult Disability Living Allowance Consequential Amendment Revocation and Saving Provision Regulations 2024"}},
+  {"tool": "search_legislation_sections", "args": {"query": "ancillary provision incidental supplementary consequential transitional regulations", "legislation_id": "asp/2018/9"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "ssi/2024/311"}}
 ]

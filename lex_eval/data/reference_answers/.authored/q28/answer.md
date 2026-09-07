@@ -1,9 +1,7 @@
-# How soon after birth must a bovine animal be officially identified in Scotland?
+### Summary Answer (BLUF)
 
-## Summary Answer (BLUF)
-
-Under **Schedule 1, paragraph 1 of the Cattle Identification (Scotland) Regulations 2007 (SSI
-2007/174)**, the deadline for applying ear tags depends on the type of animal:
+Under **[Schedule 1, paragraph 1](https://www.legislation.gov.uk/ssi/2007/174/schedule/1) of the Cattle
+Identification (Scotland) Regulations 2007 (SSI 2007/174)**, the deadline for applying ear tags depends on the type of animal:
 
 | Animal | Deadline |
 | --- | --- |
@@ -14,11 +12,12 @@ Under **Schedule 1, paragraph 1 of the Cattle Identification (Scotland) Regulati
 So for a typical beef animal the answer is **20 days**; for a dairy animal the first tag is due much
 sooner, **within 36 hours**.
 
-## Detailed Analysis
+### Detailed Analysis
 
-### The governing provision
+#### The governing provision
 
-Schedule 1 to SSI 2007/174 is headed "Application of ear tags". Paragraph 1 sets the time limits for
+[Schedule 1 to SSI 2007/174](https://www.legislation.gov.uk/ssi/2007/174/schedule/1) is headed "Application of ear
+tags". Paragraph 1 sets the time limits for
 a keeper to apply ear tags to an animal born on the keeper's holding, in accordance with Article
 4(1) of Regulation (EC) No 1760/2000.
 
@@ -35,39 +34,49 @@ Paragraph 1(4) adds that a keeper whose animal is born on an additional holding 
 indicating the unique numeric identity either of that keeper's principal holding or of the
 additional holding on which the animal was born.
 
-### Related deadlines, which are not the identification deadline
+#### Related deadlines, which are not the identification deadline
 
 Two other deadlines sit close to this and are easily confused with it.
 
-**Cattle passport.** An application for a cattle passport runs from a starting point that itself
+**Cattle passport.** ([regulation 7](https://www.legislation.gov.uk/ssi/2007/174/regulation/7) and
+[schedule 3](https://www.legislation.gov.uk/ssi/2007/174/schedule/3).) An application for a cattle passport runs from a starting point that itself
 varies by animal: for a bison, the birth of the animal; for a dairy animal, the date the second ear
 tag is applied; and in any other case, the date the ear tags are applied.
 
-**Holding register.** The birth must be recorded in the holding register **within 7 days** in the
+**Holding register.** ([Schedule 4](https://www.legislation.gov.uk/ssi/2007/174/schedule/4).) The birth must be
+recorded in the holding register **within 7 days** in the
 case of a dairy animal, and **within 30 days** in the case of an animal other than a dairy animal.
 
-### Replacement tags
+#### Replacement tags
 
-Where an ear tag on an animal born on or after 1 January 1998 is removed, lost or becomes illegible,
+([Schedule 1, paragraph 3](https://www.legislation.gov.uk/ssi/2007/174/schedule/1); see also
+[regulation 5](https://www.legislation.gov.uk/ssi/2007/174/regulation/5).) Where an ear tag on an animal born on or
+after 1 January 1998 is removed, lost or becomes illegible,
 the keeper must apply a replacement bearing the same identification code **within 28 days** of
 ascertaining that fact. No ear tag may be removed, modified or replaced without permission.
 
-### Currency of the figures
+#### Currency of the figures
 
-The Regulations have been amended, including by SSI 2007/312, SSI 2011/412 and SSI 2017/133. Nothing
+The Regulations have been amended, including by [SSI 2007/312](https://www.legislation.gov.uk/ssi/2007/312),
+[SSI 2011/412](https://www.legislation.gov.uk/ssi/2011/412) and [SSI 2017/133](https://www.legislation.gov.uk/ssi/2017/133). Nothing
 retrieved shows the Schedule 1 paragraph 1 time limits being altered by those instruments, so the
 figures above stand.
 
-## Jurisdiction & Status
+### Jurisdiction & Status
 
-Scotland. The Cattle Identification (Scotland) Regulations 2007 (SSI 2007/174) extend to Scotland
+Scotland. The [Cattle Identification (Scotland) Regulations 2007 (SSI 2007/174)](https://www.legislation.gov.uk/ssi/2007/174)
+extend to Scotland
 and are in force, status "revised".
 
-## References
+### References
 
-- The Cattle Identification (Scotland) Regulations 2007 (SSI 2007/174), Schedule 1, para 1
-  (application of ear tags)
-- The Cattle Identification (Scotland) Regulations 2007, Schedule 1, para 3 (replacement ear tags)
-- The Cattle Identification (Scotland) Regulations 2007, provisions on cattle passports and the
-  holding register
+- The Cattle Identification (Scotland) Regulations 2007 (SSI 2007/174),
+  [Schedule 1](https://www.legislation.gov.uk/ssi/2007/174/schedule/1), para 1 (application of ear tags)
+- The Cattle Identification (Scotland) Regulations 2007,
+  [Schedule 1](https://www.legislation.gov.uk/ssi/2007/174/schedule/1), para 3 (replacement ear tags)
+- The Cattle Identification (Scotland) Regulations 2007,
+  [regulation 7](https://www.legislation.gov.uk/ssi/2007/174/regulation/7) and [Schedule 3](https://www.legislation.gov.uk/ssi/2007/174/schedule/3)
+  (cattle passports), [Schedule 4](https://www.legislation.gov.uk/ssi/2007/174/schedule/4) (holding register)
+- The amending instruments: [SSI 2007/312](https://www.legislation.gov.uk/ssi/2007/312),
+  [SSI 2011/412](https://www.legislation.gov.uk/ssi/2011/412), [SSI 2017/133](https://www.legislation.gov.uk/ssi/2017/133)
 - Regulation (EC) No 1760/2000, Article 4(1)

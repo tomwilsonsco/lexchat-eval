@@ -1,7 +1,7 @@
 """
 Reference answer agreement metric.
 
-Scores a response against the statements written alongside the hand written
+Scores a response against the statements written alongside the authored
 reference ("gold") answer for the same question: how many of them does the
 response also state, and does it contradict any.
 """
@@ -109,7 +109,7 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
     """
     Evaluates how many of a question's reference statements the response makes.
 
-    The statements are written once, alongside the hand written reference answer,
+    The statements are written once, alongside the reference answer,
     and stored with it. The judge is given that fixed list and labels each entry
     stated, contradicted or missing. It never chooses the list itself, which is
     what makes the metric repeatable: when the judge picked the points on every

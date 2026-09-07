@@ -1,0 +1,56 @@
+[
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Homeless Persons Suspension of Referrals between Local Authorities Scotland Order 2022"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/1987/26",
+      "query": "power of the Scottish Ministers to modify application of sections 31 and 32; power to modify section 33; permanent accommodation does not apply in such circumstances as may be prescribed"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/1987/26",
+      "query": "duty to secure permanent accommodation homeless persons local connection referral another local authority interim accommodation"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/1987/26",
+      "query": "housing support services assessment prescribed regulations different provision"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2022/356",
+      "query": "suspension of referrals local connection section 33"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ssi/2014/243",
+      "query": "unsuitable accommodation needs of the household exemptions"
+    }
+  },
+  {
+    "tool": "search_case_law",
+    "args": {
+      "query": "homelessness duty Scotland local authority accommodation Housing Scotland Act 1987",
+      "court": "uksc"
+    }
+  },
+  {
+    "tool": "get_case_law_text",
+    "args": {
+      "url": "https://caselaw.nationalarchives.gov.uk/uksc/2025/13"
+    }
+  }
+]

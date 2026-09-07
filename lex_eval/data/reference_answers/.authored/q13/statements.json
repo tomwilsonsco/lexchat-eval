@@ -1,10 +1,8 @@
 {
-  "_comment": "The statements Reference Answer Agreement scores a response against. Write only the points a correct answer MUST make, at most 5, most important first. Do not pad the list to reach 5: a statement no correct answer needs to make just lowers every score. Each must be one sentence, must stand on its own (the judge is shown these and the response under test, never the reference answer), and must say what the law is rather than what this document does. Delete the unused entries and this _comment key.",
   "statements": [
-    "REPLACE ME, statement 1, the most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 2, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 3, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 4, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 5, the next most important thing a correct answer must say (delete if not needed)."
+    "No secondary legislation has ever been made under section 117 of the Education (Scotland) Act 1962, so the correct answer is that the list is empty.",
+    "No statutory instrument should be listed as having been made under section 117, because no retrieved source connects any instrument to that enabling power.",
+    "The Education (Scotland) Act 1962 could not be retrieved from the available legislation sources, so the terms of its section 117 were never read and nothing should be asserted about them.",
+    "The Education (Scotland) Act 1962 is a different statute from the Education (Scotland) Act 1980 that superseded it, and an answer about section 117 of the 1980 Act does not answer this question."
   ]
 }

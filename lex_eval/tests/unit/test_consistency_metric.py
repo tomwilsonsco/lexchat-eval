@@ -106,3 +106,48 @@ def test_citation_check_skipped_when_no_citations_present():
 
     assert metric.is_successful()
     assert "citations differ" not in metric.reason
+
+
+class TestAnEmptyComparisonRunIsNamed:
+    """A run that answered once and asked for clarification the next time is
+    genuinely inconsistent, so the 0.000 stands and the row stays scored.
+
+    What the bare number does not say is *why* it is zero. Read as a content
+    comparison it says the two answers diverged; what happened is that one run
+    produced nothing. The reason has to distinguish those, because the fix for
+    each is different: one is a model that contradicts itself, the other is a
+    model that sometimes declines.
+
+    Infrastructure failures are a separate case and never arrive here at all,
+    ``load_records`` drops ``is_error`` rows before the comparison is built.
+    """
+
+    def test_an_empty_partner_still_scores_zero(self):
+        answer = "Section 38 of the Transport (Scotland) Act 2001 confers it. " * 3
+        metric = ConsistencyMetric(reference_outputs=[""])
+        score = metric.measure(LLMTestCase(input="q", actual_output=answer))
+        assert score == 0.0
+        assert not metric.is_successful()
+
+    def test_an_empty_partner_is_named_in_the_reason(self):
+        answer = "Section 38 of the Transport (Scotland) Act 2001 confers it. " * 3
+        metric = ConsistencyMetric(reference_outputs=[""])
+        metric.measure(LLMTestCase(input="q", actual_output=answer))
+        assert "produced no answer to compare against" in metric.reason
+        assert "not because the answers differ" in metric.reason
+
+    def test_two_real_answers_carry_no_such_note(self):
+        answer = "Section 38 of the Transport (Scotland) Act 2001 confers it. " * 3
+        metric = ConsistencyMetric(reference_outputs=[answer])
+        metric.measure(LLMTestCase(input="q", actual_output=answer))
+        assert "produced no answer" not in metric.reason
+
+    def test_a_short_non_answer_is_still_compared_normally(self):
+        """Both runs of the s.117 question halted on the turn cap and returned
+        a stub. Those are real documents, they compare to each other normally,
+        and the resulting score is a real measurement."""
+        stub_a = "The research agent wasn't able to complete a comprehensive search."
+        stub_b = "The research agent wasn't able to complete a comprehensive search."
+        metric = ConsistencyMetric(reference_outputs=[stub_b])
+        metric.measure(LLMTestCase(input="q", actual_output=stub_a))
+        assert "produced no answer" not in metric.reason

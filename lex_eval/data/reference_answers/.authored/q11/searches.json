@@ -1,0 +1,9 @@
+[
+  {"tool": "search_legislation", "args": {"query": "Occupiers Liability Act 1957"}},
+  {"tool": "search_legislation_sections", "args": {"legislation_id": "ukpga/Eliz2/5-6/31", "query": "meaning of occupier persons occupying or having control over premises common duty of care"}},
+  {"tool": "search_legislation_sections", "args": {"legislation_id": "ukpga/Eliz2/8-9/30", "query": "occupier of premises meaning occupying or having control of land"}},
+  {"tool": "search_legislation_sections", "args": {"legislation_id": "ukpga/1984/3", "query": "duty of occupier to persons other than visitors meaning of occupier"}},
+  {"tool": "search_case_law", "args": {"query": "Wheat v E Lacon occupier sufficient degree of control"}},
+  {"tool": "get_case_law_text", "args": {"url": "https://caselaw.nationalarchives.gov.uk/ewca/civ/2023/1507"}},
+  {"tool": "get_case_law_text", "args": {"url": "https://caselaw.nationalarchives.gov.uk/ewhc/kb/2025/2204"}}
+]

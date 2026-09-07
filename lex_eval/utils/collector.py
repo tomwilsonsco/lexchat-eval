@@ -27,6 +27,7 @@ def attach_metric(
     judge_llm: Optional[str] = None,
     judge_tokens: Optional[int] = None,
     measured: Optional[bool] = None,
+    reference: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Attach metric result data to the pytest test item.
@@ -52,7 +53,18 @@ def attach_metric(
         than at each call site is deliberate, so that a metric cannot forget and
         silently put a placeholder 0.0 into a mean. Pass it explicitly only to
         override that.
+    reference
+        The reference answer this metric scored against, for the metrics that
+        use one. The row records which version it was and whether it was signed
+        off, so a score taken against an answer that has since been corrected
+        is re-run rather than believed. Derived here, so a reference metric
+        cannot forget to record it.
     """
+    from lex_eval.reference.store import reference_version
+
+    reference_sha256, reference_mode = (
+        reference_version(reference) if reference else (None, None)
+    )
     request.node._metric_data = {
         "response_id": record.get("response_id"),
         "llm_name": record["llm_name"],
@@ -71,4 +83,6 @@ def attach_metric(
         "measured": (
             (not reason_is_not_measured(reason)) if measured is None else measured
         ),
+        "reference_sha256": reference_sha256,
+        "reference_mode": reference_mode,
     }

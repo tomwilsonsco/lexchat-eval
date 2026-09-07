@@ -755,6 +755,60 @@ def backfill_halt_columns(path: Optional[Path] = None) -> int:
     return filled
 
 
+def backfill_case_law_context(path: Optional[Path] = None) -> int:
+    """Re-derive retrieval_context and case_law_context from stored audit_json.
+
+    Case law tool results were read from the wrong place until Sept 2026, so
+    responses gathered before then recorded no retrieved case law even when the
+    Worker found real judgments. The stored audit event holds everything needed,
+    so those rows can be repaired without gathering them again.
+
+    Only rows whose re-derived values differ are written, so this is safe to run
+    repeatedly. Returns the number of rows updated.
+    """
+    from .audit_capture import derive_retrieval
+
+    path = path or DEFAULT_DB
+    if not path.exists():
+        print("Database not found:", path)
+        return 0
+
+    conn = get_connection(path)
+    try:
+        init_db(conn)
+        rows = conn.execute(
+            "SELECT id, audit_json, retrieval_context, case_law_context "
+            "FROM responses WHERE audit_json IS NOT NULL"
+        ).fetchall()
+
+        updated = 0
+        for row_id, audit_json, old_retrieval, old_case_law in rows:
+            try:
+                audit = json.loads(audit_json)
+            except (ValueError, TypeError):
+                logger.warning("response %s: audit_json is not valid JSON", row_id)
+                continue
+            retrieval, case_law, _ = derive_retrieval(audit)
+            new_retrieval = json.dumps(retrieval)
+            new_case_law = json.dumps(case_law)
+            if new_retrieval == (old_retrieval or "") and new_case_law == (
+                old_case_law or ""
+            ):
+                continue
+            conn.execute(
+                "UPDATE responses SET retrieval_context = ?, case_law_context = ? "
+                "WHERE id = ?",
+                [new_retrieval, new_case_law, row_id],
+            )
+            updated += 1
+        conn.commit()
+    finally:
+        conn.close()
+
+    print(f"Re-derived retrieval context on {updated} of {len(rows)} row(s).")
+    return updated
+
+
 def backfill_measured_column(path: Optional[Path] = None) -> int:
     """Set measured = FALSE on eval rows written before the column existed.
 
@@ -859,7 +913,8 @@ _METRIC_NAME_RE = re.compile(r"^[a-z_]+$")
 
 _EVAL_COLUMNS = (
     "response_id, llm_name, question_id, question, score, threshold, "
-    "passed, reason, error, tools_used, run_at, judge_llm, judge_tokens, measured"
+    "passed, reason, error, tools_used, run_at, judge_llm, judge_tokens, measured, "
+    "reference_sha256, reference_mode"
 )
 
 # Reasons a metric writes when it could not measure a response at all, e.g. a
@@ -937,7 +992,9 @@ def init_eval_table(conn: duckdb.DuckDBPyConnection, metric: str) -> None:
             run_at       TEXT    NOT NULL,
             judge_llm    TEXT,
             judge_tokens INTEGER,
-            measured     BOOLEAN NOT NULL DEFAULT TRUE
+            measured     BOOLEAN NOT NULL DEFAULT TRUE,
+            reference_sha256 TEXT,
+            reference_mode   TEXT
         );
     """)
     # Tables created before `measured` existed. DuckDB does not allow a NOT NULL
@@ -946,6 +1003,12 @@ def init_eval_table(conn: duckdb.DuckDBPyConnection, metric: str) -> None:
     conn.execute(
         f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS measured BOOLEAN DEFAULT TRUE"
     )
+    # Which reference answer a row was scored against, NULL for the metrics
+    # that use none and for rows written before the columns existed. A NULL
+    # never matches a current reference, so those rows read as out of date and
+    # are scored again rather than being trusted.
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS reference_sha256 TEXT")
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS reference_mode TEXT")
 
 
 def insert_eval_result(
@@ -972,6 +1035,8 @@ def insert_eval_result(
             record.get("judge_llm") or None,
             record.get("judge_tokens"),
             bool(record.get("measured", True)),
+            record.get("reference_sha256") or None,
+            record.get("reference_mode") or None,
         ],
     )
 
@@ -1002,12 +1067,59 @@ def clear_eval_results(
         conn.execute(f"DELETE FROM {table}")
 
 
-def covered_response_ids(conn: duckdb.DuckDBPyConnection, metric: str) -> set:
-    """Return the set of response_ids already scored for *metric*."""
+def covered_response_ids(
+    conn: duckdb.DuckDBPyConnection,
+    metric: str,
+    reference_versions: Optional[Dict[int, tuple]] = None,
+) -> set:
+    """Return the set of response_ids already scored for *metric*.
+
+    Pass *reference_versions*, question_id -> (reference_sha256,
+    reference_mode), for a metric scored against the reference answers. A row
+    calculated against a reference that has since changed, or against a draft
+    that has since been signed off, does not count as covering its response:
+    the score is out of date and has to be taken again.
+    """
     init_eval_table(conn, metric)
     table = _eval_table_name(metric)
-    rows = conn.execute(f"SELECT DISTINCT response_id FROM {table}").fetchall()
-    return {r[0] for r in rows}
+    if reference_versions is None:
+        rows = conn.execute(f"SELECT DISTINCT response_id FROM {table}").fetchall()
+        return {r[0] for r in rows}
+
+    rows = conn.execute(
+        f"SELECT response_id, question_id, reference_sha256, reference_mode "
+        f"FROM {table}"
+    ).fetchall()
+    return {
+        response_id
+        for response_id, question_id, sha, mode in rows
+        if reference_versions.get(question_id, (None, None)) == (sha, mode)
+    }
+
+
+def clear_outdated_eval_results(
+    conn: duckdb.DuckDBPyConnection, metric: str, reference_versions: Dict[int, tuple]
+) -> int:
+    """Delete rows scored against a reference version that is no longer current.
+
+    Returns how many were deleted. Replacing them rather than leaving them is
+    what stops the dashboard averaging a score taken against a corrected answer
+    together with one taken against the answer that replaced it.
+    """
+    init_eval_table(conn, metric)
+    table = _eval_table_name(metric)
+    rows = conn.execute(
+        f"SELECT id, question_id, reference_sha256, reference_mode FROM {table}"
+    ).fetchall()
+    outdated = [
+        row_id
+        for row_id, question_id, sha, mode in rows
+        if reference_versions.get(question_id, (None, None)) != (sha, mode)
+    ]
+    if outdated:
+        placeholders = ", ".join("?" for _ in outdated)
+        conn.execute(f"DELETE FROM {table} WHERE id IN ({placeholders})", outdated)
+    return len(outdated)
 
 
 def load_eval_results(
@@ -1058,6 +1170,8 @@ def load_eval_results(
         judge_llm,
         judge_tokens,
         measured,
+        reference_sha256,
+        reference_mode,
     ) in rows:
         results.append(
             {
@@ -1079,6 +1193,8 @@ def load_eval_results(
                 "judge_llm": judge_llm,
                 "judge_tokens": judge_tokens,
                 "measured": True if measured is None else bool(measured),
+                "reference_sha256": reference_sha256,
+                "reference_mode": reference_mode,
             }
         )
     return results
@@ -1360,6 +1476,13 @@ if __name__ == "__main__":
         "their placeholder score of 0.0 is kept out of every mean",
     )
     _parser.add_argument(
+        "--backfill-case-law",
+        action="store_true",
+        help="Re-derive retrieval_context and case_law_context from stored "
+        "audit_json, repairing responses gathered before case law tool results "
+        "were read correctly",
+    )
+    _parser.add_argument(
         "--delete-response",
         metavar="ID",
         type=int,
@@ -1384,6 +1507,8 @@ if __name__ == "__main__":
         completeness_report()
     elif _args.backfill_measured:
         backfill_measured_column()
+    elif _args.backfill_case_law:
+        backfill_case_law_context()
     elif _args.delete_response is not None:
         delete_response(_args.delete_response)
     elif _args.clean or _args.dry_run:

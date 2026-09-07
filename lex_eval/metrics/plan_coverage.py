@@ -2,7 +2,7 @@
 Plan coverage metric.
 
 Scores a deep-research plan's steps against the statements written alongside
-the hand written reference answer for the same question: does the plan the
+the authored reference answer for the same question: does the plan the
 lawyer approved actually set out to cover them, before any research happens.
 """
 

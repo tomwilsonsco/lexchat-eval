@@ -1,47 +1,11 @@
 [
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Shops Act 1950 definition of shop"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "statutory definition of shop Scotland"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Licensing (Scotland) Act shop premises definition"
-    }
-  },
-  {
-    "tool": "search_legislation",
-    "args": {
-      "query": "Shops Act 1950"
-    }
-  },
-  {
-    "tool": "search_legislation_sections",
-    "args": {
-      "legislation_id": "asp/2005/16",
-      "query": "meaning of shop shop premises definition"
-    }
-  },
-  {
-    "tool": "search_legislation_sections",
-    "args": {
-      "legislation_id": "asp/2007/13",
-      "query": "definition of shop large shop retail"
-    }
-  },
-  {
-    "tool": "search_legislation_sections",
-    "args": {
-      "legislation_id": "ukpga/1964/50",
-      "query": "meaning of shop definition tenancy"
-    }
-  }
+  {"tool": "search_legislation", "args": {"query": "Shops Act 1950"}},
+  {"tool": "search_legislation", "args": {"query": "Shops Act 1950 sections 38 39 Sunday trading"}},
+  {"tool": "search_legislation", "args": {"query": "shop premises retail sale of goods definition Scotland"}},
+  {"tool": "search_legislation", "args": {"query": "Tenancy of Shops (Scotland) Act 1949"}},
+  {"tool": "search_legislation_sections", "args": {"query": "definition of shop large shop retail", "legislation_id": "asp/2007/13"}},
+  {"tool": "search_legislation_sections", "args": {"query": "shop worker shop premises meaning retail trade or business", "legislation_id": "ukpga/1996/18"}},
+  {"tool": "search_legislation_sections", "args": {"query": "meaning of retail premises retail worker shop", "legislation_id": "asp/2021/6"}},
+  {"tool": "search_legislation_sections", "args": {"query": "meaning of shop shop premises definition", "legislation_id": "asp/2005/16"}},
+  {"tool": "search_legislation_sections", "args": {"query": "meaning of shop definition tenancy", "legislation_id": "ukpga/1964/50"}}
 ]

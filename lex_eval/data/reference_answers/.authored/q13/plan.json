@@ -1,9 +1,21 @@
 {
-  "scope_note": "REPLACE ME, 1-2 sentences on what this answer covers and what it deliberately excludes.",
+  "scope_note": "Covers whether any secondary legislation was made under the enabling power in section 117 of the Education (Scotland) Act 1962, and whether that Act can be retrieved at all. Limited to legislation. Does not cover section 117 of the later Education (Scotland) Act 1980.",
   "steps": [
     {
-      "title": "REPLACE ME, short imperative title for the step",
-      "detail": "REPLACE ME, what exactly to find, in domain terms (Acts, provisions, duties)."
+      "title": "Retrieve the Education (Scotland) Act 1962",
+      "detail": "Attempt to retrieve the Act by both its modern and regnal-year identifiers, and by search, and record whether it is available at all."
+    },
+    {
+      "title": "Read section 117 and its enabling power",
+      "detail": "If the Act is retrievable, read section 117 and establish what power it confers and on whom."
+    },
+    {
+      "title": "Search for instruments made under the power",
+      "detail": "Search for secondary legislation made under section 117, and for each candidate establish whether the retrieved material actually records section 117 as its enabling provision."
+    },
+    {
+      "title": "Decide between an empty list and an unanswerable question",
+      "detail": "Distinguish instruments that merely relate to Scottish education from instruments shown to be made under section 117, and report an empty list rather than a list of unconnected instruments."
     }
   ]
 }

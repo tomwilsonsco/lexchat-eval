@@ -1,9 +1,25 @@
 {
-  "scope_note": "REPLACE ME, 1-2 sentences on what this answer covers and what it deliberately excludes.",
+  "scope_note": "Covers the statutory definitions of \"shop\" that can be retrieved from Scottish and UK legislation applying in Scotland, and states explicitly that the resulting list is not comprehensive. Covers whether the provisions relied on are still in force. Limited to legislation; case law on the meaning of \"shop\" is excluded.",
   "steps": [
     {
-      "title": "REPLACE ME, short imperative title for the step",
-      "detail": "REPLACE ME, what exactly to find, in domain terms (Acts, provisions, duties)."
+      "title": "Look for a general definition and establish there is none",
+      "detail": "Search for a statutory definition of \"shop\" in Scots law generally, and confirm that definitions are given Act by Act rather than once for all purposes."
+    },
+    {
+      "title": "Retrieve the Scottish trading definition",
+      "detail": "Retrieve the interpretation section of the Christmas Day and New Year's Day Trading (Scotland) Act 2007 and record its definitions of \"shop\", \"large shop\", \"relevant floor area\" and \"retail sale\"."
+    },
+    {
+      "title": "Retrieve the employment definition applying in Scotland",
+      "detail": "Retrieve the Employment Rights Act 1996 provisions defining \"shop\" and \"shop worker\", and note that the Act carries more than one definition of \"shop\" for different Parts."
+    },
+    {
+      "title": "Check the Acts that look relevant but define nothing",
+      "detail": "Check the Licensing (Scotland) Act 2005, the Protection of Workers (Retail and Age-restricted Goods and Services) (Scotland) Act 2021 and the Tenancy of Shops (Scotland) Act 1964 for a definition of \"shop\", and record where there is none."
+    },
+    {
+      "title": "Establish the status of the Shops Act 1950",
+      "detail": "Search for the Shops Act 1950 and establish whether it can be retrieved and whether the provisions usually cited from it are in force or repealed, before relying on anything in it."
     }
   ]
 }

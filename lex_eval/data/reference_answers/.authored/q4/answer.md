@@ -1,14 +1,12 @@
-# The Information Commissioner's powers to impose penalties for breach of data protection duties
-
-## 1. Summary Answer (BLUF)
+### 1. Summary Answer (BLUF)
 
 The Commissioner's power to impose a financial penalty is the **penalty notice** under **section 155 of the Data Protection Act 2018**, and it is the **only** route by which the administrative-fine powers in Articles 58(2)(i) and 83 of the UK GDPR may be exercised (**s.115(9)**). The maximum is tiered (**s.157**): a **higher maximum amount** of **£17,500,000 or 4% of an undertaking's total annual worldwide turnover in the preceding financial year, whichever is higher**, and a **standard maximum amount** of **£8,700,000 or 2%**, on the same "whichever is higher" basis. For UK GDPR infringements the amount is that specified in **Article 83** — Article 83(4) matters attract the 2%/£8.7m tier and Article 83(5)–(6) matters the 4%/£17.5m tier. Imposition is subject to a **mandatory procedure in Schedule 16**: a notice of intent must be given first, with **not less than 21 days** for written representations, and the penalty notice must follow **within 6 months** of the notice of intent (or as soon as reasonably practicable thereafter); payment is due within **not less than 28 days**. A penalty notice may be **appealed to the Tribunal**, including against the amount alone (**s.162(3)**), and the Tribunal may substitute its own decision (**s.163(3)**).
 
 ---
 
-## 2. Detailed Analysis
+### 2. Detailed Analysis
 
-### 2.1 The power — s.155
+#### 2.1 The power — s.155
 
 If the Commissioner is **satisfied** that a person:
 - **(a)** has failed or is failing as described in **s.149(2), (3), (4) or (5)**;
@@ -27,7 +25,7 @@ The power is **discretionary** ("may"), and the precondition is the Commissioner
 
 **Extension by regulations.** The Secretary of State may by regulations confer power to give a penalty notice in respect of *other* failures to comply with the data protection legislation, and provide whether the standard or higher maximum applies (s.155(6)); such regulations may amend ss.155–158 themselves and are subject to the **affirmative** resolution procedure (s.155(7)).
 
-### 2.2 The maximum amounts — s.157
+#### 2.2 The maximum amounts — s.157
 
 > **s.157(5):** The "higher maximum amount" is — (a) in the case of an undertaking, **£17,500,000 or 4% of the undertaking's total annual worldwide turnover in the preceding financial year, whichever is higher**, or (b) in any other case, **£17,500,000**.
 >
@@ -47,7 +45,7 @@ Which tier applies:
 
 Note the drafting of s.157(5)–(6): the turnover alternative applies **only to an undertaking**, and where it applies the maximum is **the higher** of the cash figure and the percentage — not a choice, and not a cap at the cash figure.
 
-### 2.3 The UK GDPR tiers — Article 83
+#### 2.3 The UK GDPR tiers — Article 83
 
 For UK GDPR infringements the operative amounts are in **Article 83** of the retained Regulation ([Article 83](http://www.legislation.gov.uk/id/eur/2016/679/article/83)):
 
@@ -59,14 +57,14 @@ For UK GDPR infringements the operative amounts are in **Article 83** of the ret
 
 **The overriding standard.** Article 83(1) requires the Commissioner to ensure that a fine is in each individual case "**effective, proportionate and dissuasive**" — a requirement echoed in the s.155(3)(l) factor.
 
-### 2.4 The mandatory relationship with the UK GDPR powers — s.115(9)
+#### 2.4 The mandatory relationship with the UK GDPR powers — s.115(9)
 
 > **s.115(9):** "The Commissioner's powers under Articles 58(2)(i) and 83 of the UK GDPR (administrative fines) are exercisable **only** by giving a penalty notice under section 155."
 > ([s.115](http://www.legislation.gov.uk/id/ukpga/2018/12/section/115))
 
 This is the pivotal integrating provision: there is **no free-standing power to fine** under the UK GDPR in domestic law. Section 115 does the same for the other corrective powers — Article 58(2)(c)–(h) and (j) are exercisable **only** by enforcement notice under s.149 (s.115(8)), and the Article 58(1)(a) information power only by information notice under s.142 (s.115(5)). Any analysis that treats Article 83 as directly exercisable is wrong as a matter of UK law.
 
-### 2.5 What the Commissioner must consider — s.155(2)–(4)
+#### 2.5 What the Commissioner must consider — s.155(2)–(4)
 
 When deciding **whether** to give a penalty notice **and** determining **the amount**, the Commissioner must have regard, so far as relevant:
 - to the extent the notice concerns a **UK GDPR** matter — the matters listed in **Article 83(1) and (2)** (s.155(2)(a)); and
@@ -76,7 +74,7 @@ The s.155(3) list closely tracks Article 83(2): nature, gravity and duration of 
 
 **Exception:** ss.155(2) and (3) do **not** apply to a decision or determination relating to a **s.149(5)** failure — i.e. non-compliance with the charges regulations (s.155(4)), which is dealt with by the fixed-penalty regime below.
 
-### 2.6 Procedure — Schedule 16
+#### 2.6 Procedure — Schedule 16
 
 Schedule 16 is mandatory and its steps are sequential ([Schedule 16](http://www.legislation.gov.uk/id/ukpga/2018/12/schedule/16)):
 
@@ -91,7 +89,7 @@ Schedule 16 is mandatory and its steps are sequential ([Schedule 16](http://www.
 9. **Cancellation (para 8).** The Commissioner may cancel by written notice; on cancellation the Commissioner **may not take any further action** under s.155 or Schedule 16 in relation to that failure, and must repay anything already paid.
 10. **Recovery (para 9).** No recovery action until the payment period has ended **and** all appeals (against the notice and any variation) have been decided or ended and the time for appealing has expired. Recovery is then: in **England and Wales** and **Northern Ireland**, as if payable under an order of the county court or High Court if that court so orders; in **Scotland**, "in the same manner as an extract registered decree arbitral bearing a warrant for execution issued by the sheriff court of any sheriffdom in Scotland".
 
-### 2.7 Restrictions on the power — s.156
+#### 2.7 Restrictions on the power — s.156
 
 The Commissioner **may not** give a penalty notice ([s.156](http://www.legislation.gov.uk/id/ukpga/2018/12/section/156)):
 
@@ -100,15 +98,15 @@ The Commissioner **may not** give a penalty notice ([s.156](http://www.legislati
 - **Excluded persons (s.156(4)).** To the **Crown Estate Commissioners**, or to a person who is a controller by virtue of **s.209(4)** (controller for the Royal Household etc).
 - **Joint controllers (s.156(5)).** For Part 3 or Part 4 processing where responsibilities are allocated by an arrangement under s.58 or s.104, a penalty notice in reliance on s.149(2) may be given to a controller **only if that controller is responsible for compliance** with the provision, requirement or principle in question.
 
-### 2.8 Fixed penalties for the charges regulations — s.158
+#### 2.8 Fixed penalties for the charges regulations — s.158
 
 Non-compliance with the s.137 charges regulations is dealt with separately. The Commissioner **must produce and publish** a document specifying the penalty amount, may specify different amounts for different types of failure, and the **maximum specifiable is 150% of the highest charge payable by a controller for a financial year** under the regulations, disregarding any available discount (s.158(1)–(3)). The document may be altered or replaced, must be published, requires prior consultation with the Secretary of State and such others as the Commissioner considers appropriate, and **must be laid before Parliament** (s.158(4)–(6)) ([s.158](http://www.legislation.gov.uk/id/ukpga/2018/12/section/158)).
 
-### 2.9 Published guidance — s.160
+#### 2.9 Published guidance — s.160
 
 The Commissioner **must** produce and publish guidance about how the Commissioner proposes to exercise the functions in connection with information notices, assessment notices, interview notices, enforcement notices **and penalty notices** (s.160(1)), and **may** publish guidance on other Part 6 functions (s.160(2)). Section 160 goes on to prescribe the minimum content of that guidance for each notice type ([s.160](http://www.legislation.gov.uk/id/ukpga/2018/12/section/160)). The guidance itself is not legislation and was not retrieved; the statutory duty to have it is.
 
-### 2.10 Appeals — ss.162–163
+#### 2.10 Appeals — ss.162–163
 
 A person given a **penalty notice** or a **penalty variation notice** may appeal to the **Tribunal** (s.162(1)(d)–(e)), and "may appeal to the Tribunal **against the amount** of the penalty specified in the notice, **whether or not** the person appeals against the notice" (s.162(3)) ([s.162](http://www.legislation.gov.uk/id/ukpga/2018/12/section/162)).
 
@@ -119,7 +117,7 @@ The Tribunal's powers are broad (s.163) ([s.163](http://www.legislation.gov.uk/i
 
 This is a **full merits review**, not a rationality review — the Tribunal may substitute its own view of how the discretion should have been exercised.
 
-### 2.11 Distinguish: criminal penalties — s.196
+#### 2.11 Distinguish: criminal penalties — s.196
 
 Section 196 is **not** a Commissioner penalty power. It sets the penalties on **conviction** for offences under the Act ([s.196](http://www.legislation.gov.uk/id/ukpga/2018/12/section/196)):
 - offences under s.119, s.173 or paragraph 15 of Schedule 15 — on summary conviction in England and Wales, **a fine**; in Scotland or Northern Ireland, **a fine not exceeding level 5 on the standard scale**;
@@ -129,7 +127,7 @@ The court may also order forfeiture, destruction or erasure of material connecte
 
 ---
 
-## 3. Jurisdiction & Status
+### 3. Jurisdiction & Status
 
 - **Extent.** The Data Protection Act 2018 (ukpga/2018/12) is recorded with extent `["United Kingdom"]`; Regulation (EU) 2016/679 as retained (eur/2016/679) likewise forms part of UK domestic law. The recovery provisions in Schedule 16 para 9 are expressly differentiated for England and Wales, Scotland, and Northern Ireland.
 - **Status.** Both are recorded as `revised` — the text held incorporates effected amendments. The retrieved provisions show substantial amendment: the interview-notice references throughout ss.155, 160 and 162, s.146A(6), s.148A–148C, ss.50B–50C, Articles 22B–22D and 44A–49A, and the Schedule 16 para 4(A2) six-month window are all later insertions.
@@ -139,7 +137,7 @@ The court may also order forfeiture, destruction or erasure of material connecte
 
 ---
 
-## 4. References
+### 4. References
 
 **Data Protection Act 2018 (ukpga/2018/12)**
 - [s.115 — General functions under the UK GDPR and safeguards](http://www.legislation.gov.uk/id/ukpga/2018/12/section/115) (esp. **s.115(9)**)

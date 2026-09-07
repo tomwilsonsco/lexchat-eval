@@ -1,0 +1,29 @@
+{
+  "scope_note": "Covers what legal professional privilege, common interest privilege and limited waiver are, and how each bears on sharing legal advice between the UK and Scottish Governments when that information is requested. Because the same document is held on both sides, it covers both regimes named or implied by the question: the Freedom of Information (Scotland) Act 2002 and the Environmental Information (Scotland) Regulations 2004, and the Freedom of Information Act 2000 and the Environmental Information Regulations 2004. The UK instruments are covered only so far as they bear on privileged legal advice.",
+  "steps": [
+    {
+      "title": "Retrieve the FOISA exemption and its public interest gateway",
+      "detail": "Retrieve the confidentiality exemption in FOISA and the provision governing the effect of exemptions, and establish whether the privilege limb is absolute or qualified."
+    },
+    {
+      "title": "Retrieve the environmental information route",
+      "detail": "Retrieve the exceptions regulation of the Environmental Information (Scotland) Regulations 2004 and identify which exceptions can carry privileged legal advice, together with the interpretive rules that constrain them."
+    },
+    {
+      "title": "Retrieve the UK side of both regimes",
+      "detail": "Retrieve the legal professional privilege exemption, the absolute-exemption list and the environmental information provision of the Freedom of Information Act 2000, and the exceptions regulation of the Environmental Information Regulations 2004, so the cross-government answer rests on both rulebooks rather than one."
+    },
+    {
+      "title": "Establish the law of privilege that the exemption imports",
+      "detail": "Search Find Case Law for Supreme Court authority on the nature and scope of legal professional privilege, including any statement of the Scottish position, since the FOISA exemption is framed by reference to what could be maintained in legal proceedings."
+    },
+    {
+      "title": "Test whether Scottish authority is retrievable at all",
+      "detail": "Attempt a search restricted to the Inner House of the Court of Session, and record the result, since the answer turns partly on a difference between Scots and English law."
+    },
+    {
+      "title": "Record what the tools cannot reach on the Scots law question",
+      "detail": "Establish, and state in the answer, that Court of Session authority and Scottish Information Commissioner material are outside these tools, so that the absence of Scottish authority is recorded as a gap in coverage rather than written up as evidence that a doctrine does not apply."
+    }
+  ]
+}
