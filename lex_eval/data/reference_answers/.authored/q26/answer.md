@@ -8,11 +8,11 @@ answer.
 Two instruments are confirmed direct amenders:
 
 - **The Common Agricultural Policy (Financing, Management and Monitoring) (Miscellaneous
-  Amendments) (EU Exit) Regulations 2019 (SI 2019/763)**, regulation 2, headed "Amendment of
+  Amendments) (EU Exit) Regulations 2019 (SI 2019/763)**, [regulation 2](http://www.legislation.gov.uk/id/uksi/2019/763/regulation/2), headed "Amendment of
   Regulation (EU) 1306/2013", amending it **insofar as it relates to the common organisation of the
   markets and rural development**.
 - **The Financing, Management and Monitoring of Direct Payments to Farmers (Amendment) Regulations
-  2020 (SI 2020/90)**, regulation 2, headed "Amendment of Regulation (EU) 1306/2013", amending it
+  2020 (SI 2020/90)**, [regulation 2](http://www.legislation.gov.uk/uksi/2020/90/regulation/2), headed "Amendment of Regulation (EU) 1306/2013", amending it
   **in so far as it relates to CAP direct payments**.
 
 The split between those two matters: the Regulation was brought into domestic law by two different
@@ -30,24 +30,26 @@ the other rather than on the Regulation as a whole.
 
 #### Confirmed direct amendments
 
-**SI 2019/763, regulation 2.** Provides that Regulation (EU) No 1306/2013 on the financing,
+**SI 2019/763, [regulation 2](http://www.legislation.gov.uk/id/uksi/2019/763/regulation/2).** Provides that Regulation (EU) No 1306/2013 on the financing,
 management and monitoring of the common agricultural policy "is amended, insofar as it relates to
 common organisation of the markets and rural development".
 
-**SI 2020/90, regulation 2.** Provides that the Regulation "in so far as it relates to the Common
+**SI 2020/90, [regulation 2](http://www.legislation.gov.uk/uksi/2020/90/regulation/2).** Provides that the Regulation "in so far as it relates to the Common
 Agricultural Policy ('CAP') direct payments" is amended.
 
-**SI 2019/748, The Agriculture (Legislative Functions) (EU Exit) Regulations 2019**, was retrieved
-and deals with legislative functions arising under the CAP regime; it appears in the same family of
+**SI 2019/748, The Agriculture (Legislative Functions) (EU Exit) Regulations 2019**,
+[regulation 2](http://www.legislation.gov.uk/id/uksi/2019/748/regulation/2), was retrieved and deals with legislative functions arising under the CAP regime; it appears in the same family of
 EU Exit instruments.
 
 #### The Scottish modification framework
 
 The **Agriculture (Retained EU Law and Data) (Scotland) Act 2020 (asp 2020/17)** is the Scottish
-vehicle: it defines the Horizontal Regulation and confers power on the Scottish Ministers to modify
-the retained CAP legislation. It was commenced by SSI 2020/315 (No. 1) and SSI 2020/373 (No. 2). The
+vehicle: it [defines the Horizontal Regulation](http://www.legislation.gov.uk/id/asp/2020/17/section/1) and confers power on the Scottish Ministers to
+[simplify, improve or update](http://www.legislation.gov.uk/id/asp/2020/17/section/2), [continue or end the operation of](http://www.legislation.gov.uk/id/asp/2020/17/section/3) and
+[modify financial provision in](http://www.legislation.gov.uk/id/asp/2020/17/section/4) the retained CAP legislation. It was commenced by SSI 2020/315 (No. 1) and SSI 2020/373 (No. 2). The
 **Agriculture and Rural Communities (Scotland) Act 2024 (asp 2024/11)** amends and expands that
-framework.
+framework, restating those powers at [sections 22](http://www.legislation.gov.uk/id/asp/2024/11/section/22), [23](http://www.legislation.gov.uk/id/asp/2024/11/section/23) and [24](http://www.legislation.gov.uk/id/asp/2024/11/section/24) and
+[repealing section 5 of the 2020 Act](http://www.legislation.gov.uk/id/asp/2024/11/section/25).
 
 #### Supplementing and implementing acts
 
@@ -80,10 +82,23 @@ force, status "revised".
 
 ### References
 
-- The Common Agricultural Policy (Financing, Management and Monitoring) (Miscellaneous Amendments)
-  (EU Exit) Regulations 2019 (SI 2019/763), reg 2
-- The Financing, Management and Monitoring of Direct Payments to Farmers (Amendment) Regulations
-  2020 (SI 2020/90), reg 2
-- The Agriculture (Legislative Functions) (EU Exit) Regulations 2019 (SI 2019/748)
-- Agriculture (Retained EU Law and Data) (Scotland) Act 2020 (asp 2020/17)
-- Agriculture and Rural Communities (Scotland) Act 2024 (asp 2024/11)
+- [The Common Agricultural Policy (Financing, Management and Monitoring) (Miscellaneous Amendments)
+  (EU Exit) Regulations 2019 (SI 2019/763), reg 2 - Amendment of Regulation (EU) 1306/2013](http://www.legislation.gov.uk/id/uksi/2019/763/regulation/2)
+- [The Financing, Management and Monitoring of Direct Payments to Farmers (Amendment) Regulations
+  2020 (SI 2020/90), reg 2 - Amendment of Regulation (EU) 1306/2013](http://www.legislation.gov.uk/uksi/2020/90/regulation/2)
+- [The Agriculture (Legislative Functions) (EU Exit) Regulations 2019 (SI 2019/748), reg 2 -
+  Amendment of Regulation (EU) No 1306/2013](http://www.legislation.gov.uk/id/uksi/2019/748/regulation/2)
+- [Agriculture (Retained EU Law and Data) (Scotland) Act 2020 (asp 2020/17), s.1 - Defined terms](http://www.legislation.gov.uk/id/asp/2020/17/section/1)
+- [Agriculture (Retained EU Law and Data) (Scotland) Act 2020 (asp 2020/17), s.2 - Power to simplify,
+  improve or update relevant CAP legislation](http://www.legislation.gov.uk/id/asp/2020/17/section/2)
+- [Agriculture (Retained EU Law and Data) (Scotland) Act 2020 (asp 2020/17), s.3 - Power to continue
+  or end the operation of relevant CAP legislation](http://www.legislation.gov.uk/id/asp/2020/17/section/3)
+- [Agriculture (Retained EU Law and Data) (Scotland) Act 2020 (asp 2020/17), s.4 - Power to modify
+  financial provision in relevant CAP legislation](http://www.legislation.gov.uk/id/asp/2020/17/section/4)
+- [Agriculture and Rural Communities (Scotland) Act 2024 (asp 2024/11), s.22 - Power to simplify,
+  improve or update relevant CAP legislation](http://www.legislation.gov.uk/id/asp/2024/11/section/22)
+- [Agriculture and Rural Communities (Scotland) Act 2024 (asp 2024/11), s.23 - Power to continue or
+  end the operation of relevant CAP legislation](http://www.legislation.gov.uk/id/asp/2024/11/section/23)
+- [Agriculture and Rural Communities (Scotland) Act 2024 (asp 2024/11), s.24 - Power to modify
+  financial provision in relevant CAP legislation](http://www.legislation.gov.uk/id/asp/2024/11/section/24)
+- [Agriculture and Rural Communities (Scotland) Act 2024 (asp 2024/11), s.25 - Repeal of section 5](http://www.legislation.gov.uk/id/asp/2024/11/section/25)
