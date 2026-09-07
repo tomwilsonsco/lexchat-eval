@@ -78,12 +78,13 @@ _ORDER = [TECH, SEARCH, MODEL, NO_LAW_LOST, NOT_ATTRIBUTABLE]
 # take the question's metric scores as a verdict on its legal reasoning.
 _CAVEAT = {
     TECH: (
-        "The run did not finish, so this describes only the partial answer it "
-        "produced, as do the question's metric scores."
+        "No Act was checked for this run: it stopped early, so there is nothing "
+        "to attribute. The question's metric scores measure the partial answer "
+        "it did produce."
     ),
     SEARCH: (
-        "No tool call in this run turned up this law, so the question's metric "
-        "scores reflect what the answer did without it."
+        "No search in this run found the Acts listed above, so the question's "
+        "metric scores show what the answer did without them."
     ),
 }
 

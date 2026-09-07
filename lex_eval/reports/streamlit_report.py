@@ -21,7 +21,7 @@ from lex_eval.reference.store import (
 )
 from lex_eval.reports.attribution import caveat, worst_attribution
 from lex_eval.reports.comparison import compare
-from lex_eval.reports.diagnostics import searches, plan_steps
+from lex_eval.reports.diagnostics import searches, search_summary, plan_steps
 from lex_eval.reports.data import (
     apply_scope,
     question_metadata,
@@ -200,6 +200,14 @@ SEARCH_COLUMNS: dict[str, str] = {
     "Cache reused": "True when the result came from a cache rather than a fresh API call.",
     "Error": "The error the tool call returned, if any.",
     "Later nonempty search in this step": "True when this search returned nothing but a repeat of the same tool later in the step did return results.",
+}
+
+SEARCH_SUMMARY_COLUMNS: dict[str, str] = {
+    "Response": SEARCH_COLUMNS["Response"],
+    "Tool": SEARCH_COLUMNS["Tool"],
+    "Outcome": SEARCH_COLUMNS["Outcome"],
+    "Searches": "How many calls to this tool on this response ended this way.",
+    "Items returned": "Total items those calls returned. Blank where no count is available, which is every Error and Unknown / incomplete row.",
 }
 
 COMPARISON_SUMMARY_COLUMNS: dict[str, str] = {
@@ -479,6 +487,32 @@ def _chat_mode_badge(chat_mode: str) -> str:
     return f"{icon} {label}"
 
 
+def _log_section(title: str) -> None:
+    """A label for one of the log's own sections.
+
+    Deliberately unlike a Markdown heading: a captured answer carries its own
+    # and ## headings, which render larger than anything this page could write,
+    so a heading here would sit below the content it introduces.
+    """
+    st.markdown(
+        f'<div style="border-left:3px solid #58a6ff;padding:2px 10px;'
+        f"margin:18px 0 6px 0;font-size:0.75em;font-weight:700;"
+        f'letter-spacing:0.08em;text-transform:uppercase;color:#58a6ff;">'
+        f"{html.escape(title)}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _captured_text(text: str, height: int = 420) -> None:
+    """Model output in a bordered box that scrolls once it is taller than the box.
+
+    The border marks where captured text starts and stops, and the fixed height
+    keeps the next section on screen instead of pages below.
+    """
+    with st.container(border=True, height=height):
+        st.markdown(text)
+
+
 def _render_chat_interaction(records: list[dict]) -> None:
     """
     raw chat interaction(s) for an LLM/question pair.
@@ -509,7 +543,7 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 f"Reformatted: {bool(rec.get('reformatted'))}; request attempts: {rec.get('attempts', 'unknown')}"
             )
             # --- Execution Metadata ---
-            st.markdown("##### ⚙️ Execution Context")
+            _log_section("Execution context")
             cols = st.columns(5)
             with cols[0]:
                 chat_mode = rec.get("chat_mode", "research")
@@ -534,10 +568,14 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 tool_seq = rec.get("tool_sequence") or []
                 st.markdown(f"**Tool Sequence:** `{len(tool_seq)}` steps")
                 if tool_seq:
-                    display_seq = [_strip_worker_prefix(t) for t in tool_seq]
-                    st.caption(" → ".join(display_seq))
-
-            st.divider()
+                    # The opening of the sequence only. Printing all of a long
+                    # one here fills the screen in a narrow column, and the
+                    # Tools called section below lists every call in order.
+                    display_seq = [_strip_worker_prefix(t) for t in tool_seq[:6]]
+                    preview = " → ".join(display_seq)
+                    if len(tool_seq) > 6:
+                        preview += f" → and {len(tool_seq) - 6} more"
+                    st.caption(preview)
 
             # --- Deep Research Plan ---
             research_plan = rec.get("research_plan")
@@ -564,39 +602,38 @@ def _render_chat_interaction(records: list[dict]) -> None:
                                 st.markdown(f"**{i + 1}.** {step}")
                     else:
                         st.json(research_plan, expanded=False)
-                st.divider()
 
             # --- LLM Answer ---
-            st.markdown("#### LLM Answer")
+            _log_section("Answer to the user")
             actual = rec.get("actual_output", "")
             if actual:
-                st.markdown(actual)
+                _captured_text(actual)
             else:
                 st.caption("_(no output captured)_")
-
-            st.divider()
 
             # --- Research Output ---
             research_output = rec.get("research_output", "")
             if research_output:
-                st.markdown("#### 📝 Research Output (Worker Findings)")
-                st.markdown(research_output)
-                st.divider()
+                _log_section("Research output (worker findings)")
+                _captured_text(research_output)
 
             # --- Summarisation Output ---
             summarisation_output: list = rec.get("summarisation_output") or []
             summarisation_used = rec.get("summarisation_used", False)
             if summarisation_output:
-                st.markdown(
-                    f"#### 🔍 Summarised Context ({len(summarisation_output)} passage(s))"
+                _log_section(
+                    f"Summarised context ({len(summarisation_output)} passages)"
                 )
-                for i, summary_text in enumerate(summarisation_output):
-                    with st.expander(f"Summarised Passage {i + 1}", expanded=i == 0):
-                        st.markdown(summary_text)
-                st.divider()
+                # A long list of identical rows fills screens; one scrolling
+                # box keeps the section after it within reach.
+                with st.container(height=320):
+                    for i, summary_text in enumerate(summarisation_output):
+                        with st.expander(
+                            f"Summarised Passage {i + 1}", expanded=i == 0
+                        ):
+                            st.markdown(summary_text)
             elif summarisation_used:
                 st.info("Summarisation was used but no output was captured.")
-                st.divider()
 
             # --- Tools Called (sorted by tool_sequence start order) ---
             tools_called: list[dict] = [
@@ -605,43 +642,44 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 if t.get("name") != "Research Agent"
             ]
             if tools_called:
-                st.markdown(f"#### Tools called ({len(tools_called)})")
+                _log_section(f"Tools called ({len(tools_called)})")
                 st.caption(
                     "Captured order. The step view above preserves each delegation boundary."
                 )
-                for index, tool in enumerate(tools_called, 1):
-                    name = _strip_worker_prefix(tool.get("name", "unknown"))
-                    with st.expander(f"{index}. {name}"):
-                        params = (
-                            tool.get("input_parameters")
-                            or tool.get("inputParameters")
-                            or {}
-                        )
-                        st.caption("Tool arguments")
-                        st.json(params, expanded=True)
-                        output = tool.get("output")
-                        if isinstance(output, str):
-                            try:
-                                output = json.loads(output)
-                            except (ValueError, TypeError):
-                                pass
-                        if isinstance(output, (dict, list)):
-                            st.json(output, expanded=False)
-                        elif output:
-                            st.code(str(output), language="text")
-                        else:
-                            st.caption(
-                                "No output captured; this is not proof of an empty search."
+                # A long list of identical rows fills screens; one scrolling
+                # box keeps the section after it within reach.
+                with st.container(height=360):
+                    for index, tool in enumerate(tools_called, 1):
+                        name = _strip_worker_prefix(tool.get("name", "unknown"))
+                        with st.expander(f"{index}. {name}"):
+                            params = (
+                                tool.get("input_parameters")
+                                or tool.get("inputParameters")
+                                or {}
                             )
+                            st.caption("Tool arguments")
+                            st.json(params, expanded=True)
+                            output = tool.get("output")
+                            if isinstance(output, str):
+                                try:
+                                    output = json.loads(output)
+                                except (ValueError, TypeError):
+                                    pass
+                            if isinstance(output, (dict, list)):
+                                st.json(output, expanded=False)
+                            elif output:
+                                st.code(str(output), language="text")
+                            else:
+                                st.caption(
+                                    "No output captured; this is not proof of an empty search."
+                                )
             else:
                 st.caption("No tool calls captured.")
-
-            st.divider()
 
             # --- Case Law Context ---
             case_law_ctx: list[dict] = rec.get("case_law_context") or []
             if case_law_ctx:
-                st.markdown(f"#### ⚖️ Case Law Context ({len(case_law_ctx)} items)")
+                _log_section(f"Case law context ({len(case_law_ctx)} items)")
                 for i, case_data in enumerate(case_law_ctx):
                     title = case_data.get("title", "Unknown Title")
                     ncn = case_data.get("ncn", "")
@@ -654,21 +692,21 @@ def _render_chat_interaction(records: list[dict]) -> None:
                     st.markdown(f"**{i + 1}. {title}{meta_str}**")
                     if url:
                         st.markdown(f"   🔗 [Link to judgment]({url})")
-                st.divider()
 
             # --- Retrieved Context ---
             contexts: list[str] = rec.get("retrieval_context") or []
             if contexts:
-                st.markdown(f"#### 📚 Retrieved Context ({len(contexts)} items)")
-                for i, ctx in enumerate(contexts):
-                    st.markdown(f"**Context {i + 1}**")
-                    with st.container():
+                _log_section(f"Retrieved context ({len(contexts)} items)")
+                # A long list of identical rows fills screens; one scrolling
+                # box keeps the section after it within reach.
+                with st.container(height=360):
+                    for i, ctx in enumerate(contexts):
+                        st.markdown(f"**Context {i + 1}**")
                         st.code(ctx, language="text")
             else:
                 st.caption("No retrieval context captured.")
 
-            st.divider()
-            st.markdown("ℹ️ **Full Record Metadata**")
+            _log_section("Full record metadata")
             st.json(
                 {
                     "response_id": rec.get("response_id"),
@@ -862,14 +900,42 @@ def _question_detail(key, group, rows):
     st.subheader(f"Q{key[0]}: {key[4]}")
     metadata = question_metadata(group[0])
     st.caption(metadata["metadata_source"])
-    if metadata.get("known_gap"):
-        st.info("Recorded failure or control: " + metadata["known_gap"])
     if metadata.get("eval_observation"):
         st.caption(str(metadata["eval_observation"]))
     _render_outcomes(group)
+    # Above the known failure and the metric rows: a reviewer checking whether a
+    # recorded failure came back needs the answer beside the description of it,
+    # not several screens below. Both start closed so the page still opens on
+    # the scores.
+    with st.expander("Response to user"):
+        # One panel per run, all closed when there are several: an answer runs
+        # to pages, and the point of this section is comparing the runs, not
+        # scrolling through the first to reach the second.
+        for index, rec in enumerate(group, 1):
+            with st.expander(
+                f"Run {index} · Response {rec['response_id']} · {outcome(rec)}"
+                f" · {rec['timestamp'][:19]}",
+                expanded=len(group) == 1,
+            ):
+                if rec.get("needs_clarification"):
+                    st.info(
+                        rec.get("clarification_question") or "Clarification requested"
+                    )
+                if rec.get("is_error"):
+                    st.error(rec.get("error_message") or "Request failed")
+                _captured_text(
+                    rec.get("actual_output") or "_(no output captured)_", height=500
+                )
+    with st.expander("Full research log"):
+        _render_chat_interaction(group)
     ids = {r["response_id"] for r in group}
     selected_rows = [r for r in rows if r["response_id"] in ids]
     metrics = _aggregate_metrics(selected_rows)
+    # Same heading level as the metric groups below, and before them: what this
+    # question was recorded as failing is what those scores are checking for.
+    if metadata.get("known_gap"):
+        st.markdown("#### Previous known failure check")
+        st.write(metadata["known_gap"])
     for title, keys in STAGES.items():
         subset = [m for m in metrics if m["test_name"] in keys]
         if subset:
@@ -898,11 +964,18 @@ def _question_detail(key, group, rows):
         )
         if search_rows:
             st.dataframe(
-                search_rows,
+                search_summary(search_rows),
                 hide_index=True,
                 width="stretch",
-                column_config=_column_help(SEARCH_COLUMNS),
+                column_config=_column_help(SEARCH_SUMMARY_COLUMNS),
             )
+            with st.expander(f"Every search call ({len(search_rows)})"):
+                st.dataframe(
+                    search_rows,
+                    hide_index=True,
+                    width="stretch",
+                    column_config=_column_help(SEARCH_COLUMNS),
+                )
         else:
             st.info("No captured search facts for these attempts.")
         for rec in group:
@@ -919,8 +992,6 @@ def _question_detail(key, group, rows):
                         f"Tools: {step['Tools']}; reformatted: {step['Reformatted']}; error: {step['Error'] or 'none'}"
                     )
                     st.markdown(step["Report"] or "No report")
-    if st.toggle("Response evidence", key=f"evidence::{key}"):
-        _render_chat_interaction(group)
     with st.expander("Export review evidence"):
         st.caption(
             "Includes answers, Worker reports, selected verdicts, question metadata and current reference statements. Draft agreement is not legal correctness."

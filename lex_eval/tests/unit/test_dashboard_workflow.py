@@ -6,7 +6,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from lex_eval.reports.comparison import compare
-from lex_eval.reports.diagnostics import searches
+from lex_eval.reports.diagnostics import searches, search_summary
 from lex_eval.utils.db import get_connection, init_db, insert_response
 
 pytestmark = pytest.mark.unit
@@ -34,9 +34,16 @@ def test_error_only_dashboard_renders(tmp_path):
     app.run(timeout=30)
     assert not app.exception
     assert any("Q1" in str(frame.value) for frame in app.dataframe)
-    app.toggle[0].set_value(True).run(timeout=30)
-    assert not app.exception
+    # The answer and the error are on the page from the first render, in the
+    # closed "Response to user" panel, with no widget to find first.
     assert any("timeout" in e.value for e in app.error)
+    # A lone run opens on its own; several stay closed so they can be compared
+    # without scrolling through the first.
+    runs = [e for e in app.expander if e.label.startswith("Run 1")]
+    assert len(runs) == 1 and runs[0].proto.expanded
+    # A rerun must not migrate or otherwise write to the database.
+    app.checkbox[0].set_value(True).run(timeout=30)
+    assert not app.exception
     assert path.read_bytes() == before
 
 
@@ -129,6 +136,59 @@ def test_search_recovery_and_errors_are_distinct():
     ]
     assert rows[0]["Later nonempty search in this step"]
     assert rows[2]["Returned"] is None
+
+
+def test_search_summary_groups_calls_and_keeps_unknown_counts_blank():
+    def tool(name, raw, **flags):
+        return dict(
+            name=name, args={"query": "Evans"}, raw_result=json.dumps(raw), **flags
+        )
+
+    audit = {
+        "delegations": [
+            {
+                "step": 1,
+                "tools": [
+                    tool("search_case_law", {"results": [{"title": "Evans"}]}),
+                    tool("search_case_law", {"error": "HTTP 503"}),
+                ],
+            },
+            {
+                "step": 2,
+                "tools": [
+                    tool(
+                        "search_case_law", {"results": [{"title": "A"}, {"title": "B"}]}
+                    ),
+                    tool("search_legislation", {"results": []}),
+                ],
+            },
+        ]
+    }
+    summary = search_summary(searches(record(1, audit_json=audit)))
+    assert summary == [
+        {
+            "Response": 1,
+            "Tool": "search_case_law",
+            "Outcome": "Error",
+            "Searches": 1,
+            # An errored call returns no count, so summing it would invent one.
+            "Items returned": None,
+        },
+        {
+            "Response": 1,
+            "Tool": "search_case_law",
+            "Outcome": "Results returned",
+            "Searches": 2,
+            "Items returned": 3,
+        },
+        {
+            "Response": 1,
+            "Tool": "search_legislation",
+            "Outcome": "Empty",
+            "Searches": 1,
+            "Items returned": 0,
+        },
+    ]
 
 
 def test_comparison_view_renders_recorded_experiments(tmp_path):

@@ -59,6 +59,31 @@ def searches(record: dict) -> list[dict]:
     return rows
 
 
+def search_summary(rows: list[dict]) -> list[dict]:
+    """Search calls counted per response, tool and outcome.
+
+    Grouping on the outcome means a group's calls either all carry a count or
+    all carry none, so "Items returned" is never a partial sum.
+    """
+    totals: dict[tuple, dict] = {}
+    for row in rows:
+        key = (row["Response"], row["Tool"], row["Outcome"])
+        entry = totals.setdefault(
+            key,
+            {
+                "Response": key[0],
+                "Tool": key[1],
+                "Outcome": key[2],
+                "Searches": 0,
+                "Items returned": None,
+            },
+        )
+        entry["Searches"] += 1
+        if row["Returned"] is not None:
+            entry["Items returned"] = (entry["Items returned"] or 0) + row["Returned"]
+    return [totals[key] for key in sorted(totals)]
+
+
 def plan_steps(record: dict) -> list[dict]:
     audit = record.get("audit_json") or {}
     if isinstance(audit, str):
