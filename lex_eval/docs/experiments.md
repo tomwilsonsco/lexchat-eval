@@ -73,25 +73,62 @@ verdicts and quotes. Old judge detail cannot be reconstructed without rescoring.
 streamlit run lex_eval/reports/streamlit_report.py
 ```
 
-Choose the database, model, chat mode, research mode, experiment, and questions.
-The dashboard reads without migrating or changing the database. Its main table
-shows question outcomes; the detail view groups checks by the stage they assess.
+The database path and the scoring selection are in the collapsed **Settings**
+panel, since they are chosen once a session; the caption under the filters
+repeats whatever is currently selected. Choose the model, chat mode, research
+mode, experiment, and questions on the page itself. The dashboard reads without
+migrating or changing the database.
 
-- **Measured passes** use stored verdicts, including contradiction vetoes.
-  Mixed repeats stay mixed; their mean does not decide whether they passed.
+The main table is a queue of what to look at next: how many checks failed and
+which, measurement gaps, execution warnings, and how many responses there are,
+before the configuration each row repeats. Clicking a row opens that question
+below. The detail view groups checks by the stage they assess, and its summary
+links each failed check to the stage it is under.
+
+- **Response identity** is one numbering per question, oldest attempt first.
+  Every panel, the answers, the comparison and both exports call the same
+  response by the same name, so Run 2 is the same response everywhere. A metric
+  that scored only one attempt cannot renumber the other.
+- **Measured passes** use stored verdicts, including contradiction vetoes, so a
+  high score that a veto failed still reads as a failure. Mixed repeats stay
+  mixed; their mean does not decide whether they passed.
+- **Checks with no verdict** say which kind they are: **Not applicable** (the
+  check does not cover this run), **Not measured** (it should have run and
+  could not, for example a judge error), **Not comparable** (incompatible
+  scoring versions), and **No stored result** (never scored against that
+  response). None of them counts towards a pass rate or a mean. Which one a row
+  is in comes from the run, not from the wording a metric happened to write: a
+  deep-research-only check is Not applicable on a research or conversational
+  run, while a deep research run genuinely missing its plan stays Not measured.
 - **Attempts and outcomes** include clarification, errors, empty answers, halts,
-  and report repair. Flags can overlap with an answer.
+  and report repair. Flags can overlap with a received response. "Response
+  received" means final text was captured, not that the research finished, and a
+  run that reached the research limit says so beside the response itself.
 - **Scoring selection** takes one row per response and metric. The latest view
   excludes outdated reference results; selecting a scoring run shows its
   historical results. Incompatible scorer versions are not averaged together.
-- **Source scope** is explicit. Legislation-only checks are N/A for case-law-only
-  questions. Their mixed-mode results cover legislation only. Legacy case-law
-  Tool Usage results need rescoring with the corrected rule.
+- **Source scope** is explicit. Legislation-only checks do not apply to
+  case-law-only questions. Their mixed-mode results cover legislation only.
+  Legacy case-law Tool Usage results need rescoring with the corrected rule.
+- **Repeat similarity** is one comparison shared by the responses in it, named
+  by response, not one verdict each. It compares wording, not legal agreement.
+- **Compare two responses** in a question with more than one attempt puts two
+  stored answers side by side, each under its own identity, execution warnings
+  and check results. It shows the answers as captured; a later date does not
+  make one an improvement.
+- **Inspect evidence** opens the stored reason for one score beside that same
+  response's own answer, with the Worker report on its own tab. Where a row has
+  no passage-level evidence, it says so and shows the whole captured answer.
 - **Search evidence** shows exact arguments, returned counts, errors, cache
   reuse, and later nonempty searches in the same step. A nonempty search does
   not prove that relevant law was found.
 - **Review evidence** exports the selected answers, Worker reports, metric
-  reasons, question metadata, and search facts for a reviewer to annotate.
+  reasons and their scoring provenance, question metadata, and search facts, as
+  JSON and as a readable Markdown report. Observed problem, evidence passage and
+  reviewer notes typed into the panel go into both. Notes are kept for the
+  browser session against the whole question group, so leaving a question and
+  returning brings its own notes back and never another question's. They are not
+  written to the database, so closing the browser discards them.
 
 Reference agreement against a draft is not confirmed legal correctness. A
 question's recorded historical failure is also distinct from its general

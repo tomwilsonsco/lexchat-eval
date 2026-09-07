@@ -1,13 +1,18 @@
 """Read-only dashboard data and summaries of stored verdicts."""
 
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
 import duckdb
 
 from lex_eval.utils.db import reason_is_not_measured
-from lex_eval.utils.applicability import exclusion, scope_note
+from lex_eval.utils.applicability import (
+    exclusion,
+    reason_is_not_applicable,
+    scope_note,
+)
 from lex_eval.utils.versioning import response_history
 
 
@@ -130,6 +135,8 @@ def aggregate_metrics(rows: list[dict]) -> list[dict]:
                 *[
                     {
                         **r,
+                        "measured": False,
+                        "not_comparable": True,
                         "reason": "Incompatible scoring versions; select one scoring run.",
                     }
                     for r in scored
@@ -169,6 +176,7 @@ def aggregate_metrics(rows: list[dict]) -> list[dict]:
                 "not_scored_reasons": [
                     r.get("reason") or "Not measured" for r in unmeasured
                 ],
+                "not_scored_rows": unmeasured,
             }
         )
     return aggregates
@@ -209,24 +217,86 @@ def question_groups(records: list[dict]) -> dict[tuple, list[dict]]:
     return dict(groups)
 
 
+def run_numbers(records: list[dict]) -> dict:
+    """Response id to run number for one question group, oldest run first.
+
+    The run number is a property of the group, not of a metric's result list,
+    so a metric that scored only the second attempt cannot rename it Run 1.
+    """
+    ordered = sorted(
+        records, key=lambda r: (r.get("timestamp") or "", r["response_id"])
+    )
+    return {rec["response_id"]: index for index, rec in enumerate(ordered, 1)}
+
+
+# The four states a row with no verdict can be in. They are different things to
+# a reviewer: an expected exclusion needs no action, a failed measurement does.
+NOT_APPLICABLE = "Not applicable"
+NOT_MEASURED = "Not measured"
+NOT_COMPARABLE = "Not comparable"
+NO_STORED_RESULT = "No stored result"
+
+
+def unmeasured_state(row: dict) -> str:
+    """Which non-verdict state a stored row is in. Display only, no rescoring."""
+    if row.get("not_comparable"):
+        return NOT_COMPARABLE
+    if row.get("not_applicable") or reason_is_not_applicable(row.get("reason")):
+        return NOT_APPLICABLE
+    return NOT_MEASURED
+
+
+_COHORT_SIZE = re.compile(r"across (\d+) responses")
+
+
+def consistency_cohort(rows: list[dict]) -> dict | None:
+    """One repeat-similarity comparison shared by every response it covers.
+
+    Consistency stores one row per response, all carrying the same comparison,
+    so the rows are the comparison rather than one verdict each. Returns None
+    unless the stored rows themselves say so: same score, same threshold, same
+    verdict, and a recorded cohort size matching how many rows there are.
+    Identical scores alone are not enough to merge two unrelated comparisons.
+    """
+    if len(rows) < 2:
+        return None
+    found = [_COHORT_SIZE.search(r.get("reason") or "") for r in rows]
+    if any(match is None for match in found):
+        return None
+    if {int(match.group(1)) for match in found} != {len(rows)}:
+        return None
+    if len({(r["score"], r["threshold"], bool(r["passed"])) for r in rows}) != 1:
+        return None
+    return {
+        "response_ids": sorted(r["response_id"] for r in rows),
+        "score": rows[0]["score"],
+        "threshold": rows[0]["threshold"],
+        "passed": bool(rows[0]["passed"]),
+    }
+
+
 def apply_scope(rows: list[dict]) -> list[dict]:
     """Label unsupported historical checks without rewriting stored scores."""
     result = []
     for row in rows:
         reason = exclusion(row["test_name"], row)
         stored_reason = row.get("reason") or ""
-        if row["test_name"] == "report_integration" and stored_reason.startswith(
-            "No step both retrieved"
+        if (
+            not reason
+            and row["test_name"] == "report_integration"
+            and stored_reason.startswith("No step both retrieved")
         ):
             reason = "Not measured: no reportable legislation findings to check for integration."
         if (
-            row["test_name"] == "claim_support"
+            not reason
+            and row["test_name"] == "claim_support"
             and stored_reason.startswith("All ")
             and "claim(s) are claims of absence" in stored_reason
         ):
             reason = "Not measured: only absence claims were selected; none could be traced to a passage."
         if (
-            row["test_name"] == "tool_usage"
+            not reason
+            and row["test_name"] == "tool_usage"
             and row.get("research_mode") == "case_law_only"
             and not row.get("metric_version")
         ):
@@ -235,6 +305,7 @@ def apply_scope(rows: list[dict]) -> list[dict]:
             row = {
                 **row,
                 "measured": False,
+                "not_applicable": reason_is_not_applicable(reason),
                 "stored_reason": row.get("reason"),
                 "reason": reason,
             }

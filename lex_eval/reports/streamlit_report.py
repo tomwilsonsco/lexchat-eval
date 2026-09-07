@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 import streamlit as st
@@ -23,16 +25,22 @@ from lex_eval.reports.attribution import caveat, worst_attribution
 from lex_eval.reports.comparison import compare
 from lex_eval.reports.diagnostics import searches, search_summary, plan_steps
 from lex_eval.reports.data import (
+    NOT_MEASURED,
     apply_scope,
+    consistency_cohort,
     question_metadata,
     current_reference_rows,
     aggregate_metrics,
+    measured,
     read_database,
     latest_results,
     outcome,
     outcome_counts,
     question_groups,
+    run_numbers,
+    unmeasured_state,
 )
+from lex_eval.reports.review_export import review_markdown
 from lex_eval.utils.db import (
     DEFAULT_DB,
     reason_is_not_measured,
@@ -164,30 +172,79 @@ NEEDS_ATTENTION_HELP = (
 # dict per table. They are kept separate because the same header means
 # different things in different tables: "Error" counts failed attempts in the
 # outcomes table and holds one tool call's error message in the searches table.
+# Headings for the outcomes table. "Response received" says only that final
+# answer text was captured; it is not a judgement that the research finished or
+# that the text answers the question. The stored outcome values are unchanged,
+# so anything else reading them keeps working.
 OUTCOME_COLUMNS: dict[str, str] = {
     "Attempts": "Every captured run of this question, including repeats and runs that failed.",
-    "Answer": "Runs that returned an answer.",
-    "Clarification": "Runs where LexChat asked the user a clarifying question instead of researching.",
+    "Response received": "Runs that returned final answer text. It does not mean the research finished, or that the text answers the question.",
+    "Clarification requested": "Runs where LexChat asked the user a clarifying question instead of researching.",
     "Error": "Runs that failed with an error and produced no answer.",
-    "No answer": "Runs that ended with no error, no clarifying question and no answer text.",
-    "Turn-cap flags": "Runs where at least one research step was cut short at the server's turn limit, so that step returned no findings.",
+    "No response text": "Runs that ended with no error, no clarifying question and no answer text.",
+    "Research limit reached": "Runs where at least one research step was cut short at the server's turn limit, so that step returned no findings.",
     "Reformatted": "Runs where the worker's report missed the required headings and LexChat asked the model to rewrite it once.",
 }
 
+# Stored outcome name to the heading a reviewer sees, applied at the display
+# boundary only.
+OUTCOME_DISPLAY: dict[str, str] = {
+    "Answer": "Response received",
+    "Clarification": "Clarification requested",
+    "No answer": "No response text",
+    "Turn-cap flags": "Research limit reached",
+}
+
+
+def _display_counts(counts: dict) -> dict:
+    """Rename stored outcome keys to their headings, keeping the order."""
+    return {OUTCOME_DISPLAY.get(key, key): value for key, value in counts.items()}
+
+
+def _outcome_label(rec: dict) -> str:
+    """What happened on this run, as a reviewer should read it.
+
+    "Response received" means final text was captured, nothing more, so a reply
+    that asks the user to narrow the question is not counted as completed
+    research. The research limit is shown beside the response it belongs to
+    rather than only in the question's counts.
+    """
+    label = OUTCOME_DISPLAY.get(outcome(rec), outcome(rec))
+    if rec.get("max_turns_halted"):
+        label += " · Research limit reached"
+    return label
+
+
+# The question table is a queue of what to look at next, so what needs
+# attention comes before the configuration every row repeats.
 QUESTION_COLUMNS: dict[str, str] = {
     "Question": "The question id and the start of the question text.",
+    "Failed checks": "The checks that failed for this question, by name. The first three, with a count of any others; the question's detail lists them all.",
+    "Measurement gaps": "Checks that produced no verdict: how many do not apply to this question, and how many could not be measured.",
+    "Execution warnings": "Runs that errored, asked for clarification, returned no text, or reached the research limit.",
+    "Responses": OUTCOME_COLUMNS["Attempts"],
+    "Reference agreement": "Reference Answer Agreement only: how many runs matched the reference answer's key statements, out of the runs it could score.",
+    "Needs attention": NEEDS_ATTENTION_HELP,
     "Model": "The model LexChat had active when these runs were gathered.",
     "Chat mode": "The LexChat mode used: research, deep research or conversational.",
     "Research mode": "Which sources the question expects: legislation only, case law only, or both.",
     "Experiment": "The label of the gather run these attempts belong to. Only runs in the same experiment are compared.",
     "Type": "From the question set. A regression question reproduces a past failure, a positive control is one LexChat is expected to get right.",
-    "Reference agreement": "Reference Answer Agreement only: how many runs matched the reference answer's key statements, out of the runs it could score.",
-    "Attempts": OUTCOME_COLUMNS["Attempts"],
-    "Answers": OUTCOME_COLUMNS["Answer"],
-    "Clarifications": OUTCOME_COLUMNS["Clarification"],
-    "Errors": OUTCOME_COLUMNS["Error"],
-    "Turn-cap flags": OUTCOME_COLUMNS["Turn-cap flags"],
-    "Needs attention": NEEDS_ATTENTION_HELP,
+}
+
+# Dropped from the table unless the reviewer asks for them: every row in one
+# selection usually repeats them, and the selected question's header says them.
+CONFIGURATION_COLUMNS = ("Model", "Chat mode", "Research mode", "Experiment", "Type")
+
+# Fixed so the whole queue fits a 1440px window without horizontal scrolling.
+QUESTION_COLUMN_WIDTHS: dict[str, str] = {
+    "Question": "medium",
+    "Failed checks": "medium",
+    "Measurement gaps": "small",
+    "Execution warnings": "small",
+    "Responses": "small",
+    "Reference agreement": "small",
+    "Needs attention": "small",
 }
 
 SEARCH_COLUMNS: dict[str, str] = {
@@ -235,10 +292,14 @@ COMPARISON_CHANGE_COLUMNS: dict[str, str] = {
 }
 
 
-def _column_help(tooltips: dict[str, str]) -> dict:
-    """Turn a column name to description mapping into Streamlit column config."""
+def _column_help(tooltips: dict[str, str], widths: dict | None = None) -> dict:
+    """Turn a column name to description mapping into Streamlit column config.
+
+    *widths* pins the columns that must stay on screen at 1440px, so a long
+    list of failed check names cannot push the execution warnings out of view.
+    """
     return {
-        name: st.column_config.Column(name, help=text)
+        name: st.column_config.Column(name, help=text, width=(widths or {}).get(name))
         for name, text in tooltips.items()
     }
 
@@ -270,39 +331,182 @@ def _aggregate_metrics(results: list[dict]) -> list[dict]:
     return sorted(aggregate_metrics(results), key=_metric_sort_key)
 
 
-_SCORE_THRESHOLDS = [(0.95, "excellent"), (0.80, "good"), (0.60, "warning")]
-
-_BADGE_COLOURS = {
-    "excellent": ("#1a4d2e", "#3fb950"),
-    "good": ("#2d3a1f", "#7ee787"),
-    "warning": ("#4a3a1f", "#f0ad4e"),
-    "poor": ("#4c1f1f", "#f85149"),
-    "passed": ("#1a4d2e", "#3fb950"),
-    "failed": ("#4c1f1f", "#f85149"),
+# Status wording and colour come from the stored verdict, never from where the
+# number sits on a scale: a high score can still be a stored failure. Streamlit
+# colour tokens are used rather than fixed hex so both themes stay readable.
+_STATE_MARKUP: dict[str, str] = {
+    "Stable pass": ":green[**Passed**]",
+    "Pass (one measurement)": ":green[**Passed**]",
+    "Stable fail": ":red[**Failed**]",
+    "Fail (one measurement)": ":red[**Failed**]",
+    "Mixed": ":orange[**Mixed**]",
+    "Not comparable": ":orange[**Not comparable**]",
 }
 
 
-def _score_level(score: float) -> str:
-    for threshold, level in _SCORE_THRESHOLDS:
-        if score >= threshold:
-            return level
-    return "poor"
+def _identity(records: list[dict]) -> dict:
+    """Response id to the one label that identifies it everywhere on the page.
+
+    Built once per question group and reused by every metric, the answers, the
+    comparison and the export, so "Run 2" always means the same response. A
+    metric that scored only one of two attempts cannot renumber the other.
+    """
+    numbers = run_numbers(records)
+    return {
+        rec["response_id"]: {
+            "run": numbers[rec["response_id"]],
+            "label": (
+                f"Response {rec['response_id']} · Run {numbers[rec['response_id']]}"
+                f" of {len(numbers)} · {(rec.get('timestamp') or '')[:19]}"
+            ),
+            "short": f"Response {rec['response_id']} (run {numbers[rec['response_id']]})",
+        }
+        for rec in records
+    }
 
 
-def _score_badge(score: float | str, level: str | None = None) -> str:
-    """inline-HTML coloured score badge."""
-    if isinstance(score, float):
-        text = f"{score:.3f}"
-        lvl = level or _score_level(score)
-    else:
-        text = str(score)
-        lvl = level or "poor"
-    bg, fg = _BADGE_COLOURS.get(lvl, ("#30363d", "#c9d1d9"))
-    return (
-        f'<span style="background:{bg};color:{fg};padding:2px 8px;'
-        f"border-radius:4px;font-family:monospace;font-size:0.85em;"
-        f'font-weight:600;">{text}</span>'
+def _response_heading(response_id, identity: dict | None) -> str:
+    entry = (identity or {}).get(response_id)
+    return entry["label"] if entry else f"Response {response_id}"
+
+
+def _reason_block(text: str) -> None:
+    """Stored reason text, shown as written.
+
+    Kept inside an HTML block so Markdown in a judge's wording is not
+    interpreted, and given no fixed colours so it reads in either theme.
+    """
+    body = html.escape(text or "").replace("\n", "<br>")
+    st.markdown(
+        f'<div style="font-size:0.88em;opacity:0.85;margin:2px 0 6px 0;">{body}</div>',
+        unsafe_allow_html=True,
     )
+
+
+def _gap_counts(m: dict) -> Counter:
+    """How many responses sit in each non-verdict state for this metric."""
+    return Counter(unmeasured_state(row) for row in m.get("not_scored_rows", []))
+
+
+def _gap_states(metrics: list[dict]) -> Counter:
+    """How many checks sit in each non-verdict state across a question.
+
+    One entry per check, not per response, so a check that could not be
+    measured on either repeat is one gap rather than two.
+    """
+    gaps = Counter()
+    for m in metrics:
+        for state in set(_gap_counts(m)):
+            gaps[state] += 1
+    return gaps
+
+
+def _gap_phrase(gaps: Counter) -> str:
+    """A Counter of states as "1 not applicable, 2 not measured"."""
+    return ", ".join(
+        f"{count} {state.lower()}" for state, count in sorted(gaps.items())
+    )
+
+
+def _headline_state(m: dict) -> str:
+    """The state to show for a whole check.
+
+    For a check with no verdict this is the state its rows are actually in, so
+    an expected exclusion is never announced as a measurement that did not
+    happen. The row label and the exported report say the same thing.
+    """
+    if m.get("scored", True):
+        return m["state"]
+    states = sorted(_gap_counts(m))
+    return states[0] if len(states) == 1 else m.get("state", NOT_MEASURED)
+
+
+def _provenance_bits(r: dict) -> list[str]:
+    """Which stored scoring event produced this row, in the order it reads.
+
+    The same wording is shown beside the score and written into the exported
+    report, so a reader given only the report can still say which scoring run
+    and which judge produced a finding.
+    """
+    bits = [r.get("test_name") or ""]
+    if r.get("scoring_run_id"):
+        bits.append(f"scoring run {r['scoring_run_id']}")
+        bits.append(f"code {r.get('metric_version', 'unknown')[:12]}")
+    else:
+        bits.append("legacy scorer version unknown")
+    if not _reference_is_current(r):
+        bits.append("reference answer changed since, re-run to update")
+    if r.get("run_at"):
+        bits.append(f"scored {r['run_at'][:19]}")
+    if r.get("judge_llm"):
+        bits.append(f"judge: {r['judge_llm']}")
+        if r.get("judge_tokens"):
+            bits.append(f"{r['judge_tokens']} tokens")
+    return [bit for bit in bits if bit]
+
+
+def _display_rows(m: dict, identity: dict | None) -> list[dict]:
+    """This check's stored rows, in the question's run order, as displayed.
+
+    A row in a group that could not be compared is not a pass, whatever its own
+    stored verdict says. aggregate_metrics keeps a corrected copy of every row
+    it excluded, so use that wherever it has one.
+    """
+    identity = identity or {}
+    rows = sorted(
+        m.get("raw_results", []),
+        key=lambda r: identity.get(r["response_id"], {}).get("run", 0),
+    )
+    corrected = {r["response_id"]: r for r in m.get("not_scored_rows", [])}
+    return [corrected.get(r["response_id"], r) for r in rows]
+
+
+def _check_results(m: dict, identity: dict) -> list[dict]:
+    """One export entry per stored result, in the question's own run order.
+
+    A shared repeat-similarity comparison becomes one entry naming every
+    response in it, the same way the screen shows it, so the document cannot
+    read as one verdict per response.
+    """
+    rows = _display_rows(m, identity)
+    if m["test_name"] == "consistency":
+        cohort = consistency_cohort([r for r in rows if measured(r)])
+        if cohort is not None:
+            names = ", ".join(
+                _identity_short(rid, identity) for rid in cohort["response_ids"]
+            )
+            return [
+                {
+                    "response_id": cohort["response_ids"],
+                    "run_label": names,
+                    "scored": True,
+                    "status": "Passed" if cohort["passed"] else "Failed",
+                    "score": cohort["score"],
+                    "provenance": " · ".join(_provenance_bits(rows[0])),
+                    "reason": (
+                        "One answer-text similarity comparison shared by these "
+                        f"responses, threshold {cohort['threshold']:.2f}. It "
+                        "measures how similar the wording is, not whether the "
+                        "answers agree on the law."
+                    ),
+                }
+            ]
+    return [
+        {
+            "response_id": row["response_id"],
+            "run_label": identity.get(row["response_id"], {}).get("label"),
+            "scored": _is_scored(row),
+            "status": (
+                ("Passed" if row["passed"] else "Failed")
+                if _is_scored(row)
+                else unmeasured_state(row)
+            ),
+            "score": row.get("score"),
+            "provenance": " · ".join(_provenance_bits(row)),
+            "reason": row.get("reason"),
+        }
+        for row in rows
+    ]
 
 
 def _metric_row_label(m: dict) -> str:
@@ -310,27 +514,49 @@ def _metric_row_label(m: dict) -> str:
 
     Carries everything the old summary table's row carried, so opening the row
     is the only step between seeing a score and reading why it came out that
-    way. Expander labels take Markdown, including :red[] / :green[] colour.
+    way. The words come first and the colour matches them, so a colour scan and
+    a careful read say the same thing.
     """
     name = m["metric_name"].strip()
+    gaps = _gap_counts(m)
 
     if not m.get("scored", True):
-        # Every run in this group was a judge error or capture gate, so there
-        # is no score or pass/fail status to show.
-        return f"**{name}** &nbsp; `N/A` &nbsp; :gray[{m.get('state', 'Not measured')}]"
+        states = sorted(gaps)
+        detail = (
+            f"{gaps[states[0]]} response(s)" if len(states) == 1 else _gap_phrase(gaps)
+        )
+        return (
+            f"**{name}** &nbsp; :gray[**{_headline_state(m)}**] "
+            f"&nbsp; :gray[no score · {detail}]"
+        )
 
-    status = f"{m['pass_count']}/{m['measured_count']} measured passes, {m['state']}"
+    # One shared comparison is one result, however many rows store it.
+    cohort = (
+        consistency_cohort([r for r in m.get("raw_results", []) if measured(r)])
+        if m["test_name"] == "consistency"
+        else None
+    )
+    if cohort is not None:
+        status = ":green[**Passed**]" if cohort["passed"] else ":red[**Failed**]"
+        return (
+            f"**{name}** &nbsp; {status} &nbsp; :gray[one comparison across "
+            f"{len(cohort['response_ids'])} responses · similarity "
+            f"{cohort['score']:.3f} · threshold {cohort['threshold']:.2f}]"
+        )
+
+    status = _STATE_MARKUP.get(m["state"], f":gray[**{m['state']}**]")
     label = (
-        f"**{name}** &nbsp; `{m['score']:.3f}` &nbsp; {status} "
-        f"&nbsp; :gray[threshold {m['threshold']:.2f}]"
+        f"**{name}** &nbsp; {status} &nbsp; "
+        f":gray[{m['pass_count']} of {m['measured_count']} measured responses passed"
+        f" · score {m['score']:.3f} · threshold {m['threshold']:.2f}]"
     )
 
     # Only worth the space when the runs actually disagreed.
     if "min_score" in m and m["min_score"] != m["max_score"]:
         label += f" &nbsp; :gray[runs {m['min_score']:.3f} to {m['max_score']:.3f}]"
 
-    if m.get("not_scored_count"):
-        label += f" &nbsp; :orange[{m['not_scored_count']} not scored]"
+    if gaps:
+        label += f" &nbsp; :gray[{_gap_phrase(gaps)}]"
 
     return label
 
@@ -343,7 +569,12 @@ def _is_failure(m: dict) -> bool:
     return m.get("scored", True) and not m["passed"]
 
 
-def _render_metric_rows(metrics: list[dict], failures_only: bool = False) -> None:
+def _render_metric_rows(
+    metrics: list[dict],
+    identity: dict | None = None,
+    records: dict | None = None,
+    failures_only: bool = False,
+) -> None:
     """One expander per metric: the label is the summary row, the body is that
     metric's per-run detail.
 
@@ -360,113 +591,197 @@ def _render_metric_rows(metrics: list[dict], failures_only: bool = False) -> Non
             tooltip = METRIC_TOOLTIPS.get(m["metric_name"].strip(), "")
             if tooltip:
                 st.caption(tooltip)
-            if not scored:
-                st.markdown(
-                    ":gray[No run produced a quality verdict "
-                    "(judge error or capture gate).]"
-                )
-            _render_metric_body(m)
+            _render_metric_body(m, identity, records)
 
 
-def _render_metric_body(m: dict) -> None:
+def _render_consistency_summary(m: dict, identity: dict | None) -> bool:
+    """Show one repeat-similarity comparison once, naming the responses in it.
+
+    Consistency writes a row per response, all carrying the same comparison, so
+    two rows are one observation rather than two verdicts. Rendered as one
+    summary only when the stored rows say they belong to the same comparison;
+    otherwise the caller falls back to showing them as stored.
     """
-    show individual raw eval results for one metric.
-    aggregated metrics also show a per-run breakdown.
-    """
-    if "min_score" not in m:
-        # Consistency - single aggregated result, no per-run breakdown
-        _render_single_eval_result(m)
-        return
-
-    # Mean/threshold are already in the row label; only the run count adds
-    # anything here, and only once there is more than one run.
-    n = m.get("n_runs", len(m.get("raw_results", [])))
-    if n > 1:
-        st.caption(
-            f"{m['measured_count']} measured responses; one selected score per response"
-        )
-
-    not_scored_reasons = m.get("not_scored_reasons") or []
-    if not_scored_reasons:
-        reasons_list = "; ".join(html.escape(reason) for reason in not_scored_reasons)
-        st.markdown(
-            f":orange[**{len(not_scored_reasons)} run(s) not scored** "
-            f"(excluded from the mean above, not a quality verdict): "
-            f"{reasons_list}]"
-        )
-
-    for idx, raw in enumerate(m.get("raw_results", []), 1):
-        _render_single_eval_result(raw, run_label=f"Run {idx}" if n > 1 else None)
-
-
-def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
-    """one raw eval result entry."""
-    prefix = f"{run_label}: " if run_label else ""
-
-    if _is_scored(r):
-        passed = r["passed"]
-        colour = "#3fb950" if passed else "#f85149"
-        label = "Passed" if passed else "Failed"
-        score_text = f"{r['score']:.3f}"
-    else:
-        colour = "#8b949e"
-        label = "N/A"
-        score_text = "not scored"
-
-    # Escaped, then newlines turned into <br>, so a multi-line reason (e.g.
-    # Plan Coverage's per-statement breakdown) renders as line breaks rather
-    # than one run-on line, without trusting judge/reason text as raw HTML.
-    reason_html = html.escape(r.get("reason") or "").replace("\n", "<br>")
+    cohort = consistency_cohort([r for r in m.get("raw_results", []) if measured(r)])
+    if cohort is None:
+        return False
+    names = ", ".join(_identity_short(rid, identity) for rid in cohort["response_ids"])
+    status = ":green[**Passed**]" if cohort["passed"] else ":red[**Failed**]"
     st.markdown(
-        f'<div style="background:#0d1117;border-left:3px solid {colour};'
-        f'padding:10px 14px;border-radius:4px;margin:6px 0;">'
-        f'<span style="color:#8b949e;font-size:0.8em;">'
-        f'{prefix}{r.get("test_name","")}</span>&nbsp;&nbsp;'
-        f'<span style="color:{colour};font-size:0.85em;font-weight:600;">{label}</span>'
-        f"&nbsp;&nbsp;score: <code>{score_text}</code>"
-        f'<div style="color:#8b949e;font-size:0.85em;margin-top:6px;">'
-        f"{reason_html}</div>"
-        f"</div>",
-        unsafe_allow_html=True,
+        f"Answer-text similarity across {names}: **{cohort['score']:.3f}** "
+        f"&nbsp; {status} &nbsp; :gray[threshold {cohort['threshold']:.2f}]"
+    )
+    st.caption(
+        "One comparison shared by these responses, not one verdict each. It "
+        "measures how similar the wording is, not whether the answers agree on "
+        "the law."
+    )
+    return True
+
+
+def _identity_short(response_id, identity: dict | None) -> str:
+    entry = (identity or {}).get(response_id)
+    return entry["short"] if entry else f"response {response_id}"
+
+
+def _render_metric_body(
+    m: dict, identity: dict | None = None, records: dict | None = None
+) -> None:
+    """Per-response detail for one metric, in the question's own run order."""
+    identity = identity or {}
+    rows = _display_rows(m, identity)
+
+    summarised = m["test_name"] == "consistency" and _render_consistency_summary(
+        m, identity
     )
 
-    if r.get("scope_note"):
-        st.caption(r["scope_note"])
-    if r.get("details"):
-        st.json(r["details"], expanded=False)
-    if r.get("reference_sha256"):
-        refs = r.get("scoring_config", {}).get("references", {})
-        reference = refs.get(str(r["question_id"])) or refs.get(r["question_id"])
-        if reference:
-            with st.expander("Reference used for this score"):
-                st.caption(
-                    f"Reference status: {r.get('reference_mode', 'unknown')}; fingerprint: {r['reference_sha256']}"
-                )
-                for statement in reference.get("statements", []):
-                    st.write(statement)
-    meta_bits = [f"response {r.get('response_id', 'unknown')}"]
-    if r.get("scoring_run_id"):
-        meta_bits.append(f"scoring run {r['scoring_run_id']}")
-        meta_bits.append(f"code {r.get('metric_version', 'unknown')[:12]}")
+    n = m.get("n_runs", len(rows))
+    if n > 1 and not summarised:
+        st.caption(
+            f"{m['measured_count']} of {n} responses measured; "
+            "one selected score per response"
+        )
+
+    # A metric with no row at all for a response is not a pass for it.
+    scored_ids = {r["response_id"] for r in rows}
+    missing = [rid for rid in identity if rid not in scored_ids]
+    if missing:
+        names = ", ".join(_identity_short(rid, identity) for rid in sorted(missing))
+        st.markdown(f":gray[**No stored result** for {names}.]")
+
+    # A reason shared by several responses is said once here, and left off
+    # those responses' own rows. A reason only one response has stays on it.
+    gaps = Counter(
+        (unmeasured_state(row), row.get("reason") or NOT_MEASURED)
+        for row in m.get("not_scored_rows", [])
+    )
+    repeated = {pair: count for pair, count in gaps.items() if count > 1}
+    for (state, reason), count in repeated.items():
+        st.markdown(
+            f":gray[**{state}** &nbsp; {count} responses, excluded from any "
+            "mean and not a quality verdict:]"
+        )
+        _reason_block(reason)
+
+    def covered(row: dict) -> bool:
+        pair = (unmeasured_state(row), row.get("reason") or NOT_MEASURED)
+        return not _is_scored(row) and pair in repeated
+
+    if summarised:
+        with st.expander("Individual stored rows for this comparison"):
+            for raw in rows:
+                _render_single_eval_result(raw, identity, records, evidence=False)
+        return
+
+    for raw in rows:
+        _render_single_eval_result(raw, identity, records, show_reason=not covered(raw))
+
+
+def _render_details(details) -> None:
+    """Stored per-claim evidence as prose, with the raw record still available."""
+    if isinstance(details, dict):
+        for field, value in details.items():
+            heading = field.replace("_", " ").capitalize()
+            if isinstance(value, str) and value:
+                st.markdown(f"**{heading}**")
+                _reason_block(value)
+            elif isinstance(value, list) and all(isinstance(v, str) for v in value):
+                st.markdown(f"**{heading}**")
+                for item in value:
+                    _reason_block(f"- {item}")
+    with st.expander("Raw stored evidence"):
+        st.json(details, expanded=False)
+
+
+def _render_evidence(r: dict, rec: dict, heading: str) -> None:
+    """The failure reason beside the answer it is about, for one response.
+
+    The answer shown is the one this row scored, so a reason about response 80
+    can never be read against response 72's text. Nothing here is recomputed:
+    it is the stored reason, the stored evidence if the row has any, and the
+    captured text.
+    """
+    with st.expander(f"Inspect evidence · {heading}"):
+        st.caption("The stored reason for this score, beside this response's own text.")
+        _reason_block(r.get("reason") or "")
+        details = r.get("details")
+        if details:
+            _render_details(details)
+        else:
+            st.caption(
+                "This stored score has no passage-level evidence, so the whole "
+                "captured answer is shown for manual inspection."
+            )
+        answer_tab, worker_tab = st.tabs(
+            ["Answer to the user", "Worker research report"]
+        )
+        with answer_tab:
+            _captured_text(rec.get("actual_output") or "_(no output captured)_")
+        with worker_tab:
+            st.caption(
+                "The Worker's report to the Manager. This is not the answer the "
+                "user saw."
+            )
+            _captured_text(rec.get("research_output") or "_(no report captured)_")
+
+
+def _render_single_eval_result(
+    r: dict,
+    identity: dict | None = None,
+    records: dict | None = None,
+    evidence: bool = True,
+    show_reason: bool = True,
+) -> None:
+    """One raw eval result entry, headed by the response it belongs to."""
+    heading = _response_heading(r.get("response_id", "unknown"), identity)
+    passing = _is_scored(r) and bool(r["passed"])
+
+    if _is_scored(r):
+        status = ":green[**Passed**]" if r["passed"] else ":red[**Failed**]"
+        threshold = r.get("threshold")
+        detail = f"score {r['score']:.3f}" + (
+            f" · threshold {threshold:.2f}" if threshold is not None else ""
+        )
     else:
-        meta_bits.append("legacy scorer version unknown")
-    if not _reference_is_current(r):
-        meta_bits.append("reference answer changed since, re-run to update")
-    if r.get("run_at"):
-        meta_bits.append(f"scored {r['run_at'][:19]}")
-    if r.get("judge_llm"):
-        meta_bits.append(f"judge: `{r['judge_llm']}`")
-        if r.get("judge_tokens"):
-            meta_bits.append(f"{r['judge_tokens']} tokens")
-    if meta_bits:
-        st.caption(" · ".join(meta_bits))
+        status = f":gray[**{unmeasured_state(r)}**]"
+        detail = "no score"
 
-    tools = r.get("tools_used")
-    if tools:
-        st.caption(f"Tools used: {', '.join(tools)}")
+    with st.container(border=True):
+        st.markdown(f"{status} &nbsp; {heading} &nbsp; :gray[{detail}]")
+        if show_reason:
+            _reason_block(r.get("reason") or "")
 
-    if r.get("error"):
-        st.error(r["error"])
+        if r.get("scope_note"):
+            st.caption(r["scope_note"])
+        rec = (records or {}).get(r.get("response_id"))
+        # Only where a reviewer has something to check. A passing row's answer
+        # is still in "Response to user", the comparison and the research log,
+        # and repeating every answer and Worker report once per check made the
+        # page many times larger than the reading it supports.
+        if evidence and rec is not None and not passing:
+            _render_evidence(r, rec, heading)
+        elif r.get("details"):
+            _render_details(r["details"])
+        if r.get("reference_sha256"):
+            refs = r.get("scoring_config", {}).get("references", {})
+            reference = refs.get(str(r["question_id"])) or refs.get(r["question_id"])
+            if reference:
+                with st.expander("Reference used for this score"):
+                    st.caption(
+                        f"Reference status: {r.get('reference_mode', 'unknown')}; "
+                        f"fingerprint: {r['reference_sha256']}"
+                    )
+                    for statement in reference.get("statements", []):
+                        st.write(statement)
+
+        st.caption(" · ".join(_provenance_bits(r)))
+
+        tools = r.get("tools_used")
+        if tools:
+            st.caption(f"Tools used: {', '.join(tools)}")
+
+        if r.get("error"):
+            st.error(r["error"])
 
 
 def _strip_worker_prefix(name: str) -> str:
@@ -503,28 +818,45 @@ def _log_section(title: str) -> None:
     )
 
 
-def _captured_text(text: str, height: int = 420) -> None:
-    """Model output in a bordered box that scrolls once it is taller than the box.
+# Below this many characters an answer is shown at its natural height. A short
+# clarification request in a fixed 420px box used to fill the screen while the
+# answer it should be compared with sat below the fold.
+_NATURAL_HEIGHT_CHARS = 1200
 
-    The border marks where captured text starts and stops, and the fixed height
-    keeps the next section on screen instead of pages below.
+
+def _captured_text(text: str, height: int = 420) -> None:
+    """Model output in a bordered box, scrolling only once it is long.
+
+    The border marks where captured text starts and stops. A long answer is
+    bounded so the next section stays on screen; a short one takes the room it
+    needs and no more.
     """
+    if len(text or "") <= _NATURAL_HEIGHT_CHARS:
+        with st.container(border=True):
+            st.markdown(text)
+        return
     with st.container(border=True, height=height):
         st.markdown(text)
 
 
-def _render_chat_interaction(records: list[dict]) -> None:
+def _render_chat_interaction(records: list[dict], identity: dict | None = None) -> None:
     """
     raw chat interaction(s) for an LLM/question pair.
     A row/record in responses.db is one run.
+
+    Tabs are labelled from the question group's own run numbering, so a tab
+    called Run 2 is the same response the metrics above call Run 2.
     """
     if not records:
         st.info("No response records found in responses.db for this combination.")
         return
 
+    identity = identity or _identity(records)
     run_tabs = st.tabs(
         [
-            f"Run {i + 1}  {_chat_mode_badge(r.get('chat_mode', 'research'))}  "
+            f"Run {identity.get(r['response_id'], {}).get('run', i + 1)}  "
+            f"Response {r['response_id']}  "
+            f"{_chat_mode_badge(r.get('chat_mode', 'research'))}  "
             f"({r['timestamp'][:19]})"
             for i, r in enumerate(records)
         ]
@@ -532,13 +864,18 @@ def _render_chat_interaction(records: list[dict]) -> None:
 
     for tab, rec in zip(run_tabs, records, strict=True):
         with tab:
-            st.caption(f"Response {rec['response_id']} · {outcome(rec)}")
+            st.caption(
+                f"{_response_heading(rec['response_id'], identity)} · {_outcome_label(rec)}"
+            )
             if rec.get("needs_clarification"):
                 st.info(rec.get("clarification_question") or "Clarification requested")
             if rec.get("is_error"):
                 st.error(rec.get("error_message") or "Request failed")
             if rec.get("max_turns_halted"):
-                st.warning("A research step reached the tool-call limit.")
+                st.warning(
+                    "Research limit reached: a research step stopped at the "
+                    "tool-call limit, so it returned no findings."
+                )
             st.caption(
                 f"Reformatted: {bool(rec.get('reformatted'))}; request attempts: {rec.get('attempts', 'unknown')}"
             )
@@ -731,13 +1068,13 @@ def _render_chat_interaction(records: list[dict]) -> None:
 # reports/attribution.py. Grey for "cannot say", which is a gap in the
 # reference answers rather than a finding about the response.
 _ATTRIBUTION_STYLE = {
-    "tech": ("#f85149", "Run did not finish"),
-    "search": ("#f0ad4e", "The search did not find the law"),
-    "model": ("#58a6ff", "Found the law, did not cite it"),
+    "tech": ("#d1242f", "Run did not finish"),
+    "search": ("#bf8700", "The search did not find the law"),
+    "model": ("#0969da", "Found the law, did not cite it"),
     # Not the pass green used elsewhere: this says no step lost any law, which
     # is narrower than the response being good, and the detail says so.
-    "no_law_lost": ("#56d364", "No law lost"),
-    "not_attributable": ("#8b949e", "Cannot say"),
+    "no_law_lost": ("#1a7f37", "No law lost"),
+    "not_attributable": ("#6e7781", "Cannot say"),
 }
 
 
@@ -791,7 +1128,7 @@ def _render_attribution_flag(response_records: list[dict]) -> None:
     if verdict is None:
         return
 
-    colour, label = _ATTRIBUTION_STYLE.get(verdict["stage"], ("#8b949e", "Unclear"))
+    colour, label = _ATTRIBUTION_STYLE.get(verdict["stage"], ("#6e7781", "Unclear"))
     ids = ", ".join(verdict["ids"][:4])
     if len(verdict["ids"]) > 4:
         ids += f" and {len(verdict['ids']) - 4} more"
@@ -800,7 +1137,7 @@ def _render_attribution_flag(response_records: list[dict]) -> None:
         f'<div style="border-left:3px solid {colour};padding:4px 10px;'
         f'margin:0 0 10px 0;font-size:0.9em;">'
         f'<span style="color:{colour};font-weight:600;">{label}</span>'
-        f'<span style="color:#8b949e;"> &nbsp; {detail}</span></div>',
+        f'<span style="opacity:0.8;"> &nbsp; {detail}</span></div>',
         unsafe_allow_html=True,
     )
     note = caveat(verdict["stage"])
@@ -828,7 +1165,7 @@ def _reference_status_line() -> str:
 
 
 def _render_outcomes(records):
-    counts = outcome_counts(records)
+    counts = _display_counts(outcome_counts(records))
     st.dataframe(
         [counts],
         hide_index=True,
@@ -836,7 +1173,9 @@ def _render_outcomes(records):
         column_config=_column_help(OUTCOME_COLUMNS),
     )
     st.caption(
-        "Outcomes count all attempts. Turn-cap and reformat flags may overlap with answers or errors."
+        "Outcomes count all attempts. A response received is captured text, not "
+        "a judgement that the research finished. Research-limit and reformat "
+        "flags may overlap with a received response or an error."
     )
 
 
@@ -862,6 +1201,30 @@ STAGES = {
 }
 
 
+# The question text is trimmed hard so the columns that say what to look at
+# next stay inside a 1440px window without horizontal scrolling.
+_QUESTION_TEXT_CHARS = 70
+
+
+# Short forms for the queue table's narrow column. The full wording is in the
+# column tooltip and beside each response in the question's detail.
+_WARNING_SHORT = {
+    "Error": "error",
+    "Clarification": "clarification",
+    "No answer": "no text",
+    "Turn-cap flags": "limit reached",
+}
+
+
+def _execution_warnings(counts: dict) -> str:
+    """Runs that did not simply answer, as a short phrase for the queue table."""
+    return ", ".join(
+        f"{counts[stored]} {short}"
+        for stored, short in _WARNING_SHORT.items()
+        if counts[stored]
+    )
+
+
 def _question_summary(key, records, rows):
     qid, model, chat, research, question, experiment = key
     ids = {r["response_id"] for r in records}
@@ -871,37 +1234,224 @@ def _question_summary(key, records, rows):
     )
     counts = outcome_counts(records)
     metadata = question_metadata(records[0])
+    failed = [m["metric_name"].strip() for m in metrics if _is_failure(m)]
+    # The count comes first so it survives a narrow column, then as many names
+    # as fit. The question's detail lists all of them.
+    listed = ", ".join(failed[:3]) + (
+        f", and {len(failed) - 3} more" if len(failed) > 3 else ""
+    )
+    listed = f"{len(failed)}: {listed}" if failed else ""
+    gaps = _gap_states(metrics)
     return {
-        "Question": f"Q{qid}: {question[:95]}",
-        "Model": model,
-        "Chat mode": chat,
-        "Research mode": research,
-        "Experiment": records[0].get("experiment", {}).get("label", experiment),
-        "Type": metadata.get("test_type", ""),
+        "Question": f"Q{qid}: {question[:_QUESTION_TEXT_CHARS]}",
+        "Failed checks": listed,
+        "Measurement gaps": _gap_phrase(gaps)
+        or ("no checks stored" if not metrics else ""),
+        "Execution warnings": _execution_warnings(counts),
+        "Responses": counts["Attempts"],
         "Reference agreement": (
-            f"{agreement['pass_count']}/{agreement['measured_count']} measured passes"
+            f"{agreement['pass_count']}/{agreement['measured_count']} measured"
             if agreement
             else "Not scored"
         ),
-        "Attempts": counts["Attempts"],
-        "Answers": counts["Answer"],
-        "Clarifications": counts["Clarification"],
-        "Errors": counts["Error"],
-        "Turn-cap flags": counts["Turn-cap flags"],
         "Needs attention": any(
             _is_failure(m) or m.get("not_scored_count") for m in metrics
         )
         or any(outcome(r) != "Answer" or r.get("max_turns_halted") for r in records)
         or not metrics,
+        "Model": model,
+        "Chat mode": chat,
+        "Research mode": research,
+        "Experiment": records[0].get("experiment", {}).get("label", experiment),
+        "Type": metadata.get("test_type", ""),
     }
 
 
-def _question_detail(key, group, rows):
+# Notes a reviewer typed, kept for the session and keyed by the whole question
+# group, so returning to a question brings its own notes back and never another
+# question's. Streamlit drops a widget's value as soon as the widget stops being
+# drawn, which is what leaving the question does, so the text cannot live in the
+# widget alone.
+_NOTES_STATE = "review_notes"
+
+REVIEW_FIELDS: tuple[tuple[str, str, str], ...] = (
+    (
+        "observed_problem",
+        "Observed problem",
+        "What you found wrong with the answer, in your own words.",
+    ),
+    (
+        "evidence_passage",
+        "Evidence passage",
+        "The passage from the answer that shows it.",
+    ),
+    ("reviewer", "Reviewer", "Who reviewed this."),
+)
+
+
+def _review_notes(key) -> dict:
+    """Draw the note fields for one question group and return what they hold.
+
+    Kept in this browser session only. Nothing here is written to the database
+    or sent anywhere; the downloads below are what carries a note onwards.
+    """
+    store = st.session_state.setdefault(_NOTES_STATE, {})
+    saved = store.setdefault(key, {})
+    group = hashlib.sha1(repr(key).encode()).hexdigest()[:12]
+
+    def remember(field: str, widget_key: str) -> None:
+        saved[field] = st.session_state[widget_key]
+
+    notes = {}
+    for field, label, help_text in REVIEW_FIELDS:
+        widget_key = f"review_{field}_{group}"
+        notes[field] = st.text_area(
+            label,
+            value=saved.get(field, ""),
+            key=widget_key,
+            help=help_text,
+            on_change=remember,
+            args=(field, widget_key),
+        )
+    st.caption(
+        "Notes stay in this browser session and go into both downloads. They "
+        "are not written to the database."
+    )
+    return notes
+
+
+def _stage_of(test_name: str) -> str:
+    """Which detail-page group a check is rendered under."""
+    for title, keys in STAGES.items():
+        if test_name in keys:
+            return title
+    return "Other checks"
+
+
+def _stage_anchor(title: str) -> str:
+    """The link target Streamlit gives this stage's heading."""
+    return title.lower().replace(" ", "-")
+
+
+def _stage_heading(title: str) -> None:
+    """A stage heading, whose Streamlit anchor the failure summary links to."""
+    st.markdown(f"#### {title}")
+
+
+def _render_failure_summary(metrics: list[dict]) -> None:
+    """What failed on this question, and where on the page to read about it."""
+    failed = [m for m in metrics if _is_failure(m)]
+    gaps = _gap_states(metrics)
+    if not failed and not gaps:
+        st.markdown(":green[**No failed checks and no measurement gaps.**]")
+        return
+    if failed:
+        named = ", ".join(
+            f"{m['metric_name'].strip()} (in "
+            f"[{_stage_of(m['test_name'])}](#{_stage_anchor(_stage_of(m['test_name']))}))"
+            for m in failed
+        )
+        st.markdown(f":red[**Failed checks:**] {named}")
+    if gaps:
+        st.markdown(f":gray[**Checks with no verdict:** {_gap_phrase(gaps)}]")
+    st.caption("Failed checks are open below; the rest stay closed.")
+
+
+def _response_state_line(response_id, metrics: list[dict]) -> str:
+    """This response's own check results, in one line.
+
+    A shared repeat-similarity comparison is left out: it belongs to the
+    responses together, and the Repeat similarity section says so.
+    """
+    failed, gaps, passed = [], 0, 0
+    for m in metrics:
+        if m["test_name"] == "consistency" and consistency_cohort(
+            [r for r in m.get("raw_results", []) if measured(r)]
+        ):
+            continue
+        row = next(
+            (r for r in _display_rows(m, None) if r["response_id"] == response_id),
+            None,
+        )
+        if row is None:
+            continue
+        if not _is_scored(row):
+            gaps += 1
+        elif row["passed"]:
+            passed += 1
+        else:
+            failed.append(m["metric_name"].strip())
+    parts = [f":red[Failed: {', '.join(failed)}]"] if failed else []
+    parts.append(f"Passed: {passed}")
+    if gaps:
+        parts.append(f"No verdict: {gaps}")
+    return " · ".join(parts)
+
+
+def _render_response_comparison(
+    group: list[dict], identity: dict, metrics: list[dict]
+) -> None:
+    """Two of this question's answers next to each other, chosen by the reader.
+
+    Repeat attempts are read against one another far more often than they are
+    read alone, and stacking them vertically put the second one below the fold.
+    Nothing is scored here: these are the stored answers as captured.
+    """
+    with st.expander(f"Compare two responses ({len(group)} captured)"):
+        st.caption(
+            "These are repeat attempts as captured. A later date does not make "
+            "an answer an improvement, and unknown deployment conditions still "
+            "apply to legacy responses."
+        )
+        by_id = {rec["response_id"]: rec for rec in group}
+        ordered = sorted(by_id, key=lambda rid: identity[rid]["run"])
+        left, right = st.columns(2)
+        first = left.selectbox(
+            "Left",
+            ordered,
+            index=0,
+            format_func=lambda rid: identity[rid]["label"],
+            key=f"compare_left_{group[0]['question_id']}",
+        )
+        second = right.selectbox(
+            "Right",
+            ordered,
+            index=1 if len(ordered) > 1 else 0,
+            format_func=lambda rid: identity[rid]["label"],
+            key=f"compare_right_{group[0]['question_id']}",
+        )
+        side_by_side = st.toggle(
+            "Side by side",
+            value=True,
+            key=f"compare_side_{group[0]['question_id']}",
+            help="Turn off for one answer above the other on a narrow screen.",
+        )
+        panels = st.columns(2) if side_by_side else [st.container(), st.container()]
+        for panel, rid in zip(panels, (first, second), strict=True):
+            with panel:
+                rec = by_id[rid]
+                st.markdown(f"**{identity[rid]['label']}**")
+                st.caption(_outcome_label(rec))
+                st.markdown(_response_state_line(rid, metrics))
+                _captured_text(rec.get("actual_output") or "_(no output captured)_")
+
+
+def _question_detail(key, group, rows, scoring_label: str = "Latest stored"):
     st.subheader(f"Q{key[0]}: {key[4]}")
     metadata = question_metadata(group[0])
+    st.caption(
+        f"{key[1]} · {key[2]} · {key[3]} · experiment "
+        f"{group[0].get('experiment', {}).get('label', key[5])}"
+    )
     st.caption(metadata["metadata_source"])
     if metadata.get("eval_observation"):
         st.caption(str(metadata["eval_observation"]))
+    identity = _identity(group)
+    records_by_id = {rec["response_id"]: rec for rec in group}
+    ids = set(records_by_id)
+    selected_rows = [r for r in rows if r["response_id"] in ids]
+    metrics = _aggregate_metrics(selected_rows)
+    _render_failure_summary(metrics)
     _render_outcomes(group)
     # Above the known failure and the metric rows: a reviewer checking whether a
     # recorded failure came back needs the answer beside the description of it,
@@ -911,10 +1461,9 @@ def _question_detail(key, group, rows):
         # One panel per run, all closed when there are several: an answer runs
         # to pages, and the point of this section is comparing the runs, not
         # scrolling through the first to reach the second.
-        for index, rec in enumerate(group, 1):
+        for rec in sorted(group, key=lambda r: identity[r["response_id"]]["run"]):
             with st.expander(
-                f"Run {index} · Response {rec['response_id']} · {outcome(rec)}"
-                f" · {rec['timestamp'][:19]}",
+                f"{identity[rec['response_id']]['label']} · {_outcome_label(rec)}",
                 expanded=len(group) == 1,
             ):
                 if rec.get("needs_clarification"):
@@ -923,14 +1472,18 @@ def _question_detail(key, group, rows):
                     )
                 if rec.get("is_error"):
                     st.error(rec.get("error_message") or "Request failed")
+                if rec.get("max_turns_halted"):
+                    st.warning(
+                        "Research limit reached: a research step stopped at the "
+                        "tool-call limit, so it returned no findings."
+                    )
                 _captured_text(
                     rec.get("actual_output") or "_(no output captured)_", height=500
                 )
+    if len(group) > 1:
+        _render_response_comparison(group, identity, metrics)
     with st.expander("Full research log"):
-        _render_chat_interaction(group)
-    ids = {r["response_id"] for r in group}
-    selected_rows = [r for r in rows if r["response_id"] in ids]
-    metrics = _aggregate_metrics(selected_rows)
+        _render_chat_interaction(group, identity)
     # Same heading level as the metric groups below, and before them: what this
     # question was recorded as failing is what those scores are checking for.
     if metadata.get("known_gap"):
@@ -939,8 +1492,8 @@ def _question_detail(key, group, rows):
     for title, keys in STAGES.items():
         subset = [m for m in metrics if m["test_name"] in keys]
         if subset:
-            st.markdown(f"#### {title}")
-            _render_metric_rows(subset)
+            _stage_heading(title)
+            _render_metric_rows(subset, identity, records_by_id)
     if key[3] != "case_law_only":
         with st.expander(
             "Did this run find the legislation the reference answer relies on?"
@@ -955,7 +1508,7 @@ def _question_detail(key, group, rows):
                 "correct."
             )
             for rec in group:
-                st.caption(f"Response {rec['response_id']}")
+                st.caption(_response_heading(rec["response_id"], identity))
                 _render_attribution_flag([rec])
     search_rows = [r for rec in group for r in searches(rec)]
     with st.expander("Searches and deep-research steps"):
@@ -982,7 +1535,8 @@ def _question_detail(key, group, rows):
             steps = plan_steps(rec)
             approved = len((rec.get("research_plan") or {}).get("steps", []))
             st.caption(
-                f"Response {rec['response_id']}: {approved} approved steps, {len(steps)} captured delegations"
+                f"{_response_heading(rec['response_id'], identity)}: "
+                f"{approved} approved steps, {len(steps)} captured delegations"
             )
             for step in steps:
                 with st.expander(
@@ -996,9 +1550,18 @@ def _question_detail(key, group, rows):
         st.caption(
             "Includes answers, Worker reports, selected verdicts, question metadata and current reference statements. Draft agreement is not legal correctness."
         )
+        notes = _review_notes(key)
+        notes["metric_caught_it"] = None
         reference = _reference_answers(_reference_manifest_mtime()).get(key[0], {})
         pack = {
             "question": metadata,
+            "selection": {
+                "Model": key[1],
+                "Chat mode": key[2],
+                "Research mode": key[3],
+                "Experiment": group[0].get("experiment", {}).get("label", key[5]),
+                "Scoring selection": scoring_label,
+            },
             "current_reference_statements": reference.get("statements", []),
             "current_reference_sha256": reference.get("reference_sha256"),
             "scored_reference_snapshots": {
@@ -1010,37 +1573,61 @@ def _question_detail(key, group, rows):
             },
             "responses": [
                 {
-                    k: r.get(k)
-                    for k in (
-                        "response_id",
-                        "question",
-                        "actual_output",
-                        "research_output",
-                        "experiment_id",
-                        "gather_run_id",
-                        "needs_clarification",
-                        "error_message",
-                    )
+                    **{
+                        k: rec.get(k)
+                        for k in (
+                            "response_id",
+                            "question",
+                            "timestamp",
+                            "actual_output",
+                            "research_output",
+                            "experiment_id",
+                            "gather_run_id",
+                            "needs_clarification",
+                            "error_message",
+                        )
+                    },
+                    "run_label": identity[rec["response_id"]]["label"],
+                    "outcome": _outcome_label(rec),
+                    "research_limit_reached": bool(rec.get("max_turns_halted")),
                 }
-                for r in group
+                for rec in sorted(
+                    group, key=lambda r: identity[r["response_id"]]["run"]
+                )
+            ],
+            "checks": [
+                {
+                    "metric_name": m["metric_name"].strip(),
+                    "state": _headline_state(m),
+                    "scored": m.get("scored", True),
+                    "threshold": m.get("threshold"),
+                    "results": _check_results(m, identity),
+                }
+                for m in metrics
             ],
             "metrics": [
                 {k: v for k, v in r.items() if k != "scoring_config"}
                 for r in selected_rows
             ],
             "searches": search_rows,
-            "review": {
-                "observed_problem": "",
-                "evidence_passage": "",
-                "metric_caught_it": None,
-                "reviewer": "",
-            },
+            "review": notes,
         }
-        st.download_button(
+        json_column, markdown_column = st.columns(2)
+        json_column.download_button(
             "Download review pack",
-            json.dumps(pack, ensure_ascii=False, indent=2),
+            json.dumps(pack, ensure_ascii=False, indent=2, default=str),
             file_name=f"q{key[0]}_review.json",
             mime="application/json",
+        )
+        markdown_column.download_button(
+            "Download review report (.md)",
+            review_markdown(pack),
+            file_name=f"q{key[0]}_review.md",
+            mime="text/markdown",
+        )
+        st.caption(
+            "Both downloads describe the selection shown above and write nothing "
+            "to the database."
         )
 
 
@@ -1053,6 +1640,12 @@ def _compare_experiments(records, rows):
     if len(experiments) < 2:
         st.info(
             "Comparison needs two recorded experiments. Legacy responses remain available in the question review; dates alone do not establish matching conditions."
+        )
+        st.button(
+            "Review repeated responses instead",
+            help="Opens the question review, where repeat attempts to the same "
+            "question can be read side by side.",
+            on_click=lambda: st.session_state.update(view="Review questions"),
         )
         return
     options = sorted(experiments)
@@ -1077,7 +1670,7 @@ def _compare_experiments(records, rows):
         column_config=_column_help(COMPARISON_SUMMARY_COLUMNS),
     )
     st.dataframe(
-        outcomes,
+        [_display_counts(row) for row in outcomes],
         hide_index=True,
         width="stretch",
         column_config=_column_help(COMPARISON_OUTCOME_COLUMNS),
@@ -1115,7 +1708,12 @@ def main() -> None:
     st.set_page_config(page_title="LexChat Eval", layout="wide")
     st.title("LexChat evaluation")
     st.caption(_reference_status_line())
-    db_path = Path(st.text_input("Results database", str(RESPONSES_DB)))
+    # The database path and the scoring selection are set once a session and
+    # then repeat on every screen, so they are folded away and summarised in
+    # the caption below the filters instead of leading the page.
+    settings = st.expander("Settings: database and scoring selection")
+    with settings:
+        db_path = Path(st.text_input("Results database", str(RESPONSES_DB)))
     if not db_path.exists():
         st.info("No database at this path.")
         return
@@ -1124,8 +1722,9 @@ def main() -> None:
         st.info("No response attempts in this database.")
         return
     view = st.radio(
-        "View", ["Review questions", "Compare experiments"], horizontal=True
+        "View", ["Review questions", "Compare experiments"], horizontal=True, key="view"
     )
+    active = {"Database": db_path.name}
     cols = st.columns(3)
     for col, field, label in zip(
         cols,
@@ -1135,6 +1734,7 @@ def main() -> None:
     ):
         options = sorted({r.get(field) or "unknown" for r in records})
         selected = col.selectbox(label, ["All", *options])
+        active[label] = selected
         if selected != "All":
             records = [r for r in records if (r.get(field) or "unknown") == selected]
     selected_questions = st.multiselect(
@@ -1159,6 +1759,7 @@ def main() -> None:
         ["All", *sorted(experiments)],
         format_func=lambda e: e if e == "All" else f"{experiments[e]} ({e[:8]})",
     )
+    active["Experiment"] = exp
     if exp != "All":
         records = [r for r in records if (r.get("experiment_id") or "Legacy") == exp]
     ids = {r["response_id"] for r in records}
@@ -1168,11 +1769,19 @@ def main() -> None:
         for r in rows
         if r.get("scoring_run_id")
     }
-    scoring = st.selectbox(
-        "Scoring selection",
-        ["Latest stored", *sorted(runs)],
-        format_func=lambda r: r if r == "Latest stored" else f"{runs[r]} ({r[:8]})",
+    with settings:
+        scoring = st.selectbox(
+            "Scoring selection",
+            ["Latest stored", *sorted(runs)],
+            format_func=lambda r: r if r == "Latest stored" else f"{runs[r]} ({r[:8]})",
+        )
+        st.caption(
+            "One selected score per response and metric. Legacy scorer versions are unknown. An explicit scoring run shows its historical reference; the latest view excludes outdated reference verdicts."
+        )
+    scoring_label = (
+        scoring if scoring == "Latest stored" else f"{runs[scoring]} ({scoring[:8]})"
     )
+    active["Scoring"] = scoring_label
     if scoring != "Latest stored":
         rows = [r for r in rows if r.get("scoring_run_id") == scoring]
     else:
@@ -1180,10 +1789,7 @@ def main() -> None:
             rows, _reference_answers(_reference_manifest_mtime())
         )
     rows = apply_scope(latest_results(rows))
-    st.caption(
-        "One selected score per response and metric. Legacy scorer versions are unknown. An explicit scoring run shows its historical reference; the latest view excludes outdated reference verdicts."
-    )
-    _render_outcomes(records)
+    st.caption(" · ".join(f"{name}: {value}" for name, value in active.items()))
     if records:
         st.caption(
             f"Gathered {min(r['timestamp'] for r in records)[:10]} to {max(r['timestamp'] for r in records)[:10]}"
@@ -1192,30 +1798,52 @@ def main() -> None:
     summaries = {
         key: _question_summary(key, group, rows) for key, group in groups.items()
     }
-    attention = st.checkbox(
+    left, right = st.columns(2)
+    attention = left.checkbox(
         "Only questions needing attention",
         help="Hides questions where every run answered and every metric passed. "
         + NEEDS_ATTENTION_HELP,
+    )
+    configuration = right.checkbox(
+        "Show run configuration columns",
+        help="Model, chat mode, research mode, experiment and question type. "
+        "Every row in one selection usually repeats them, and the selected "
+        "question's header says them.",
     )
     keys = [
         key for key, row in summaries.items() if not attention or row["Needs attention"]
     ]
     keys.sort(key=lambda k: (not summaries[k]["Needs attention"], k))
-    st.dataframe(
-        [summaries[k] for k in keys],
+    table = [
+        {
+            name: value
+            for name, value in summaries[k].items()
+            if configuration or name not in CONFIGURATION_COLUMNS
+        }
+        for k in keys
+    ]
+    # Clicking a row opens that question below, so the queue and the detail
+    # view are the same control rather than two selections to keep in step.
+    event = st.dataframe(
+        table,
         hide_index=True,
         width="stretch",
-        column_config=_column_help(QUESTION_COLUMNS),
+        column_config=_column_help(QUESTION_COLUMNS, QUESTION_COLUMN_WIDTHS),
+        on_select="rerun",
+        selection_mode="single-row",
+        key="question_table",
     )
     if not keys:
         st.info("No questions match this selection.")
         return
+    chosen = getattr(event, "selection", {}).get("rows") if event is not None else None
     selected = st.selectbox(
         "Inspect question",
         keys,
+        index=chosen[0] if chosen and chosen[0] < len(keys) else 0,
         format_func=lambda k: f"Q{k[0]} · {k[1]} · {k[2]} · {k[3]} · {k[5][:8]}",
     )
-    _question_detail(selected, groups[selected], rows)
+    _question_detail(selected, groups[selected], rows, scoring_label)
 
 
 if __name__ == "__main__":

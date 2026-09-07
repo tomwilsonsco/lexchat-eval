@@ -164,8 +164,16 @@ streamlit run lex_eval/reports/streamlit_report.py
 
 The dashboard reads `lex_eval/data/responses.db` without modifying it. Filter by
 model, chat mode, research mode, and experiment, then inspect questions and their
-failure stages. Stored contradiction failures stay failures, mixed repeats remain
-mixed, and clarification, errors, halts, and report repair are shown separately.
+failure stages. The question table leads with what needs attention, failed checks,
+measurement gaps and execution warnings, and clicking a row opens that question.
+Stored contradiction failures stay failures, mixed repeats remain mixed, and
+clarification, errors, halts, and report repair are shown separately. A check with
+no verdict says whether it does not apply, could not be measured, is not
+comparable, or was never scored against that response. Every panel names a
+response the same way, repeat answers can be read side by side with their own
+check results, and the review evidence exports as JSON and as a readable
+Markdown report carrying each score's provenance. Reviewer notes typed into the
+export panel are kept for the browser session against that question.
 
 Use `--label` and `--experiment-id` when gathering to identify repeat sweeps.
 Scoring runs have their own identity, so rejudging an answer cannot count as an
@@ -411,6 +419,7 @@ lex_eval/
 │   ├── lex_client.py        # the LEX and Find Case Law tools, as LexChat calls them
 │   └── store.py             # manifest + Markdown for review
 ├── reports/
+│   ├── review_export.py     # review pack as a readable Markdown report
 │   └── streamlit_report.py  # Streamlit dashboard
 ├── tests/                   # pytest evaluation suites
 ├── utils/                   # shared utilities (db, client, capture, judge)
