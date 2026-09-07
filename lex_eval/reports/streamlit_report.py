@@ -3,7 +3,6 @@ from __future__ import annotations
 import html
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 import streamlit as st
@@ -21,11 +20,22 @@ from lex_eval.reference.store import (
     reference_version,
 )
 from lex_eval.reports.attribution import caveat, worst_attribution
+from lex_eval.reports.comparison import compare
+from lex_eval.reports.diagnostics import searches, plan_steps
+from lex_eval.reports.data import (
+    apply_scope,
+    question_metadata,
+    current_reference_rows,
+    aggregate_metrics,
+    read_database,
+    latest_results,
+    outcome,
+    outcome_counts,
+    question_groups,
+)
 from lex_eval.utils.db import (
     DEFAULT_DB,
-    load_eval_results as db_load_eval_results,
     reason_is_not_measured,
-    load_records as db_load_records,
 )
 
 script_dir = Path(__file__).parent
@@ -38,65 +48,9 @@ DEFAULT_CHAT_MODE = "research"
 
 
 @st.cache_data
-def load_eval_results(_db_mtime: float = 0.0) -> list[dict]:
-    """Load every metric's eval_<metric> table and tag each row with the
-    test_name/metric_name implied by which table it came from (the table
-    itself doesn't store them, since the table name already is the metric).
-
-    Also tags each row with the chat_mode of the response it scored. The
-    eval_<metric> tables have no chat_mode column, so it is looked up through
-    response_id. Everything downstream groups on it, so a deep research run is
-    never averaged together with a single-shot one."""
-    modes = _response_chat_modes()
-    results: list[dict] = []
-    for key, display_name, _tooltip in METRICS:
-        for row in db_load_eval_results(RESPONSES_DB, metric=key):
-            results.append(
-                {
-                    **row,
-                    "test_name": key,
-                    "metric_name": display_name,
-                    # "unknown" rather than a silent default: an eval row whose
-                    # response_id matches no response is a broken FK, and it
-                    # should surface as its own group rather than quietly
-                    # inflating the single-shot numbers.
-                    "chat_mode": modes.get(row.get("response_id"), "unknown"),
-                }
-            )
-    return results
-
-
-def _response_chat_modes() -> dict[int, str]:
-    """response_id -> chat_mode, for tagging eval rows."""
-    return {
-        int(rec["response_id"]): (rec.get("chat_mode") or DEFAULT_CHAT_MODE)
-        for rec in db_load_records(RESPONSES_DB)
-        if rec.get("response_id") is not None
-    }
-
-
-@st.cache_data
-def load_responses(_mtime: float = 0.0) -> dict[tuple[str, str, int], list[dict]]:
-    """
-    Load responses from DuckDB and index by (llm_name, chat_mode, question_id).
-    Each key maps to a list of response records (could be 2+ runs).
-
-    chat_mode is part of the key so the Chat Interaction tab shows the same runs
-    the metrics above it were scored on, rather than every run of the question.
-
-    Error rows are included. They carry no metric rows, so they add nothing to
-    the scores, but reports/attribution.py cannot report a run that timed out
-    if the run is never loaded.
-    """
-    idx: dict[tuple[str, str, int], list[dict]] = defaultdict(list)
-    for rec in db_load_records(RESPONSES_DB, include_errors=True):
-        key = (
-            rec["llm_name"],
-            rec.get("chat_mode") or DEFAULT_CHAT_MODE,
-            int(rec["question_id"]),
-        )
-        idx[key].append(rec)
-    return dict(idx)
+def load_dashboard(db_path: str, mtime: float):
+    """Cache by path and modification time; never migrate the source database."""
+    return read_database(Path(db_path), METRICS)
 
 
 # Single source of truth for every metric this dashboard displays: its
@@ -197,16 +151,7 @@ METRIC_DISPLAY_ORDER: list[str] = [name for _key, name, _tooltip in METRICS]
 # hover over tips on app summary tables
 METRIC_TOOLTIPS: dict[str, str] = {name: tip for _key, name, tip in METRICS}
 
-# do not keep the individual response results of these metrics as only make sense
-# comparing multiple
-_AGGREGATE_ONLY_METRICS = {"Consistency (Cosine)"}
 
-
-# Reason prefixes written by judge exceptions and harness capture gates (see
-# metrics/*.py except blocks, tests/eval/test_groundedness.py gate functions,
-# and structure.py's delegate_research precondition). Rows carrying one of
-# these are not a genuine quality verdict, excluded from the mean, reported
-# separately instead of averaged in as 0.0.
 def _is_scored(result: dict) -> bool:
     """Whether this row's score is a verdict, and so belongs in a mean.
 
@@ -231,71 +176,7 @@ def _metric_sort_key(metric: dict) -> int:
 
 
 def _aggregate_metrics(results: list[dict]) -> list[dict]:
-    """
-    return aggregated result per metric type.
-
-    Consistency: single aggregated entry (no per-run breakdown).
-    All other metrics:
-      keep every individual run, computes mean/min/max over all of them,
-      stores the full list in raw_results for the detail expander.
-    """
-    by_metric: dict[str, list[dict]] = defaultdict(list)
-    for r in results:
-        by_metric[r["metric_name"]].append(r)
-
-    aggregated: list[dict] = []
-    for metric_name, metric_results in by_metric.items():
-        if metric_name in _AGGREGATE_ONLY_METRICS:
-            aggregated.append(
-                {**metric_results[0], "scored": _is_scored(metric_results[0])}
-            )
-        else:
-            scored = [r for r in metric_results if _is_scored(r)]
-            not_scored = [r for r in metric_results if not _is_scored(r)]
-            scores = [r["score"] for r in scored]
-            mean_score = sum(scores) / len(scores) if scores else 0.0
-            aggregated.append(
-                {
-                    **metric_results[0],
-                    "score": mean_score,
-                    "min_score": min(scores) if scores else 0.0,
-                    "max_score": max(scores) if scores else 0.0,
-                    "n_runs": len(metric_results),
-                    "test_names": [r["test_name"] for r in metric_results],
-                    "raw_results": metric_results,
-                    "passed": bool(scores)
-                    and mean_score >= metric_results[0]["threshold"],
-                    "scored": bool(scores),
-                    "not_scored_count": len(not_scored),
-                    "not_scored_reasons": [r["reason"] for r in not_scored],
-                }
-            )
-    return sorted(aggregated, key=_metric_sort_key)
-
-
-def _build_hierarchy(
-    raw: list[dict],
-) -> dict[tuple[str, str], dict[int, list[dict]]]:
-    """
-    group raw results
-    (llm_name, chat_mode) + question_id + [aggregated metric results]
-
-    chat_mode is part of the key because a deep research run and a single-shot
-    run of the same question are different products of the same model, and
-    averaging them into one score hides the difference between them.
-    """
-    grouped: dict[tuple[str, str], dict[int, list[dict]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
-    for r in raw:
-        key = (r["llm_name"], r.get("chat_mode") or DEFAULT_CHAT_MODE)
-        grouped[key][int(r["question_id"])].append(r)
-    hierarchy: dict[tuple[str, str], dict[int, list[dict]]] = {}
-    for key, questions in grouped.items():
-        hierarchy[key] = {}
-        for qid, results in questions.items():
-            hierarchy[key][qid] = _aggregate_metrics(results)
-    return hierarchy
+    return sorted(aggregate_metrics(results), key=_metric_sort_key)
 
 
 _SCORE_THRESHOLDS = [(0.95, "excellent"), (0.80, "good"), (0.60, "warning")]
@@ -333,146 +214,6 @@ def _score_badge(score: float | str, level: str | None = None) -> str:
     )
 
 
-def _get_group_pass_rate(key: tuple[str, str], hierarchy: dict) -> float:
-    """Calculate the overall pass rate for one (llm, chat_mode) group.
-
-    Metric groups with nothing scored (every run a judge error or capture
-    gate) are excluded entirely, not counted as failed.
-    """
-    q_data = hierarchy.get(key, {})
-    all_m = [r for results in q_data.values() for r in results if r.get("scored", True)]
-    total = len(all_m)
-    return (sum(1 for r in all_m if r["passed"]) / total) if total else 0.0
-
-
-def _group_label(key: tuple[str, str], show_mode: bool) -> str:
-    """Display name for an (llm, chat_mode) group."""
-    llm, mode = key
-    return f"{llm}  ·  {_chat_mode_badge(mode)}" if show_mode else llm
-
-
-def _sorted_group_keys(hierarchy: dict) -> list[tuple[str, str]]:
-    """Groups worst pass rate first, so the ones needing attention lead."""
-    return sorted(
-        hierarchy.keys(), key=lambda k: (_get_group_pass_rate(k, hierarchy), k)
-    )
-
-
-# Display priority for chat_mode in the top summary: deep research leads,
-# since that is the mode under active development, then single-shot research,
-# then conversational. Any other/unknown mode sorts after these.
-_MODE_ORDER = ["deep_research", "research", "conversational"]
-
-
-def _mode_sort_key(mode: str) -> int:
-    try:
-        return _MODE_ORDER.index(mode)
-    except ValueError:
-        return len(_MODE_ORDER)
-
-
-def _top_summary_sorted_group_keys(hierarchy: dict) -> list[tuple[str, str]]:
-    """Groups by chat_mode (in _MODE_ORDER), then worst pass rate first within
-    each mode, matching the per-mode ordering the page used before."""
-    return sorted(
-        hierarchy.keys(),
-        key=lambda k: (_mode_sort_key(k[1]), _get_group_pass_rate(k, hierarchy), k),
-    )
-
-
-def _render_top_summary(hierarchy: dict, show_mode: bool) -> None:
-    """summary rows at the top of the page for each (llm, chat_mode) group.
-    Expand to show mean score per metric across all questions."""
-    for key in _top_summary_sorted_group_keys(hierarchy):
-        group_name = _group_label(key, show_mode)
-        q_data = hierarchy[key]
-        all_results = [r for results in q_data.values() for r in results]
-        all_m = [r for r in all_results if r.get("scored", True)]
-        n_na = len(all_results) - len(all_m)
-        total = len(all_m)
-        passed = sum(1 for r in all_m if r["passed"])
-        failed = total - passed
-        pct = passed / total * 100 if total else 0.0
-
-        na_part = f" &nbsp; N/A: **{n_na}**" if n_na else ""
-        label = (
-            f"**{group_name}** &nbsp;|&nbsp; "
-            f"Passed: **{passed}** &nbsp; Failed: **{failed}** &nbsp; "
-            f"Total: **{total}**{na_part} &nbsp; Pass Rate: **{pct:.1f}%**"
-        )
-
-        with st.expander(label, expanded=False):
-            # mean score per metric (in display order)
-            by_metric: dict[str, list[float]] = defaultdict(list)
-            thresholds: dict[str, float] = {}
-            for m in all_m:
-                name = m["metric_name"].strip()
-                by_metric[name].append(m["score"])
-                thresholds[name] = m["threshold"]
-
-            metric_names = sorted(
-                by_metric.keys(),
-                key=lambda n: (
-                    METRIC_DISPLAY_ORDER.index(n)
-                    if n in METRIC_DISPLAY_ORDER
-                    else len(METRIC_DISPLAY_ORDER)
-                ),
-            )
-
-            rows_html = ""
-            for name in metric_names:
-                scores = by_metric[name]
-                mean = sum(scores) / len(scores)
-                threshold = thresholds[name]
-                badge = _score_badge(mean)
-                pass_count = sum(1 for s in scores if s >= threshold)
-                tooltip = METRIC_TOOLTIPS.get(name, "")
-                if tooltip:
-                    name_cell = f'<span title="{tooltip}" style="cursor:help;color:#c9d1d9;">{name}</span>'
-                else:
-                    name_cell = f'<span style="color:#c9d1d9;">{name}</span>'
-                rows_html += (
-                    f"<tr>"
-                    f'<td style="padding:6px 14px;">{name_cell}</td>'
-                    f'<td style="padding:6px 14px;">{badge}</td>'
-                    f'<td style="padding:6px 14px;font-family:monospace;color:#8b949e;">{threshold:.2f}</td>'
-                    f'<td style="padding:6px 14px;font-family:monospace;color:#8b949e;">{pass_count}/{len(scores)}</td>'
-                    f"</tr>"
-                )
-
-            st.markdown(
-                f"""
-                <table style="border-collapse:collapse;width:100%;
-                              background:#161b22;border-radius:6px;overflow:hidden;">
-                  <thead>
-                    <tr style="background:#21262d;color:#8b949e;font-size:0.8em;text-transform:uppercase;">
-                      <th style="padding:8px 14px;text-align:left;">Metric</th>
-                      <th style="padding:8px 14px;text-align:left;">Mean Score</th>
-                      <th style="padding:8px 14px;text-align:left;">Threshold</th>
-                      <th style="padding:8px 14px;text-align:left;">Questions Passed</th>
-                    </tr>
-                  </thead>
-                  <tbody>{rows_html}</tbody>
-                </table>
-                """,
-                unsafe_allow_html=True,
-            )
-
-
-def _render_llm_summary_bar(q_data: dict[int, list[dict]]) -> None:
-    """header stats for one (llm, chat_mode) group"""
-    all_m = [r for results in q_data.values() for r in results if r.get("scored", True)]
-    total = len(all_m)
-    passed = sum(1 for r in all_m if r["passed"])
-    pct = passed / total * 100 if total else 0.0
-    colour = "#3fb950" if pct >= 80 else "#f0ad4e" if pct >= 50 else "#f85149"
-    st.markdown(
-        f"**{passed}/{total}** metrics passed &nbsp;"
-        f'<span style="color:{colour};font-weight:600;">{pct:.1f}%</span>',
-        unsafe_allow_html=True,
-    )
-
-
 def _metric_row_label(m: dict) -> str:
     """One-line summary of a metric, used as its expander label.
 
@@ -485,9 +226,9 @@ def _metric_row_label(m: dict) -> str:
     if not m.get("scored", True):
         # Every run in this group was a judge error or capture gate, so there
         # is no score or pass/fail status to show.
-        return f"**{name}** &nbsp; `N/A` &nbsp; :gray[Not scored]"
+        return f"**{name}** &nbsp; `N/A` &nbsp; :gray[{m.get('state', 'Not measured')}]"
 
-    status = ":green[Passed]" if m["passed"] else ":red[Failed]"
+    status = f"{m['pass_count']}/{m['measured_count']} measured passes, {m['state']}"
     label = (
         f"**{name}** &nbsp; `{m['score']:.3f}` &nbsp; {status} "
         f"&nbsp; :gray[threshold {m['threshold']:.2f}]"
@@ -550,7 +291,9 @@ def _render_metric_body(m: dict) -> None:
     # anything here, and only once there is more than one run.
     n = m.get("n_runs", len(m.get("raw_results", [])))
     if n > 1:
-        st.caption(f"Mean of {n} runs")
+        st.caption(
+            f"{m['measured_count']} measured responses; one selected score per response"
+        )
 
     not_scored_reasons = m.get("not_scored_reasons") or []
     if not_scored_reasons:
@@ -582,7 +325,7 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
     # Escaped, then newlines turned into <br>, so a multi-line reason (e.g.
     # Plan Coverage's per-statement breakdown) renders as line breaks rather
     # than one run-on line, without trusting judge/reason text as raw HTML.
-    reason_html = html.escape(r.get("reason", "")).replace("\n", "<br>")
+    reason_html = html.escape(r.get("reason") or "").replace("\n", "<br>")
     st.markdown(
         f'<div style="background:#0d1117;border-left:3px solid {colour};'
         f'padding:10px 14px;border-radius:4px;margin:6px 0;">'
@@ -596,7 +339,26 @@ def _render_single_eval_result(r: dict, run_label: str | None = None) -> None:
         unsafe_allow_html=True,
     )
 
-    meta_bits = []
+    if r.get("scope_note"):
+        st.caption(r["scope_note"])
+    if r.get("details"):
+        st.json(r["details"], expanded=False)
+    if r.get("reference_sha256"):
+        refs = r.get("scoring_config", {}).get("references", {})
+        reference = refs.get(str(r["question_id"])) or refs.get(r["question_id"])
+        if reference:
+            with st.expander("Reference used for this score"):
+                st.caption(
+                    f"Reference status: {r.get('reference_mode', 'unknown')}; fingerprint: {r['reference_sha256']}"
+                )
+                for statement in reference.get("statements", []):
+                    st.write(statement)
+    meta_bits = [f"response {r.get('response_id', 'unknown')}"]
+    if r.get("scoring_run_id"):
+        meta_bits.append(f"scoring run {r['scoring_run_id']}")
+        meta_bits.append(f"code {r.get('metric_version', 'unknown')[:12]}")
+    else:
+        meta_bits.append("legacy scorer version unknown")
     if not _reference_is_current(r):
         meta_bits.append("reference answer changed since, re-run to update")
     if r.get("run_at"):
@@ -651,14 +413,24 @@ def _render_chat_interaction(records: list[dict]) -> None:
         ]
     )
 
-    for tab, rec in zip(run_tabs, records):
+    for tab, rec in zip(run_tabs, records, strict=True):
         with tab:
+            st.caption(f"Response {rec['response_id']} · {outcome(rec)}")
+            if rec.get("needs_clarification"):
+                st.info(rec.get("clarification_question") or "Clarification requested")
+            if rec.get("is_error"):
+                st.error(rec.get("error_message") or "Request failed")
+            if rec.get("max_turns_halted"):
+                st.warning("A research step reached the tool-call limit.")
+            st.caption(
+                f"Reformatted: {bool(rec.get('reformatted'))}; request attempts: {rec.get('attempts', 'unknown')}"
+            )
             # --- Execution Metadata ---
             st.markdown("##### ⚙️ Execution Context")
             cols = st.columns(5)
             with cols[0]:
                 chat_mode = rec.get("chat_mode", "research")
-                st.markdown(f"**Research Type:** {_chat_mode_badge(chat_mode)}")
+                st.markdown(f"**Chat mode:** {_chat_mode_badge(chat_mode)}")
             with cols[1]:
                 st.markdown(f"**Research Mode:** `{rec.get('research_mode', 'N/A')}`")
             with cols[2]:
@@ -697,7 +469,11 @@ def _render_chat_interaction(records: list[dict]) -> None:
                         for i, step in enumerate(steps):
                             if isinstance(step, dict):
                                 title = step.get("title") or f"Step {i + 1}"
-                                detail = step.get("brief") or step.get("description")
+                                detail = (
+                                    step.get("detail")
+                                    or step.get("brief")
+                                    or step.get("description")
+                                )
                                 st.markdown(f"**{i + 1}. {title}**")
                                 if detail:
                                     st.caption(detail)
@@ -746,129 +522,36 @@ def _render_chat_interaction(records: list[dict]) -> None:
                 if t.get("name") != "Research Agent"
             ]
             if tools_called:
-                # Sort tools_called by their position in tool_sequence
-                tool_seq = rec.get("tool_sequence") or []
-                order_map = {name: i for i, name in enumerate(tool_seq)}
-                tools_called.sort(key=lambda t: order_map.get(t.get("name", ""), 999))
-
-                st.markdown(f"#### Tools Called ({len(tools_called)})")
-                for i, tool in enumerate(tools_called):
-                    tool_name = tool.get("name", f"tool_{i}")
-                    display_name = _strip_worker_prefix(tool_name)
-                    is_lex_api = any(
-                        k in tool_name
-                        for k in (
-                            "search_legislation",
-                            "get_legislation_text",
-                            "get_legislation",
-                        )
-                    )
-                    st.markdown(f"🔧 **{display_name}**")
-                    if is_lex_api:
+                st.markdown(f"#### Tools called ({len(tools_called)})")
+                st.caption(
+                    "Captured order. The step view above preserves each delegation boundary."
+                )
+                for index, tool in enumerate(tools_called, 1):
+                    name = _strip_worker_prefix(tool.get("name", "unknown"))
+                    with st.expander(f"{index}. {name}"):
                         params = (
                             tool.get("input_parameters")
                             or tool.get("inputParameters")
                             or {}
                         )
-                        output_raw = tool.get("output", "")
-                        req_col, _ = st.columns([3, 1])
-                        with req_col:
-                            method = params.get("method", "POST")
-                            url = params.get("url", "")
-                            payload = params.get("payload") or {}
-                            st.markdown(
-                                f'<div style="background:#0d1117;border-left:3px solid #58a6ff;'
-                                f"padding:8px 12px;border-radius:4px;margin:4px 0 2px 0;"
-                                f'font-size:0.85em;font-family:monospace;color:#58a6ff;">'
-                                f"📡 {method} {url}</div>",
-                                unsafe_allow_html=True,
+                        st.caption("Tool arguments")
+                        st.json(params, expanded=True)
+                        output = tool.get("output")
+                        if isinstance(output, str):
+                            try:
+                                output = json.loads(output)
+                            except (ValueError, TypeError):
+                                pass
+                        if isinstance(output, (dict, list)):
+                            st.json(output, expanded=False)
+                        elif output:
+                            st.code(str(output), language="text")
+                        else:
+                            st.caption(
+                                "No output captured; this is not proof of an empty search."
                             )
-                            if payload:
-                                st.json(payload, expanded=True)
-                        st.markdown(
-                            '<div style="font-size:0.8em;color:#8b949e;margin:4px 0 2px 16px;">'
-                            "↩ Response</div>",
-                            unsafe_allow_html=True,
-                        )
-                        with st.container():
-                            if isinstance(output_raw, str):
-                                # Check for explicit "no results" fallback indicators
-                                if output_raw.strip().lower() in (
-                                    "done",
-                                    "none",
-                                    "null",
-                                    "",
-                                ):
-                                    st.info(
-                                        "⚠️ No results returned from this API call."
-                                    )
-                                else:
-                                    try:
-                                        parsed = json.loads(output_raw)
-                                        if (
-                                            isinstance(parsed, dict)
-                                            and parsed.get("status") == "no_results"
-                                        ):
-                                            st.info(
-                                                f"⚠️ {parsed.get('message', 'No results returned from this API call.')}"
-                                            )
-                                        else:
-                                            st.json(parsed, expanded=False)
-                                    except (json.JSONDecodeError, ValueError):
-                                        st.code(output_raw, language="text")
-                            elif (
-                                isinstance(output_raw, dict)
-                                and output_raw.get("status") == "no_results"
-                            ):
-                                st.info(
-                                    f"⚠️ {output_raw.get('message', 'No results returned from this API call.')}"
-                                )
-                            elif isinstance(output_raw, (dict, list)):
-                                st.json(output_raw, expanded=False)
-                            else:
-                                st.text(str(output_raw))
-                    elif tool_name == "delegate_research":
-                        params = (
-                            tool.get("input_parameters")
-                            or tool.get("inputParameters")
-                            or {}
-                        )
-                        query = params.get("query", "")
-                        if query:
-                            st.markdown(
-                                f'<div style="background:#0d1117;border-left:3px solid #d29922;'
-                                f"padding:8px 12px;border-radius:4px;margin:4px 0 2px 0;"
-                                f'font-size:0.85em;font-family:monospace;color:#d29922;">'
-                                f"🎯 Manager asked: {html.escape(query)}</div>",
-                                unsafe_allow_html=True,
-                            )
-                        output_raw = tool.get("output", "")
-                        with st.container():
-                            if isinstance(output_raw, str):
-                                try:
-                                    parsed = json.loads(output_raw)
-                                    st.json(parsed, expanded=False)
-                                except (json.JSONDecodeError, ValueError):
-                                    st.code(output_raw, language="text")
-                            elif isinstance(output_raw, (dict, list)):
-                                st.json(output_raw, expanded=False)
-                            else:
-                                st.text(str(output_raw))
-                    else:
-                        output_raw = tool.get("output", "")
-                        with st.container():
-                            if isinstance(output_raw, str):
-                                try:
-                                    parsed = json.loads(output_raw)
-                                    st.json(parsed, expanded=False)
-                                except (json.JSONDecodeError, ValueError):
-                                    st.code(output_raw, language="text")
-                            elif isinstance(output_raw, (dict, list)):
-                                st.json(output_raw, expanded=False)
-                            else:
-                                st.text(str(output_raw))
             else:
-                st.caption("No tools_called data captured.")
+                st.caption("No tool calls captured.")
 
             st.divider()
 
@@ -905,6 +588,9 @@ def _render_chat_interaction(records: list[dict]) -> None:
             st.markdown("ℹ️ **Full Record Metadata**")
             st.json(
                 {
+                    "response_id": rec.get("response_id"),
+                    "experiment_id": rec.get("experiment_id"),
+                    "gather_run_id": rec.get("gather_run_id"),
                     "timestamp": rec.get("timestamp"),
                     "llm_name": rec.get("llm_name"),
                     "summarisation_llm": rec.get("summarisation_llm", ""),
@@ -935,7 +621,7 @@ _ATTRIBUTION_STYLE = {
 
 
 @st.cache_data
-def _reference_answers(_mtime: float = 0.0) -> dict:
+def _reference_answers(mtime: float = 0.0) -> dict:
     """Reference answers keyed by question_id.
 
     Signed and unsigned, matching tests/eval/test_reference.py: excluding
@@ -1019,225 +705,320 @@ def _reference_status_line() -> str:
     )
 
 
-def _render_question_block(
-    qid: int,
-    question_text: str,
-    metrics: list[dict],
-    response_records: list[dict],
-    chat_key: str,
-    failures_only: bool = False,
-) -> None:
-    """Full block for one question within an LLM section."""
-    scored_metrics = [m for m in metrics if m.get("scored", True)]
-    n_pass = sum(1 for m in scored_metrics if m["passed"])
-    n_total = len(scored_metrics)
-    n_na = len(metrics) - n_total
-    n_fail = sum(1 for m in metrics if _is_failure(m))
-
-    count = f"{n_pass}/{n_total} passed" if n_total else "nothing scored"
-    count = f":green[{count}]" if n_pass == n_total and n_total else f":red[{count}]"
-    if n_na:
-        count += f" &nbsp; :gray[{n_na} N/A]"
-
-    # In failures-only mode the failing questions are the point, so open them
-    # rather than making the reader click through to what they asked to see.
-    with st.expander(
-        f"**Q{qid}:** {question_text[:120]}{'…' if len(question_text) > 120 else ''}"
-        f" &nbsp; {count}",
-        expanded=failures_only and bool(n_fail),
-    ):
-        _render_attribution_flag(response_records)
-        _render_metric_rows(metrics, failures_only=failures_only)
-
-        # Loaded on demand. Streamlit runs an expander's body whether or not it
-        # is open, so rendering every question's transcript on every rerun cost
-        # about 1.6 of the 1.8 seconds each filter change used to take. The
-        # toggle keeps its own state, so this builds only for a question the
-        # reader actually opened.
-        if st.toggle("💬 Chat interaction", key=chat_key):
-            _render_chat_interaction(response_records)
-
-
-_ALL_MODES = "All research types"
-
-
-def _render_mode_filter(container, modes_present: list[str]) -> str:
-    """Dropdown selecting which chat_mode to show. Returns the selection.
-
-    Only rendered when the database holds more than one research type, since
-    with one it would be a dropdown with a single choice.
-    """
-    if len(modes_present) < 2:
-        return _ALL_MODES
-    return container.selectbox(
-        "Research type",
-        [_ALL_MODES, *modes_present],
-        index=0,
-        format_func=lambda m: (
-            m if m == _ALL_MODES else _chat_mode_badge(m).replace("_", " ")
-        ),
-        help="Deep research and single-shot runs are scored and averaged "
-        "separately, never blended into one number.",
-    )
-
-
-def _render_model_selector(container, llms: list[str]) -> str:
-    """Dropdown selecting which model's detail to show.
-
-    A selectbox rather than st.tabs because Streamlit renders every tab's
-    contents on every rerun, so tabs made the page cost grow with the number of
-    models evaluated even though only one is ever on screen.
-    """
-    return container.selectbox("Model", llms, index=0, help="Worst pass rate first.")
-
-
-_ALL_RESULTS = "All results"
-_FAILURES_ONLY = "Failures only"
-
-
-def _render_show_filter(container) -> str:
-    """Dropdown selecting whether to show every metric or only the failures."""
-    return container.selectbox(
-        "Show",
-        [_ALL_RESULTS, _FAILURES_ONLY],
-        index=0,
-        help="Failures only hides passing metrics and questions, and opens what "
-        "is left, so the reasons are on screen without hunting.",
-    )
-
-
-def _render_mode_comparison(
-    llm: str, keys: list[tuple[str, str]], hierarchy: dict, failures_only: bool
-) -> None:
-    """Metrics passed per question, one column per research type.
-
-    Only shown when a model has been run under more than one research type,
-    which is the case where the numbers are otherwise only comparable by
-    flipping the filter and remembering what was there.
-    """
-    qids = sorted({q for k in keys for q in hierarchy[k]})
-    rows = []
-    for qid in qids:
-        row = {"Question": f"Q{qid}"}
-        for _llm, mode in keys:
-            metrics = hierarchy[(llm, mode)].get(qid, [])
-            scored = [m for m in metrics if m.get("scored", True)]
-            n_fail = sum(1 for m in metrics if _is_failure(m))
-            if not scored:
-                row[mode] = "-"
-            elif failures_only:
-                row[mode] = str(n_fail)
-            else:
-                row[mode] = f"{len(scored) - n_fail}/{len(scored)}"
-        rows.append(row)
-
+def _render_outcomes(records):
+    counts = outcome_counts(records)
+    st.dataframe([counts], hide_index=True, width="stretch")
     st.caption(
-        "Failures per question" if failures_only else "Metrics passed per question"
+        "Outcomes count all attempts. Turn-cap and reformat flags may overlap with answers or errors."
     )
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+
+
+STAGES = {
+    "Answer coverage": {"reference_answer_agreement", "citation_agreement"},
+    "Planning and search": {"plan_coverage"},
+    "Worker evidence": {
+        "claim_support",
+        "citation_grounding",
+        "citation_read",
+        "citation_domain",
+        "genuine_gap",
+        "tool_usage",
+        "step_completion",
+    },
+    "Final synthesis": {
+        "response_groundedness",
+        "report_integration",
+        "citation_passthrough",
+        "mandatory_structure",
+    },
+    "Repeat similarity": {"consistency"},
+}
+
+
+def _question_summary(key, records, rows):
+    qid, model, chat, research, question, experiment = key
+    ids = {r["response_id"] for r in records}
+    metrics = _aggregate_metrics([r for r in rows if r["response_id"] in ids])
+    agreement = next(
+        (m for m in metrics if m["test_name"] == "reference_answer_agreement"), None
+    )
+    counts = outcome_counts(records)
+    metadata = question_metadata(records[0])
+    return {
+        "Question": f"Q{qid}: {question[:95]}",
+        "Model": model,
+        "Chat mode": chat,
+        "Research mode": research,
+        "Experiment": records[0].get("experiment", {}).get("label", experiment),
+        "Type": metadata.get("test_type", ""),
+        "Reference agreement": (
+            f"{agreement['pass_count']}/{agreement['measured_count']} measured passes"
+            if agreement
+            else "Not scored"
+        ),
+        "Attempts": counts["Attempts"],
+        "Answers": counts["Answer"],
+        "Clarifications": counts["Clarification"],
+        "Errors": counts["Error"],
+        "Turn-cap flags": counts["Turn-cap flags"],
+        "Needs attention": any(
+            _is_failure(m) or m.get("not_scored_count") for m in metrics
+        )
+        or any(outcome(r) != "Answer" or r.get("max_turns_halted") for r in records)
+        or not metrics,
+    }
+
+
+def _question_detail(key, group, rows):
+    st.subheader(f"Q{key[0]}: {key[4]}")
+    metadata = question_metadata(group[0])
+    st.caption(metadata["metadata_source"])
+    if metadata.get("known_gap"):
+        st.info("Recorded failure or control: " + metadata["known_gap"])
+    if metadata.get("eval_observation"):
+        st.caption(str(metadata["eval_observation"]))
+    _render_outcomes(group)
+    ids = {r["response_id"] for r in group}
+    selected_rows = [r for r in rows if r["response_id"] in ids]
+    metrics = _aggregate_metrics(selected_rows)
+    for title, keys in STAGES.items():
+        subset = [m for m in metrics if m["test_name"] in keys]
+        if subset:
+            st.markdown(f"#### {title}")
+            _render_metric_rows(subset)
+    if key[3] != "case_law_only":
+        with st.expander("Expected legislation: current-reference search attribution"):
+            st.caption(
+                "Uses the current reference, independently of a historical scoring selection. This checks Acts only, not judgments or legal correctness."
+            )
+            for rec in group:
+                st.caption(f"Response {rec['response_id']}")
+                _render_attribution_flag([rec])
+    search_rows = [r for rec in group for r in searches(rec)]
+    with st.expander("Searches and deep-research steps"):
+        st.caption(
+            "Counts describe returned items, not relevance. A later nonempty search is evidence of further results, not proof that the question was resolved."
+        )
+        if search_rows:
+            st.dataframe(search_rows, hide_index=True, width="stretch")
+        else:
+            st.info("No captured search facts for these attempts.")
+        for rec in group:
+            steps = plan_steps(rec)
+            approved = len((rec.get("research_plan") or {}).get("steps", []))
+            st.caption(
+                f"Response {rec['response_id']}: {approved} approved steps, {len(steps)} captured delegations"
+            )
+            for step in steps:
+                with st.expander(
+                    f"Response {rec['response_id']}, step {step['Step']}: {step['Title']}"
+                ):
+                    st.caption(
+                        f"Tools: {step['Tools']}; reformatted: {step['Reformatted']}; error: {step['Error'] or 'none'}"
+                    )
+                    st.markdown(step["Report"] or "No report")
+    if st.toggle("Response evidence", key=f"evidence::{key}"):
+        _render_chat_interaction(group)
+    with st.expander("Export review evidence"):
+        st.caption(
+            "Includes answers, Worker reports, selected verdicts, question metadata and current reference statements. Draft agreement is not legal correctness."
+        )
+        reference = _reference_answers(_reference_manifest_mtime()).get(key[0], {})
+        pack = {
+            "question": metadata,
+            "current_reference_statements": reference.get("statements", []),
+            "current_reference_sha256": reference.get("reference_sha256"),
+            "scored_reference_snapshots": {
+                r["reference_sha256"]: r.get("scoring_config", {})
+                .get("references", {})
+                .get(str(key[0]))
+                for r in selected_rows
+                if r.get("reference_sha256") and r.get("scoring_config")
+            },
+            "responses": [
+                {
+                    k: r.get(k)
+                    for k in (
+                        "response_id",
+                        "question",
+                        "actual_output",
+                        "research_output",
+                        "experiment_id",
+                        "gather_run_id",
+                        "needs_clarification",
+                        "error_message",
+                    )
+                }
+                for r in group
+            ],
+            "metrics": [
+                {k: v for k, v in r.items() if k != "scoring_config"}
+                for r in selected_rows
+            ],
+            "searches": search_rows,
+            "review": {
+                "observed_problem": "",
+                "evidence_passage": "",
+                "metric_caught_it": None,
+                "reviewer": "",
+            },
+        }
+        st.download_button(
+            "Download review pack",
+            json.dumps(pack, ensure_ascii=False, indent=2),
+            file_name=f"q{key[0]}_review.json",
+            mime="application/json",
+        )
+
+
+def _compare_experiments(records, rows):
+    experiments = {
+        r["experiment_id"]: r.get("experiment", {})
+        for r in records
+        if r.get("experiment_id")
+    }
+    if len(experiments) < 2:
+        st.info(
+            "Comparison needs two recorded experiments. Legacy responses remain available in the question review; dates alone do not establish matching conditions."
+        )
+        return
+    options = sorted(experiments)
+    label = lambda value: f"{experiments[value].get('label', value)} ({value[:8]})"
+    left, right = st.columns(2)
+    baseline = left.selectbox("Baseline experiment", options, format_func=label)
+    candidate = right.selectbox(
+        "Candidate experiment", [e for e in options if e != baseline], format_func=label
+    )
+    sides = [
+        [r for r in records if r.get("experiment_id") == exp]
+        for exp in (baseline, candidate)
+    ]
+    st.caption(
+        "Matched question wording, snapshot and modes only. The latest shared scoring version is selected per metric; missing measurements remain visible. Two repeats describe observations, not statistical certainty."
+    )
+    summary, changes, outcomes = compare(*sides, apply_scope(rows))
+    st.dataframe([summary], hide_index=True, width="stretch")
+    st.dataframe(outcomes, hide_index=True, width="stretch")
+    if changes:
+        st.dataframe(changes, hide_index=True, width="stretch")
+    else:
+        st.info("No matched metric results to compare.")
+    with st.expander("Experiment conditions"):
+        for exp in (baseline, candidate):
+            st.write(label(exp))
+            st.json(
+                {
+                    k: v
+                    for k, v in experiments[exp].get("config", {}).items()
+                    if k != "questions"
+                }
+            )
+    matched_ids = {r["response_id"] for side in sides for r in side}
+    options = [r for r in records if r["response_id"] in matched_ids]
+    selected = st.selectbox(
+        "Inspect a response",
+        options,
+        format_func=lambda r: f"Response {r['response_id']}: Q{r['question_id']} ({r.get('experiment', {}).get('label', '')})",
+    )
+    _render_chat_interaction([selected])
 
 
 def main() -> None:
-    st.set_page_config(
-        page_title="LexChat Eval",
-        layout="wide",
-        initial_sidebar_state="collapsed",
-    )
-
-    st.title("LexChat Evaluation")
-    st.markdown("[LexChat](https://github.com/delphium226/lexchat) testing metric \
-    results exploration. Explore LLM responses to a set of legal queries.   \
-    Currently under development.")
-
+    st.set_page_config(page_title="LexChat Eval", layout="wide")
+    st.title("LexChat evaluation")
     st.caption(_reference_status_line())
-
-    st.divider()
-
-    _db_mtime = RESPONSES_DB.stat().st_mtime if RESPONSES_DB.exists() else 0.0
-
-    if not RESPONSES_DB.exists():
-        st.error(
-            "No results found. Run evaluations first: python lex_eval/run_evals.py"
-        )
-        st.stop()
-
-    raw_results = load_eval_results(_db_mtime=_db_mtime)
-    if not raw_results:
-        st.warning("No eval_<metric> tables have results yet - run evaluations first.")
-
-    hierarchy = _build_hierarchy(raw_results)
-    responses = load_responses(_mtime=_db_mtime) if RESPONSES_DB.exists() else {}
-
-    if not responses:
-        st.warning(
-            f"responses.db not found at {RESPONSES_DB} - chat interaction will be empty."
-        )
-
-    st.markdown(
-        """
-    <style>
-        .block-container { padding-top: 1.8 rem; }
-    </style>
-""",
-        unsafe_allow_html=True,
-    )
-
-    modes_present = sorted({mode for _llm, mode in hierarchy})
-    multiple_modes = len(modes_present) > 1
-
-    # Every model and research type in the database, rendered above the filters
-    # because the filters do not narrow it. They control the per question detail
-    # below, and a control that changed something above it would not read that
-    # way.
-    _render_top_summary(hierarchy, multiple_modes)
-    st.divider()
-
-    model_col, mode_col, show_col = st.columns([2, 1, 1])
-
-    # Models worst pass rate first, matching the summary above.
-    llms = list(dict.fromkeys(llm for llm, _mode in _sorted_group_keys(hierarchy)))
-    llm = _render_model_selector(model_col, llms)
-    selected_mode = _render_mode_filter(mode_col, modes_present)
-    failures_only = _render_show_filter(show_col) == _FAILURES_ONLY
-
-    # Model and research type are independent axes, so "All research types" for a
-    # model that has several shows them one after another rather than picking one.
-    keys = [
-        k
-        for k in _sorted_group_keys(hierarchy)
-        if k[0] == llm and (selected_mode == _ALL_MODES or k[1] == selected_mode)
-    ]
-    if not keys:
-        st.info(f"No {selected_mode} results for {llm}.")
+    db_path = Path(st.text_input("Results database", str(RESPONSES_DB)))
+    if not db_path.exists():
+        st.info("No database at this path.")
         return
-
-    if len(keys) > 1:
-        _render_mode_comparison(llm, keys, hierarchy, failures_only)
-        st.markdown("")
-
-    for key in keys:
-        _llm, mode = key
-        q_data = hierarchy[key]
-        st.subheader(_group_label(key, show_mode=multiple_modes))
-        _render_llm_summary_bar(q_data)
-        st.markdown("")
-
-        shown_any = False
-        for qid in sorted(q_data.keys()):
-            metrics = q_data[qid]
-            if failures_only and not any(_is_failure(m) for m in metrics):
-                continue
-            shown_any = True
-            _render_question_block(
-                qid,
-                metrics[0].get("question", ""),
-                metrics,
-                responses.get((llm, mode, qid), []),
-                chat_key=f"chat::{llm}::{mode}::{qid}",
-                failures_only=failures_only,
-            )
-        if not shown_any:
-            st.success("No failures. Every scored metric passed for this model.")
+    records, rows = load_dashboard(str(db_path), db_path.stat().st_mtime_ns)
+    if not records:
+        st.info("No response attempts in this database.")
+        return
+    view = st.radio(
+        "View", ["Review questions", "Compare experiments"], horizontal=True
+    )
+    cols = st.columns(3)
+    for col, field, label in zip(
+        cols,
+        ("llm_name", "chat_mode", "research_mode"),
+        ("Model", "Chat mode", "Research mode"),
+        strict=True,
+    ):
+        options = sorted({r.get(field) or "unknown" for r in records})
+        selected = col.selectbox(label, ["All", *options])
+        if selected != "All":
+            records = [r for r in records if (r.get(field) or "unknown") == selected]
+    selected_questions = st.multiselect(
+        "Questions",
+        sorted({r["question_id"] for r in records}),
+        format_func=lambda q: f"Q{q}",
+    )
+    if selected_questions:
+        records = [r for r in records if r["question_id"] in selected_questions]
+    ids = {r["response_id"] for r in records}
+    rows = [r for r in rows if r["response_id"] in ids]
+    if view == "Compare experiments":
+        _compare_experiments(records, rows)
+        return
+    experiments = {
+        r.get("experiment_id")
+        or "Legacy": r.get("experiment", {}).get("label", "Legacy, condition unknown")
+        for r in records
+    }
+    exp = st.selectbox(
+        "Experiment",
+        ["All", *sorted(experiments)],
+        format_func=lambda e: e if e == "All" else f"{experiments[e]} ({e[:8]})",
+    )
+    if exp != "All":
+        records = [r for r in records if (r.get("experiment_id") or "Legacy") == exp]
+    ids = {r["response_id"] for r in records}
+    rows = [r for r in rows if r["response_id"] in ids]
+    runs = {
+        r["scoring_run_id"]: r.get("scoring_label", r["scoring_run_id"])
+        for r in rows
+        if r.get("scoring_run_id")
+    }
+    scoring = st.selectbox(
+        "Scoring selection",
+        ["Latest stored", *sorted(runs)],
+        format_func=lambda r: r if r == "Latest stored" else f"{runs[r]} ({r[:8]})",
+    )
+    if scoring != "Latest stored":
+        rows = [r for r in rows if r.get("scoring_run_id") == scoring]
+    else:
+        rows = current_reference_rows(
+            rows, _reference_answers(_reference_manifest_mtime())
+        )
+    rows = apply_scope(latest_results(rows))
+    st.caption(
+        "One selected score per response and metric. Legacy scorer versions are unknown. An explicit scoring run shows its historical reference; the latest view excludes outdated reference verdicts."
+    )
+    _render_outcomes(records)
+    if records:
+        st.caption(
+            f"Gathered {min(r['timestamp'] for r in records)[:10]} to {max(r['timestamp'] for r in records)[:10]}"
+        )
+    groups = question_groups(records)
+    summaries = {
+        key: _question_summary(key, group, rows) for key, group in groups.items()
+    }
+    attention = st.checkbox("Only questions needing attention")
+    keys = [
+        key for key, row in summaries.items() if not attention or row["Needs attention"]
+    ]
+    keys.sort(key=lambda k: (not summaries[k]["Needs attention"], k))
+    st.dataframe([summaries[k] for k in keys], hide_index=True, width="stretch")
+    if not keys:
+        st.info("No questions match this selection.")
+        return
+    selected = st.selectbox(
+        "Inspect question",
+        keys,
+        format_func=lambda k: f"Q{k[0]} · {k[1]} · {k[2]} · {k[3]} · {k[5][:8]}",
+    )
+    _question_detail(selected, groups[selected], rows)
 
 
 if __name__ == "__main__":

@@ -137,9 +137,12 @@ python lex_eval/run_evals.py -v
 ```
 
 Each metric writes to its own `eval_<metric>` table in `lex_eval/data/responses.db`.
-By default, a response already scored for a metric is skipped for it, use
-`--overwrite` to clear and force re-running, or `--append` to re-run without
-clearing (useful for testing a metric's determinism).
+By default, only scores with compatible code, judge configuration, and reference
+versions are skipped. Normal rescoring preserves historical rows. Use `--dry-run`
+to preview pending work without writes or judge calls, especially before the first
+judge sweep over legacy results whose scoring version is unknown. `--append`
+repeats compatible measurements too; `--overwrite` explicitly clears selected
+results and cannot be combined with an experiment filter.
 
 ### Evaluation requirements
 
@@ -159,7 +162,19 @@ clearing (useful for testing a metric's determinism).
 streamlit run lex_eval/reports/streamlit_report.py
 ```
 
-The dashboard reads directly from `lex_eval/data/responses.db`.
+The dashboard reads `lex_eval/data/responses.db` without modifying it. Filter by
+model, chat mode, research mode, and experiment, then inspect questions and their
+failure stages. Stored contradiction failures stay failures, mixed repeats remain
+mixed, and clarification, errors, halts, and report repair are shown separately.
+
+Use `--label` and `--experiment-id` when gathering to identify repeat sweeps.
+Scoring runs have their own identity, so rejudging an answer cannot count as an
+extra response. The comparison view matches questions and compatible scoring
+versions across two recorded experiments. Existing results remain labelled as
+legacy, with unknown experiment conditions.
+
+See [Experiments and reviewing results](lex_eval/docs/experiments.md) for commands,
+deployment metadata, scoring previews, and the review-evidence export.
 
 ## Step 5 Compact database for deployment
 
@@ -415,7 +430,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 
 | Metric | Description |
 |--------|-------------|
-| Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed), and does the Worker stick to that order rather than looping back to an earlier step later in the same run? |
+| Tool Usage | Did the run delegate research and use the expected tools? Legislation checks retain their mode-specific order rules. Case-law-only runs require delegation and either a case-law search or direct judgment lookup; mixed-mode scores cover legislation tools only. |
 | Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. Not measured in conversational mode, where the worker is told not to use those headers. |
 | Reference Links | Are all reference links found by the researcher included in the final answer given to the user. |
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |

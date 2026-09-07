@@ -234,10 +234,13 @@ def init_db(conn: duckdb.DuckDBPyConnection) -> None:
 
 def clear_responses(conn: duckdb.DuckDBPyConnection) -> None:
     """Delete all rows from the responses table."""
+    _delete_eval_rows(
+        conn, [r[0] for r in conn.execute("SELECT id FROM responses").fetchall()]
+    )
     conn.execute("DELETE FROM responses")
 
 
-def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> None:
+def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> int:
     """
     Insert one record into the responses table.
 
@@ -247,8 +250,8 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
     """
     is_error = "error" in record
 
-    conn.execute(
-        _INSERT_RESPONSE,
+    inserted = conn.execute(
+        _INSERT_RESPONSE.rstrip().rstrip(";") + " RETURNING id",
         [
             record["question_id"],
             record["question"],
@@ -295,6 +298,7 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             record.get("attempts"),
         ],
     )
+    return inserted.fetchone()[0]
 
 
 def load_records(
@@ -342,6 +346,9 @@ def load_records(
             {where}
             ORDER BY id
             """).fetchall()
+        from lex_eval.utils.versioning import response_history
+
+        history = response_history(conn)
     finally:
         conn.close()
 
@@ -433,6 +440,8 @@ def load_records(
                 "attempts": attempts,
             }
         )
+    for record in records:
+        record.update(history.get(record["response_id"], {}))
     return records
 
 
@@ -450,9 +459,18 @@ def consistency_group_key(record: Dict[str, Any]) -> str:
     Both the test IDs in ``tests/eval/test_consistency.py`` and the deselect
     IDs in ``run_evals.py`` are built from this, so they cannot drift apart.
     """
+    from lex_eval.utils.versioning import fingerprint
+
+    condition = fingerprint(
+        {
+            "question": record.get("question"),
+            "research_mode": record.get("research_mode", "legislation_only"),
+            "experiment": record.get("experiment_id"),
+        }
+    )[:12]
     return (
         f"Q{record['question_id']}_{record['llm_name']}_"
-        f"{record.get('chat_mode') or 'research'}"
+        f"{record.get('chat_mode') or 'research'}_{condition}"
     )
 
 
@@ -509,15 +527,24 @@ def _delete_eval_rows(
     no longer resolves, so every caller that removes a response must call this
     first. Returns the same {table: rows deleted} shape as _eval_rows_for.
     """
-    counts = _eval_rows_for(conn, response_ids)
-    if not counts:
+    if not response_ids:
         return {}
-
+    counts = _eval_rows_for(conn, response_ids)
     placeholders = ",".join("?" for _ in response_ids)
-    for table in counts:
+    tables = {r[0] for r in conn.execute("SHOW TABLES").fetchall()}
+    if "response_runs" in tables:
         conn.execute(
-            f"DELETE FROM {table} WHERE response_id IN ({placeholders})",
+            f"DELETE FROM response_runs WHERE response_id IN ({placeholders})",
             response_ids,
+        )
+    for table in counts:
+        if "eval_versions" in tables:
+            conn.execute(
+                f"DELETE FROM eval_versions WHERE metric=? AND eval_id IN (SELECT id FROM {table} WHERE response_id IN ({placeholders}))",
+                [table.removeprefix("eval_"), *response_ids],
+            )
+        conn.execute(
+            f"DELETE FROM {table} WHERE response_id IN ({placeholders})", response_ids
         )
     return counts
 
@@ -924,6 +951,7 @@ _EVAL_COLUMNS = (
 # only used to set it on rows written before the column existed, via
 # backfill_measured_column; new rows are told directly by the metric.
 _NOT_MEASURED_PREFIXES = (
+    "Not measured:",
     "Judge error:",
     "Output too short",
     "No retrieval context captured",
@@ -1016,10 +1044,10 @@ def insert_eval_result(
 ) -> None:
     """Insert one eval result record into the eval_<metric> table."""
     table = _eval_table_name(metric)
-    conn.execute(
+    inserted = conn.execute(
         f"INSERT INTO {table} ({_EVAL_COLUMNS}) VALUES ("
         + ", ".join(["?"] * len(_EVAL_COLUMNS.split(", ")))
-        + ")",
+        + ") RETURNING id",
         [
             record["response_id"],
             record["llm_name"],
@@ -1039,6 +1067,18 @@ def insert_eval_result(
             record.get("reference_mode") or None,
         ],
     )
+    eval_id = inserted.fetchone()[0]
+    if record.get("scoring_run_id"):
+        conn.execute(
+            "INSERT INTO eval_versions VALUES (?, ?, ?, ?, ?)",
+            [
+                metric,
+                eval_id,
+                record["scoring_run_id"],
+                record["metric_version"],
+                json.dumps(record.get("details")),
+            ],
+        )
 
 
 def clear_eval_results(
@@ -1065,6 +1105,13 @@ def clear_eval_results(
             )
     else:
         conn.execute(f"DELETE FROM {table}")
+    if conn.execute(
+        "SELECT count(*) FROM information_schema.tables WHERE table_name='eval_versions'"
+    ).fetchone()[0]:
+        conn.execute(
+            f"DELETE FROM eval_versions WHERE metric=? AND eval_id NOT IN (SELECT id FROM {table})",
+            [metric],
+        )
 
 
 def covered_response_ids(
@@ -1281,11 +1328,9 @@ def make_deploy_db(
     if output_path.exists():
         output_path.unlink()
 
-    src = get_connection(source_path)
+    src = get_connection(source_path, read_only=True)
     dst = get_connection(output_path)
     try:
-        # Ensure source schema is migrated (adds new columns to existing DBs)
-        init_db(src)
         # Recreate schema in the destination
         init_db(dst)
 
@@ -1414,16 +1459,39 @@ def make_deploy_db(
                 continue
             table = _eval_table_name(metric)
             eval_rows = src.execute(
-                f"SELECT {_EVAL_COLUMNS} FROM {table} ORDER BY id"
+                f"SELECT id, {_EVAL_COLUMNS} FROM {table} ORDER BY id"
             ).fetchall()
-            placeholders = ", ".join(["?"] * len(_EVAL_COLUMNS.split(", ")))
+            placeholders = ", ".join(["?"] * (1 + len(_EVAL_COLUMNS.split(", "))))
             for er in eval_rows:
                 dst.execute(
-                    f"INSERT INTO {table} ({_EVAL_COLUMNS}) VALUES ({placeholders})",
+                    f"INSERT INTO {table} (id, {_EVAL_COLUMNS}) VALUES ({placeholders})",
                     list(er),
+                )
+            if eval_rows:
+                dst.execute(
+                    f"SELECT nextval('{table}_id_seq') FROM range(?)",
+                    [max(r[0] for r in eval_rows)],
                 )
             eval_row_count += len(eval_rows)
 
+        from lex_eval.utils.versioning import init_history
+
+        init_history(dst)
+        source_tables = {r[0] for r in src.execute("SHOW TABLES").fetchall()}
+        for table in (
+            "experiments",
+            "gather_runs",
+            "response_runs",
+            "scoring_runs",
+            "eval_versions",
+        ):
+            if table in source_tables:
+                rows = src.execute(f"SELECT * FROM {table}").fetchall()
+                if rows:
+                    placeholders = ", ".join("?" for _ in rows[0])
+                    dst.executemany(
+                        f"INSERT INTO {table} VALUES ({placeholders})", rows
+                    )
         dst.execute("CHECKPOINT")
     finally:
         src.close()

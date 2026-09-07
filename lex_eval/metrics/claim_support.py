@@ -187,6 +187,15 @@ class ClaimSupportMetric(BaseMetric):
         return self._score_claims(claims, retrieval_context_str)
 
     def _score_claims(self, claims: List[_Claim], retrieval_context: str) -> float:
+        self.details = {
+            "claims": [
+                {
+                    **c.model_dump(),
+                    "quote_found": _quote_found(c.quote, retrieval_context),
+                }
+                for c in claims
+            ]
+        }
         absence = [c for c in claims if c.label == "absence"]
         scorable = [c for c in claims if c.label != "absence"]
 
@@ -203,10 +212,10 @@ class ClaimSupportMetric(BaseMetric):
         unsupported = [c for c in scorable if c.label == "unsupported"]
 
         if not scorable:
-            self.score = 1.0
-            self.success = True
+            self.score = 0.0
+            self.success = False
             self.reason = (
-                f"All {len(absence)} claim(s) are claims of absence, which "
+                f"Not measured: All {len(absence)} claim(s) are claims of absence, which "
                 f"cannot be traced to a passage: {absence[0].claim}"
             )
             return self.score

@@ -2,15 +2,14 @@
 Test consistency of responses when the same LLM answers the same question
 multiple times (repeatability).
 
-To generate test data, run gather_responses.py multiple times with --append:
-    python lex_eval/gather_responses.py --append
+To generate repeat data, join the same experiment on the second gather:
+    python lex_eval/gather_responses.py --experiment-id EXPERIMENT_ID
 """
 
 import pytest
 
 from lex_eval.metrics.consistency import ConsistencyMetric
 from lex_eval.utils.test_helpers import (
-    load_records,
     record_to_test_case,
     group_by_question_llm_and_mode,
 )
@@ -91,7 +90,7 @@ def _gate_output_length(request, record) -> tuple[bool, str]:
 
 @pytest.mark.skipif(
     not _same_model,
-    reason="No repeated runs found, re-run gather_responses.py with --append to generate repeatability data",
+    reason="No repeated runs found; gather again with --experiment-id to join the same condition",
 )
 @pytest.mark.parametrize("record, other_outputs", _same_model)
 def test_consistency(request, record, other_outputs):

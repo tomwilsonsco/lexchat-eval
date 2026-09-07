@@ -129,10 +129,10 @@ class ReportIntegrationMetric(BaseMetric):
         }
 
         if not in_scope:
-            self.score = 1.0
-            self.success = True
+            self.score = 0.0
+            self.success = False
             self.reason = (
-                "No step both retrieved and reported a usable finding; "
+                "Not measured: no step both retrieved and reported a usable finding; "
                 "nothing to check for integration."
             )
             return self.score

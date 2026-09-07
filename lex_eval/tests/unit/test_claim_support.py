@@ -222,8 +222,9 @@ def test_a_report_of_only_absence_claims_has_nothing_to_trace():
     metric = ClaimSupportMetric(research_output="report", model=_StubJudge(claims))
     metric.measure(_test_case())
 
-    assert metric.score == 1.0
-    assert metric.is_successful()
+    assert metric.score == 0.0
+    assert not metric.is_successful()
+    assert metric.reason.startswith("Not measured:")
     assert "All 1 claim(s) are claims of absence" in metric.reason
 
 

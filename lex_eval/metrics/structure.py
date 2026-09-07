@@ -903,7 +903,7 @@ class GenuineGapMetric(BaseMetric):
 
     Score:
         0.0: no delegate_research call found; cannot be verified.
-        1.0: research_mode is not legislation_only; check doesn't apply.
+        Not measured: research_mode is not legislation_only.
         1.0: every step either retrieved usable content itself (nothing to
                disclose) or, having retrieved nothing, disclosed that plainly.
         0.5: the worst such step disclosed the gap only as a paraphrase of
@@ -937,10 +937,10 @@ class GenuineGapMetric(BaseMetric):
             return self.score
 
         if self.research_mode != "legislation_only":
-            self.score = 1.0
-            self.success = True
+            self.score = 0.0
+            self.success = False
             self.reason = (
-                f"Not applicable: research_mode is '{self.research_mode}', "
+                f"Not measured: research_mode is '{self.research_mode}', "
                 "not legislation_only."
             )
             return self.score
@@ -1035,9 +1035,8 @@ class StepCompletionMetric(BaseMetric):
         1.0: no step both retrieved usable content and cited none of it.
         <1.0: fraction of steps that pass; any lost step drags the score down.
 
-    A step whose own retrieval was genuinely empty passes automatically here
-    regardless of what its report says. That is GenuineGapMetric's question
-    to answer, not this one.
+    Only steps that retrieved usable legislation are scored. Empty retrieval
+    is GenuineGapMetric's question; no eligible steps means not measured.
     """
 
     def __init__(self, threshold: float = 1.0) -> None:
@@ -1058,30 +1057,40 @@ class StepCompletionMetric(BaseMetric):
             )
             return self.score
 
-        failed = [
-            i
+        eligible = {
+            i: g
             for i, g in enumerate(groups, 1)
             if _retrieved_usable_content(g["tools"])
-            and not (
+        }
+        if not eligible:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                "Not measured: no captured step retrieved usable legislation text."
+            )
+            return self.score
+        failed = [
+            i
+            for i, g in eligible.items()
+            if not (
                 _retrieved_legislation_ids(g["tools"])
                 & _cited_legislation_ids(g["report"])
             )
         ]
-
-        self.score = (len(groups) - len(failed)) / len(groups)
+        self.score = (len(eligible) - len(failed)) / len(eligible)
         self.success = self.score >= self.threshold
 
         if failed:
             steps = ", ".join(str(i) for i in failed)
             self.reason = (
-                f"Step(s) {steps} of {len(groups)} retrieved legal text but "
+                f"Step(s) {steps} retrieved legislation text but "
                 "their own report cites none of it."
             )
         else:
             self.reason = (
-                f"All {len(groups)} step(s) carried their retrieved legal "
+                f"All {len(eligible)} eligible step(s) carried their retrieved legislation "
                 "text into their own report."
-                if len(groups) > 1
+                if len(eligible) > 1
                 else "The report cites the legal text it retrieved."
             )
 

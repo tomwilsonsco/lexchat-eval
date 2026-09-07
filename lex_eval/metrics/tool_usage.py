@@ -295,6 +295,18 @@ class ToolUsageMetric(BaseMetric):
                 if isinstance(output, str) and "no_completion_event" in output:
                     incomplete_tools.add(tool.name)
 
+        if self.research_mode == "case_law_only":
+            # A named judgment can be opened directly; an empty search is still
+            # a valid attempt. Completion and claim support are separate checks.
+            delegated = "delegate_research" in tools_used
+            researched = bool(
+                tools_used & {"Worker: search_case_law", "Worker: get_case_law_text"}
+            )
+            self.score = (int(delegated) + int(researched)) / 2
+            self.success = self.score >= self.threshold
+            self.reason = f"Case-law tools: delegated research {delegated}; searched or opened a judgment {researched}."
+            return self.score
+
         present = [t for t in REQUIRED_TOOLS if t in tools_used]
         missing = [t for t in REQUIRED_TOOLS if t not in tools_used]
 

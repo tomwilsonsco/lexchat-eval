@@ -6,11 +6,12 @@ Results are written to per-metric `eval_<test_name>` DuckDB tables
 (data/responses.db) at the end of each pytest session.
 """
 
+import os
+import json
 import pytest
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
 
 # Accumulated during the session, keyed by metric (test_name).
 _metric_records: dict[str, list[dict]] = defaultdict(list)
@@ -37,7 +38,7 @@ def pytest_configure(config):
 def pytest_runtest_makereport(item, call):
     """Capture test reports and collect metric data, keyed by metric (test_name)."""
     outcome = yield
-    report = outcome.get_result()
+    outcome.get_result()
 
     if call.when == "call" and hasattr(item, "_metric_data"):
         data = item._metric_data
@@ -73,14 +74,48 @@ def pytest_sessionfinish(session, exitstatus):
     )
 
     conn = get_connection(DEFAULT_DB)
+    from lex_eval.utils.versioning import (
+        init_history,
+        scoring_config,
+        start_scoring,
+        metric_version,
+        finish_run,
+    )
+
+    init_history(conn)
+    scoring_run_id = os.getenv("LEX_EVAL_SCORING_RUN_ID")
+    if scoring_run_id:
+        stored = conn.execute(
+            "SELECT config FROM scoring_runs WHERE id=?", [scoring_run_id]
+        ).fetchone()
+        if not stored:
+            raise ValueError("Scoring run does not exist")
+        config = json.loads(stored[0])
+    else:
+        config = scoring_config(
+            list(_metric_records),
+            {r["response_id"] for rows in _metric_records.values() for r in rows},
+        )
+        scoring_run_id = start_scoring(conn, config, "Direct pytest evaluation")
 
     total = 0
     for metric, records in _metric_records.items():
         init_eval_table(conn, metric)
         for record in records:
+            record.update(
+                scoring_run_id=scoring_run_id,
+                metric_version=metric_version(config, metric),
+            )
             insert_eval_result(conn, metric, record)
             total += 1
 
+    if not os.getenv("LEX_EVAL_SCORING_RUN_ID"):
+        finish_run(
+            conn,
+            "scoring_runs",
+            scoring_run_id,
+            "finished" if exitstatus in (0, 1) else "incomplete",
+        )
     conn.commit()
     conn.close()
     print(f"\n📊 {total} eval result(s) written to {DEFAULT_DB}")

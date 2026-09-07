@@ -43,6 +43,7 @@ Verbose output:
     python lex_eval/run_evals.py -v
 """
 
+import json
 import argparse
 import os
 import subprocess
@@ -115,7 +116,7 @@ def _group_by_file(metrics: list[str]) -> dict[str, list[str]]:
     return grouped
 
 
-def _deselect_args(covered: dict[str, set], test_file: str) -> list[str]:
+def _deselect_args(covered: dict[str, set], test_file: str, records=None) -> list[str]:
     """
     Build pytest ``--deselect`` arguments for test IDs that already have a
     result for that *specific* response, one metric's covered response_ids
@@ -127,8 +128,8 @@ def _deselect_args(covered: dict[str, set], test_file: str) -> list[str]:
     if not any(covered.values()):
         return []
 
-    # Pytest appends a numeric suffix (0, 1, …) when multiple records share
-    # the same base ID, so we must replicate that here for most metrics.
+    # Ordinary metrics use unique response IDs; consistency also numbers
+    # the peers within its question and experiment group.
     # test_consistency.py is the one exception: _same_model_cases() assigns
     # its own explicit ids of the form "{group_key}_run{n+1}" rather than
     # letting pytest auto-number them, so its deselect ids must match that
@@ -151,17 +152,17 @@ def _deselect_args(covered: dict[str, set], test_file: str) -> list[str]:
             counts[k] = n + 1
         return out
 
-    records = load_records()
+    if records is None:
+        records = load_records(read_only=True)
     base_ids = [record_id(r) for r in records]
-    occurrences = _numbered(base_ids)
     # Consistency groups (and numbers within) by mode as well, so it needs its
     # own key and its own run numbering.
     cons_ids = [consistency_group_key(r) for r in records]
     cons_occurrences = _numbered(cons_ids)
 
     deselect_args: list[str] = []
-    for record, bid, n, cons_id, cons_n in zip(
-        records, base_ids, occurrences, cons_ids, cons_occurrences
+    for record, bid, cons_id, cons_n in zip(
+        records, base_ids, cons_ids, cons_occurrences, strict=True
     ):
         response_id = record.get("response_id")
         for metric, response_ids in covered.items():
@@ -169,7 +170,7 @@ def _deselect_args(covered: dict[str, set], test_file: str) -> list[str]:
                 if metric == "consistency":
                     test_id = f"{cons_id}_run{cons_n + 1}"
                 else:
-                    test_id = f"{bid}{n}"
+                    test_id = bid
                 deselect_args.extend(
                     [
                         "--deselect",
@@ -188,6 +189,9 @@ def run_evals(
     extra_args: list[str] | None = None,
     llm: str | None = None,
     workers: int | None = None,
+    experiment: str | None = None,
+    label: str = "Evaluation",
+    dry_run: bool = False,
 ) -> int:
     """
     Launch pytest against the requested metrics (all of them if *metrics* is
@@ -202,8 +206,6 @@ def run_evals(
     from lex_eval.utils.db import (
         DEFAULT_DB,
         clear_eval_results,
-        clear_outdated_eval_results,
-        covered_response_ids,
         get_connection,
         init_db,
         init_eval_table,
@@ -214,109 +216,186 @@ def run_evals(
     # the reference it was scored against is unchanged.
     reference_versions = current_reference_versions()
 
-    for test_file, file_metrics in grouped.items():
+    from lex_eval.utils.versioning import (
+        scoring_config,
+        start_scoring,
+        finish_run,
+        compatible_ids,
+        metric_version,
+    )
+    from lex_eval.utils.db import load_records
+
+    # load_records below is read-only, and a read-only connection cannot run
+    # schema migrations, so bring an older database up to date first.
+    if DEFAULT_DB.exists():
         conn = get_connection(DEFAULT_DB)
-        covered: dict[str, set] = {}
         try:
-            # Migrate the responses schema and each requested metric's table
-            # here, up front, in this single read-write connection. Eval test
-            # modules load records/results via read-only connections (safe
-            # under parallel pytest-xdist workers) and skip migration
-            # themselves, so it must happen once before pytest starts.
             init_db(conn)
-            for metric in file_metrics:
-                init_eval_table(conn, metric)
-                versions = reference_versions if metric in REFERENCE_METRICS else None
-                if overwrite:
-                    clear_eval_results(conn, metric, llm=llm)
-                elif not append:
-                    if versions is not None:
-                        dropped = clear_outdated_eval_results(conn, metric, versions)
-                        if dropped:
-                            print(
-                                f"ℹ️  {metric}: dropped {dropped} result(s) scored "
-                                f"against an older reference answer; they will be "
-                                f"scored again"
-                            )
-                    covered[metric] = covered_response_ids(conn, metric, versions)
             conn.commit()
         finally:
             conn.close()
 
-        cmd: list[str] = [sys.executable, "-m", "pytest", str(TESTS_DIR / test_file)]
-
-        if markers:
-            cmd.extend(["-m", markers])
-
-        # Filter to just the requested metrics' functions (only needed when
-        # not every metric in this file was requested), anded with an LLM
-        # filter if given.
-        all_file_metrics = [m for m, f in METRIC_FILES.items() if f == test_file]
-        keyword_parts = []
-        if set(file_metrics) != set(all_file_metrics):
-            fn_expr = " or ".join(f"test_{m}" for m in file_metrics)
-            keyword_parts.append(f"({fn_expr})" if len(file_metrics) > 1 else fn_expr)
-        if llm:
-            keyword_parts.append(llm)
-        if keyword_parts:
-            cmd.extend(["-k", " and ".join(keyword_parts)])
-
-        # skip logic: deselect tests that already have results
-        deselect: list[str] = []
-        if not overwrite and not append:
-            deselect = _deselect_args(covered, test_file)
-            if deselect:
-                cmd.extend(deselect)
-                n_skipped = deselect.count("--deselect")
-                print(
-                    f"ℹ️  {test_file}: skipping {n_skipped} test(s) with existing "
-                    f"results (use --overwrite or --append to force)"
+    source_records = load_records(DEFAULT_DB, read_only=True)
+    if experiment:
+        source_records = [
+            r for r in source_records if r.get("experiment_id") == experiment
+        ]
+    if llm:
+        source_records = [r for r in source_records if llm in r["llm_name"]]
+    if not source_records:
+        print("No responses match the selected experiment/model.")
+        return 5
+    config = scoring_config(requested, {r["response_id"] for r in source_records})
+    if dry_run:
+        conn = get_connection(DEFAULT_DB, read_only=True)
+        try:
+            for metric in requested:
+                versions = reference_versions if metric in REFERENCE_METRICS else None
+                covered = (
+                    set()
+                    if append or overwrite
+                    else compatible_ids(
+                        conn, metric, metric_version(config, metric), versions
+                    )
                 )
-
-        # parallelise via pytest-xdist unless disabled (--workers 1); applied
-        # uniformly across metrics so any future AI-judge metric benefits with
-        # no extra wiring, and fast/offline metrics just pay a small
-        # worker-startup cost
-        n_workers = workers if workers is not None else _default_workers()
-        if n_workers != 1:
-            cmd.extend(["-n", str(n_workers)])
-
-        # display
-        cmd.extend(["-v" if verbose else "-q", "--tb=short"])
-
-        # pass-through args
-        if extra_args:
-            cmd.extend(extra_args)
-
-        print(f"\n{'='*60}")
-        print(f"Running: {', '.join(file_metrics)}")
-        print(f"{'='*60}")
-        print(f"Command: {' '.join(cmd)}\n")
-
-        result = subprocess.run(cmd)
-        rc = result.returncode
-
-        # pytest exits 5 (NO_TESTS_COLLECTED) when every test was deselected,
-        # which happens whenever a metric is already fully covered, the
-        # documented default behaviour, not a failure. Only normalize it when
-        # we know that's why: --deselect args were present in this exact
-        # invocation. A rc 5 with no deselect args (e.g. a typo'd --llm
-        # matching nothing) is a genuine collection problem and still
-        # surfaces.
-        if rc == 5 and deselect:
+                pending = set(config["response_ids"]) - covered
+                print(
+                    f"{metric}: up to {len(pending)} response evaluations; {len(set(config['response_ids']) & covered)} already compatible"
+                )
             print(
-                f"ℹ️  {test_file}: nothing new to run, all requested responses already covered"
+                "Preview only. No database changes or judge calls. Applicability gates may reduce these counts."
             )
-            rc = 0
+        finally:
+            conn.close()
+        return 0
 
-        if rc > overall_rc:
-            overall_rc = rc
+    conn = get_connection(DEFAULT_DB)
+    try:
+        scoring_run_id = start_scoring(conn, config, label)
+    finally:
+        conn.close()
+    worker_env = dict(
+        os.environ,
+        LEX_EVAL_SCORING_RUN_ID=scoring_run_id,
+        LEX_EVAL_RESPONSE_IDS=json.dumps(config["response_ids"]),
+    )
+    print(f"Scoring run: {scoring_run_id}")
 
-    if overall_rc in (0, 1):
-        print(
-            "\n📊 Results written to data/responses.db (one eval_<metric> table per metric)"
-            "\n   View dashboard: streamlit run lex_eval/reports/streamlit_report.py"
-        )
+    run_status = "interrupted"
+    try:
+        for test_file, file_metrics in grouped.items():
+            conn = get_connection(DEFAULT_DB)
+            covered: dict[str, set] = {}
+            try:
+                # Migrate the responses schema and each requested metric's table
+                # here, up front, in this single read-write connection. Eval test
+                # modules load records/results via read-only connections (safe
+                # under parallel pytest-xdist workers) and skip migration
+                # themselves, so it must happen once before pytest starts.
+                init_db(conn)
+                for metric in file_metrics:
+                    init_eval_table(conn, metric)
+                    versions = (
+                        reference_versions if metric in REFERENCE_METRICS else None
+                    )
+                    if overwrite:
+                        clear_eval_results(conn, metric, llm=llm)
+                    elif not append:
+                        covered[metric] = compatible_ids(
+                            conn, metric, metric_version(config, metric), versions
+                        )
+                conn.commit()
+            finally:
+                conn.close()
+
+            cmd: list[str] = [
+                sys.executable,
+                "-m",
+                "pytest",
+                str(TESTS_DIR / test_file),
+            ]
+
+            if markers:
+                cmd.extend(["-m", markers])
+
+            # Filter to just the requested metrics' functions (only needed when
+            # not every metric in this file was requested), anded with an LLM
+            # filter if given.
+            all_file_metrics = [m for m, f in METRIC_FILES.items() if f == test_file]
+            keyword_parts = []
+            if set(file_metrics) != set(all_file_metrics):
+                fn_expr = " or ".join(f"test_{m}" for m in file_metrics)
+                keyword_parts.append(
+                    f"({fn_expr})" if len(file_metrics) > 1 else fn_expr
+                )
+            if llm:
+                keyword_parts.append(llm)
+            if keyword_parts:
+                cmd.extend(["-k", " and ".join(keyword_parts)])
+
+            # skip logic: deselect tests that already have results
+            deselect: list[str] = []
+            if not overwrite and not append:
+                deselect = _deselect_args(covered, test_file, source_records)
+                if deselect:
+                    cmd.extend(deselect)
+                    n_skipped = deselect.count("--deselect")
+                    print(
+                        f"ℹ️  {test_file}: skipping {n_skipped} test(s) with existing "
+                        f"results (use --overwrite or --append to force)"
+                    )
+
+            # parallelise via pytest-xdist unless disabled (--workers 1); applied
+            # uniformly across metrics so any future AI-judge metric benefits with
+            # no extra wiring, and fast/offline metrics just pay a small
+            # worker-startup cost
+            n_workers = workers if workers is not None else _default_workers()
+            if n_workers != 1:
+                cmd.extend(["-n", str(n_workers)])
+
+            # display
+            cmd.extend(["-v" if verbose else "-q", "--tb=short"])
+
+            # pass-through args
+            if extra_args:
+                cmd.extend(extra_args)
+
+            print(f"\n{'='*60}")
+            print(f"Running: {', '.join(file_metrics)}")
+            print(f"{'='*60}")
+            print(f"Command: {' '.join(cmd)}\n")
+
+            result = subprocess.run(cmd, env=worker_env)
+            rc = result.returncode
+
+            # pytest exits 5 (NO_TESTS_COLLECTED) when every test was deselected,
+            # which happens whenever a metric is already fully covered, the
+            # documented default behaviour, not a failure. Only normalize it when
+            # we know that's why: --deselect args were present in this exact
+            # invocation. A rc 5 with no deselect args (e.g. a typo'd --llm
+            # matching nothing) is a genuine collection problem and still
+            # surfaces.
+            if rc == 5 and deselect:
+                print(
+                    f"ℹ️  {test_file}: nothing new to run, all requested responses already covered"
+                )
+                rc = 0
+
+            if rc > overall_rc:
+                overall_rc = rc
+
+        if overall_rc in (0, 1):
+            print(
+                "\n📊 Results written to data/responses.db (one eval_<metric> table per metric)"
+                "\n   View dashboard: streamlit run lex_eval/reports/streamlit_report.py"
+            )
+        run_status = "finished" if overall_rc in (0, 1) else "incomplete"
+    finally:
+        conn = get_connection(DEFAULT_DB)
+        try:
+            finish_run(conn, "scoring_runs", scoring_run_id, run_status)
+        finally:
+            conn.close()
 
     return overall_rc
 
@@ -412,10 +491,25 @@ Dashboard:
         help="Additional arguments passed through to pytest",
     )
 
+    parser.add_argument(
+        "--experiment", help="Only score responses belonging to this experiment ID"
+    )
+    parser.add_argument("--label", default="Evaluation", help="Scoring run label")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview pending evaluations without writes or judge calls",
+    )
     args = parser.parse_args()
 
     if args.overwrite and args.append:
         parser.error("--overwrite and --append are mutually exclusive")
+
+    if args.overwrite and args.experiment:
+        parser.error(
+            "--overwrite cannot be combined with --experiment; use --append to "
+            "rescore an experiment while preserving historical results"
+        )
 
     return run_evals(
         metrics=args.metrics,
@@ -426,6 +520,9 @@ Dashboard:
         extra_args=args.extra,
         llm=args.llm,
         workers=args.workers,
+        experiment=args.experiment,
+        label=args.label,
+        dry_run=args.dry_run,
     )
 
 

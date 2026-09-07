@@ -195,6 +195,7 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
             data = json.loads(str(result))
             findings = [_Contradiction(**f) for f in data["findings"]]
 
+        self.contradiction_findings = [f.model_dump() for f in findings]
         valid = range(1, len(self.statements) + 1)
         return {
             f.index
@@ -243,6 +244,12 @@ class ReferenceAnswerAgreementMetric(BaseMetric):
             if p.label == "contradicted" and _quote_found(p.quote, actual_output)
         }
 
+        self.details = {
+            "statements": self.statements,
+            "points": [p.model_dump() for p in ordered],
+            "contradicted_indexes": sorted(found),
+            "contradiction_findings": getattr(self, "contradiction_findings", []),
+        }
         self.score = len(stated) / len(ordered)
         self.success = self.score >= self.threshold and not found
 

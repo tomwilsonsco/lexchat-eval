@@ -3,13 +3,15 @@ Helpers for loading captured responses (from DuckDB) and converting them into
 LLMTestCase objects for evaluation.
 """
 
+import os
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..testcase import LLMTestCase, ToolCall
 
 from .db import load_records as _db_load_records
-from .db import DEFAULT_DB, consistency_group_key
+from .db import consistency_group_key
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 
@@ -31,7 +33,12 @@ def load_records(
     pytest-xdist workers may call this concurrently (see
     ``db.load_records``).
     """
-    return _db_load_records(path=filepath, read_only=read_only)
+    records = _db_load_records(path=filepath, read_only=read_only)
+    selected = os.getenv("LEX_EVAL_RESPONSE_IDS")
+    if selected is not None:
+        ids = set(json.loads(selected))
+        records = [r for r in records if r["response_id"] in ids]
+    return records
 
 
 def record_to_test_case(record: Dict[str, Any]) -> LLMTestCase:
@@ -123,14 +130,12 @@ def group_by_question_llm_and_mode(
 
     Useful for testing repeatability of the same LLM answering the same
     question the same way, when ``gather_responses.py`` is run with
-    ``--append``.
+    ``--experiment-id`` to join the same condition.
 
     Pass ``read_only=True`` at pytest collection time (see ``load_records``).
     """
     if records is None:
-        from .db import group_by_question_llm_and_mode as _db_group
-
-        return _db_group(path=filepath, read_only=read_only)
+        records = load_records(filepath=filepath, read_only=read_only)
 
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for r in records:
@@ -140,4 +145,6 @@ def group_by_question_llm_and_mode(
 
 def record_id(record: Dict[str, Any]) -> str:
     """Return a short pytest-friendly identifier for a record."""
-    return f"Q{record['question_id']}_{record['llm_name']}"
+    return (
+        f"Q{record['question_id']}_{record['llm_name']}_response{record['response_id']}"
+    )
