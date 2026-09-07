@@ -332,17 +332,84 @@ def provision_id_from_url(url: str) -> str:
     return _url_path(url)
 
 
+# Path segments that begin a provision, a version, or a format suffix. An Act
+# id is everything before the first of these, so the id survives whatever
+# follows it: "/section/10C", "/schedule/1", "/made", "/section/12/england+wales".
+#
+# Counting segments instead does not work. An Act dated by calendar year has
+# three (ukpga/1978/29) but one dated by regnal year has four
+# (ukpga/Edw7/4/31 is the Shop Hours Act 1904), and the corpus holds both.
+_PROVISION_SUFFIXES = frozenset(
+    {
+        "section",
+        "regulation",
+        "schedule",
+        "article",
+        "part",
+        "chapter",
+        "paragraph",
+        "rule",
+        "crossheading",
+        "division",
+        "appendix",
+        "annex",
+        "note",
+        "signature",
+        "introduction",
+        "body",
+        "contents",
+        "made",
+        "enacted",
+        "adopted",
+        "created",
+        "revised",
+        "prospective",
+    }
+)
+
+# A single path segment of a real legislation id: letters, digits, and the
+# ".-_" that regnal and local Act ids use (1-2geo5, 26geo5_1edw8, ch.lxxxiv).
+# Anything else, a percent-encoding, a bracket, an ampersand, a space, means
+# the model wrote something that is not an id at all.
+_ID_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+
+
 def _legislation_id_from_url(url: str) -> str:
     """
     Derive the Act-level legislation_id (e.g. ``ukpga/1978/29``) from a
     legislation.gov.uk URL, whether it points at the Act itself or a specific
     section/schedule within it (e.g. ``ukpga/1978/29/section/10C``).
 
-    Keeps only the first three path segments (type/year/number) since that's
-    the granularity search_legislation_sections and get_legislation_text are
-    called at.
+    Everything from the first provision or version segment onward is dropped,
+    which is the granularity search_legislation_sections and
+    get_legislation_text are called at.
     """
-    return "/".join(_url_path(url).split("/")[:3])
+    segments = _url_path(url).split("/")
+    for i, segment in enumerate(segments):
+        if segment in _PROVISION_SUFFIXES:
+            segments = segments[:i]
+            break
+    return "/".join(segments)
+
+
+def _is_plausible_legislation_id(identifier: str) -> bool:
+    """Whether *identifier* could be a legislation id at all.
+
+    Deliberately permissive: this only rejects text that no id could be, so
+    that a citation to a real Act is never discarded. A model sometimes writes
+    a link body that is prose rather than a reference, e.g.
+    ``.../id/[UNCLEAR: no document reference provided]``. Treating one of
+    those as a cited Act makes it a fabricated citation, which reads as an
+    accusation about an Act rather than what it is, a broken link.
+
+    Three segments is the floor because no legislation id has fewer: every id
+    the LEX API returned across the stored responses has at least
+    type/year/number, and every citation below that floor was junk, including
+    a bare ``ukpga/1988`` written alongside correct links to
+    ``ukpga/1988/41/section/65`` in the same report.
+    """
+    segments = identifier.split("/")
+    return len(segments) >= 3 and all(_ID_SEGMENT_RE.match(s) for s in segments)
 
 
 _LEGISLATION_DOMAIN = "legislation.gov.uk"
@@ -406,6 +473,11 @@ def _retrieved_legislation_ids(tools: list) -> set:
     results returned by ``search_legislation``, plus the legislation_id
     argument passed to ``search_legislation_sections`` / ``get_legislation_text``.
 
+    Ids are lowercased, because that is how they arrive from a citation URL.
+    The API sends them cased (``ukpga/Edw7/4/31``) and roughly one id in
+    fourteen has a capital in it, so comparing raw would report every Act
+    dated by regnal year as never retrieved.
+
     Pass a single group's ``tools`` list to scope this to one delegation, or
     ``test_case.tools_called`` for the whole run.
     """
@@ -421,7 +493,7 @@ def _retrieved_legislation_ids(tools: list) -> set:
                 for r in (data or {}).get("results", []):
                     lid = r.get("legislation_id")
                     if lid:
-                        ids.add(lid)
+                        ids.add(lid.lower())
             except (json.JSONDecodeError, AttributeError, TypeError):
                 continue
         elif tool.name in (
@@ -431,7 +503,7 @@ def _retrieved_legislation_ids(tools: list) -> set:
             params = tool.input_parameters or {}
             lid = params.get("legislation_id")
             if lid:
-                ids.add(lid)
+                ids.add(lid.lower())
 
     return ids
 
@@ -440,7 +512,8 @@ def _cited_legislation_ids(report: str) -> set:
     """Act-level ids cited by legislation.gov.uk URL in *report*.
 
     Case law links are skipped: there is no legislation retrieval to check
-    them against.
+    them against. So is a link body that is not an id at all, which
+    :func:`_malformed_citations` counts instead.
     """
     return {
         lid
@@ -449,7 +522,24 @@ def _cited_legislation_ids(report: str) -> set:
             for u in _URL_RE.findall(report or "")
             if _is_legislation_url(u)
         )
-        if lid
+        if lid and _is_plausible_legislation_id(lid)
+    }
+
+
+def _malformed_citations(report: str) -> set:
+    """legislation.gov.uk link bodies in *report* that are not ids.
+
+    Reported, never scored. These are broken links rather than claims about a
+    source, so they are not the failure Citation Grounding exists to catch.
+    """
+    return {
+        lid
+        for lid in (
+            _legislation_id_from_url(u)
+            for u in _URL_RE.findall(report or "")
+            if _is_legislation_url(u)
+        )
+        if lid and not _is_plausible_legislation_id(lid)
     }
 
 
@@ -487,13 +577,15 @@ def _read_legislation_ids(tools: list) -> set:
     Narrower than ``_retrieved_legislation_ids`` on purpose. That function
     also counts an Act that merely turned up in a ``search_legislation``
     results list, which returns titles and links but no legal text.
+
+    Lowercased for the same reason as ``_retrieved_legislation_ids``.
     """
     ids: set = set()
     for tool in tools or []:
         if tool.name in _TEXT_TOOLS and _usable_output(tool.output):
             lid = (tool.input_parameters or {}).get("legislation_id")
             if lid:
-                ids.add(lid)
+                ids.add(lid.lower())
     return ids
 
 
@@ -539,15 +631,25 @@ class CitationGroundingMetric(BaseMetric):
             return self.score
 
         cited_ids: set[str] = set()
+        malformed: set[str] = set()
         for dr_output in dr_outputs:
             cited_ids |= _cited_legislation_ids(dr_output)
+            malformed |= _malformed_citations(dr_output)
+
+        broken_note = (
+            f" Diagnostic, not scored: {len(malformed)} legislation.gov.uk "
+            "link(s) whose address is not a legislation id, e.g. "
+            f"{sorted(malformed)[0]!r}."
+            if malformed
+            else ""
+        )
 
         if not cited_ids:
             self.score = 1.0
             self.success = True
             self.reason = (
                 "No legislation.gov.uk citations found in Worker output; "
-                "nothing to ground."
+                "nothing to ground." + broken_note
             )
             return self.score
 
@@ -561,13 +663,14 @@ class CitationGroundingMetric(BaseMetric):
                 f"Fabricated citation(s): {sorted(fabricated)} cited in Worker "
                 "output but never retrieved by search_legislation, "
                 "search_legislation_sections, or get_legislation_text in this run."
+                + broken_note
             )
         else:
             self.score = 1.0
             self.success = True
             self.reason = (
                 f"All {len(cited_ids)} cited Act(s) were retrieved by this "
-                "run's tool calls."
+                "run's tool calls." + broken_note
             )
 
         return self.score

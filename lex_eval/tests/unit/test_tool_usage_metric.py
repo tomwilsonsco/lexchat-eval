@@ -123,3 +123,33 @@ def test_tool_usage_metric_threads_chat_mode_through():
 
     assert deep_research_metric.is_successful(), deep_research_metric.reason
     assert not research_metric.is_successful()
+
+
+def test_conversational_loop_back_passes():
+    """A conversational turn asking about several instruments goes back to
+    search after reading the first Act's sections. That is the same multi-Act
+    interleaving the deep-research exemption exists for, and it accounted for
+    16 of the 22 order failures in the August 2026 question set."""
+    sequence = [_DELEGATE, _SEARCH, _SECTIONS, _SEARCH, _SECTIONS]
+    ok, detail = _check_tool_order(
+        sequence, "legislation_only", chat_mode="conversational"
+    )
+    assert ok, detail
+
+
+def test_conversational_still_requires_search_before_sections():
+    """Loosening the revisit rule must not stop the metric noticing a run that
+    retrieved provisions it never searched for."""
+    sequence = [_DELEGATE, _SECTIONS, _SEARCH]
+    ok, detail = _check_tool_order(
+        sequence, "legislation_only", chat_mode="conversational"
+    )
+    assert not ok, detail
+
+
+def test_conversational_still_requires_sections_before_fallback():
+    sequence = [_DELEGATE, _SEARCH, _FALLBACK, _SECTIONS]
+    ok, detail = _check_tool_order(
+        sequence, "legislation_only", chat_mode="conversational"
+    )
+    assert not ok, detail

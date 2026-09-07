@@ -34,6 +34,16 @@ def _same_model_cases():
     one captured response. A deep research answer and an ordinary research
     answer to the same question are not repeat runs of each other, so they are
     never compared, and a mode with only one run is simply not scored.
+
+    A run that produced no answer stays in the comparison on purpose. A model
+    that answers on one run and asks for clarification on the next, or halts
+    on the turn cap, is genuinely inconsistent, and that is the finding. What
+    it is not is two answers that disagree, so ``ConsistencyMetric`` names an
+    empty comparison run in its reason rather than leaving a bare 0.000 to be
+    read as divergent content.
+
+    Infrastructure failures are already out: ``load_records`` drops ``is_error``
+    rows, so a dropped connection or a provider timeout never reaches here.
     """
     grouped = group_by_question_llm_and_mode(read_only=True)
     cases = []

@@ -3,6 +3,8 @@ Unit tests for ``lex_eval.metrics.structure.MandatoryStructureMetric``'s
 heading matching, synthetic Worker output, no DB or LexChat instance needed.
 """
 
+import json
+
 import pytest
 from lex_eval.testcase import LLMTestCase, ToolCall
 
@@ -442,3 +444,152 @@ class TestCitationReadSiblingStepDiagnostic:
         assert metric.score == 0.0
         assert "Cited without reading" in metric.reason
         assert "Diagnostic" not in metric.reason
+
+
+class TestRegnalYearActsAreNotFabricated:
+    """Acts before 1963 are identified by regnal year, e.g. ``ukpga/Edw7/4/31``
+    is the Shop Hours Act 1904.
+
+    Two things used to make every one of them look fabricated: the Act id was
+    taken as the first three path segments, which cuts a four-segment regnal id
+    in half, and the API sends ids cased while a citation URL arrives
+    lowercased. Both were live, and together they scored two "shop definitions"
+    runs 0.0 for citing Acts their own searches had returned.
+    """
+
+    @staticmethod
+    def _case(retrieved_id: str, cited_path: str) -> LLMTestCase:
+        search_output = json.dumps(
+            {
+                "results": [
+                    {
+                        "legislation_id": retrieved_id,
+                        "title": "An Act",
+                        "url": f"http://www.legislation.gov.uk/{retrieved_id}",
+                    }
+                ],
+                "total": 1,
+            }
+        )
+        report = f"See [the Act](http://www.legislation.gov.uk/id/{cited_path})."
+        return LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="Worker: search_legislation",
+                    input_parameters={},
+                    output=search_output,
+                ),
+                ToolCall(name="delegate_research", input_parameters={}, output=report),
+            ],
+        )
+
+    @pytest.mark.parametrize(
+        "retrieved_id, cited_path",
+        [
+            # Four-segment regnal ids: the truncation bug.
+            ("ukpga/Edw7/4/31", "ukpga/Edw7/4/31"),
+            ("ukpga/Geo6/12-13-14/25", "ukpga/Geo6/12-13-14/25/section/3"),
+            ("ukla/Eliz2/1-2/27", "ukla/Eliz2/1-2/27"),
+            # Three-segment regnal id: case alone was enough to break it.
+            ("ukpga/1-2Geo5/54", "ukpga/1-2Geo5/54/section/14"),
+            # Underscored regnal id.
+            ("ukpga/26Geo5_1Edw8/28/1936", "ukpga/26Geo5_1Edw8/28/1936"),
+            # Modern ids must keep working.
+            ("ukpga/1978/29", "ukpga/1978/29/section/10C"),
+            ("ssi/2008/216", "ssi/2008/216/regulation/4"),
+        ],
+    )
+    def test_a_retrieved_act_is_grounded(self, retrieved_id, cited_path):
+        metric = CitationGroundingMetric()
+        metric.measure(self._case(retrieved_id, cited_path))
+        assert metric.score == 1.0, metric.reason
+        assert "Fabricated" not in metric.reason
+
+    def test_an_act_that_was_never_retrieved_still_fails(self):
+        """The fix must not make everything pass."""
+        metric = CitationGroundingMetric()
+        metric.measure(self._case("ukpga/Edw7/4/31", "ukpga/Geo6/14/28"))
+        assert metric.score == 0.0
+        assert "ukpga/geo6/14/28" in metric.reason
+
+    @pytest.mark.parametrize(
+        "suffix",
+        ["section/8", "schedule/1", "regulation/4", "article/2", "made", "enacted"],
+    )
+    def test_provision_and_version_suffixes_are_stripped(self, suffix):
+        metric = CitationGroundingMetric()
+        metric.measure(self._case("ssi/2008/216", f"ssi/2008/216/{suffix}"))
+        assert metric.score == 1.0, metric.reason
+
+    def test_an_extent_suffix_after_a_section_is_stripped(self):
+        metric = CitationGroundingMetric()
+        metric.measure(
+            self._case("ukpga/1990/43", "ukpga/1990/43/section/79/england+wales")
+        )
+        assert metric.score == 1.0, metric.reason
+
+
+class TestMalformedLinksAreNotFabricatedCitations:
+    """A model sometimes writes prose into a link body, e.g.
+    ``.../id/[UNCLEAR: no document reference provided]``. That is a broken
+    link, not a claim about an Act, so calling it a fabricated citation
+    accuses the run of the wrong thing. Reported, not scored.
+    """
+
+    @staticmethod
+    def _case(*cited_paths: str) -> LLMTestCase:
+        search_output = json.dumps(
+            {"results": [{"legislation_id": "asp/2021/3", "title": "An Act"}]}
+        )
+        report = " ".join(
+            f"See [it](http://www.legislation.gov.uk/id/{p})." for p in cited_paths
+        )
+        return LLMTestCase(
+            input="q",
+            actual_output="final answer",
+            tools_called=[
+                ToolCall(
+                    name="Worker: search_legislation",
+                    input_parameters={},
+                    output=search_output,
+                ),
+                ToolCall(name="delegate_research", input_parameters={}, output=report),
+            ],
+        )
+
+    @pytest.mark.parametrize(
+        "junk",
+        [
+            "[UNCLEAR:%20no%20document%20reference%20provided]",
+            "10%20&%2011%20Geo.%205.%20c.%2058",
+            "s.i.%201950%20No.%201133%20(S.%2080)",
+        ],
+    )
+    def test_a_malformed_link_does_not_fail_the_metric(self, junk):
+        metric = CitationGroundingMetric()
+        metric.measure(self._case("asp/2021/3", junk))
+        assert metric.score == 1.0, metric.reason
+        assert "Fabricated" not in metric.reason
+
+    def test_a_malformed_link_is_still_reported(self):
+        metric = CitationGroundingMetric()
+        metric.measure(self._case("asp/2021/3", "[UNCLEAR:%20none%20provided]"))
+        assert "Diagnostic, not scored" in metric.reason
+        assert "not a legislation id" in metric.reason
+
+    def test_a_genuine_fabrication_alongside_junk_still_fails(self):
+        metric = CitationGroundingMetric()
+        metric.measure(self._case("ukpga/1999/99", "[UNCLEAR:%20none]"))
+        assert metric.score == 0.0
+        assert "ukpga/1999/99" in metric.reason
+
+    def test_a_truncated_act_link_is_not_a_fabrication(self):
+        """A bare type/year link has no chapter number, so it names no Act.
+        Response 95 wrote one alongside two correct links to
+        ukpga/1988/41/section/65, and the Act itself had been retrieved."""
+        metric = CitationGroundingMetric()
+        metric.measure(self._case("asp/2021/3", "ukpga/1988"))
+        assert metric.score == 1.0, metric.reason
+        assert "Diagnostic, not scored" in metric.reason
