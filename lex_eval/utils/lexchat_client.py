@@ -60,8 +60,13 @@ def get_authenticated_client() -> httpx.Client:
     """
     config = _validate_config()
 
-    # 5-minute timeout for streaming LLM responses
-    timeout = httpx.Timeout(300.0, read=300.0)
+    # Timeout for streaming LLM responses, in seconds. The read timeout is the
+    # binding one: it is how long the stream may go silent before we give up,
+    # not how long the whole response may take. Deep Research runs can stream
+    # for well over the 300s default and still be working, so raise this with
+    # LEXCHAT_TIMEOUT (or gather_responses.py --timeout) rather than losing them.
+    timeout_s = float(os.getenv("LEXCHAT_TIMEOUT", "300"))
+    timeout = httpx.Timeout(timeout_s, read=timeout_s)
     client = httpx.Client(base_url=config["base_url"], timeout=timeout)
 
     logger.info("Authenticating with LexChat API...")

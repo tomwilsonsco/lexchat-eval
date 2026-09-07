@@ -9,66 +9,6 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 
 ```json
 {
- "query": "Shops Act 1950 definition of shop",
- "year_from": null,
- "year_to": null,
- "limit": 5,
- "include_text": false
-}
-```
-
-- `ukla/Eliz2/1-2/27`, **Gateshead Extension Act 1953** (1953, final, extent n/a)
-- `ukla/Eliz2/4-5/32`, **Crosby Corporation Act 1956** (1956, final, extent n/a)
-- `ukla/Eliz2/1-2/35`, **Dudley Extension Act 1953** (1953, final, extent n/a)
-- `[UNCLEAR: '15 & 16 Geo. 6 & 1 Eliz. 2 Ch. xlix']`, **West Hartlepool Extension Act, 1952** (1900, revised, extent n/a)
-- `ukla/1980/11`, **West Midlands County Council Act 1980** (1980, final, extent n/a)
-
----
-
-## `search_legislation`, HTTP 200
-
-```json
-{
- "query": "statutory definition of shop Scotland",
- "year_from": null,
- "year_to": null,
- "limit": 5,
- "include_text": false
-}
-```
-
-- `ukpga/1996/18`, **Employment Rights Act 1996** (1996, revised, extent United Kingdom)
-- `ukpga/Geo6/12-13-14/25`, **†Citation, extent, interpretation and duration.** (1948, stub, extent n/a)
-- `si/1948/1382 (S. 107)`, **The Town and Country Planning (Development Charge Exemptions) (Scotland) Regulations, 1948** (1948, revised, extent n/a)
-- `ukpga/Edw7/4/31`, **Shop Hours Act 1904** (1900, revised, extent n/a)
-- `ukpga/1964/50`, **Tenancy of Shops (Scotland) Act 1964** (1964, final, extent n/a)
-
----
-
-## `search_legislation`, HTTP 200
-
-```json
-{
- "query": "Licensing (Scotland) Act shop premises definition",
- "year_from": null,
- "year_to": null,
- "limit": 5,
- "include_text": false
-}
-```
-
-- `ukpga/1984/58`, **Rent (Scotland) Act 1984** (1984, revised, extent Scotland)
-- `ukpga/1996/18`, **Employment Rights Act 1996** (1996, revised, extent United Kingdom)
-- `asp/2005/16`, **Licensing (Scotland) Act 2005** (2005, revised, extent Scotland)
-- `asp/2007/13`, **Christmas Day and New Year's Day Trading (Scotland) Act 2007** (2007, revised, extent Scotland)
-- `ssi/2012/276`, **The Criminal Legal Aid (Scotland) (Fees) Amendment Regulations 2012** (2012, final, extent n/a)
-
----
-
-## `search_legislation`, HTTP 200
-
-```json
-{
  "query": "Shops Act 1950",
  "year_from": null,
  "year_to": null,
@@ -82,6 +22,482 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 - `[UNCLEAR: '15 & 16 Geo. 6 & 1 Eliz. 2 Ch. xlix']`, **West Hartlepool Extension Act, 1952** (1900, revised, extent n/a)
 - `ukla/Eliz2/1-2/35`, **Dudley Extension Act 1953** (1953, final, extent n/a)
 - `14 & 15 Geo. 6 c. xxix`, **Brighton Extension Act, 1951** (1900, revised, extent n/a)
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
+ "query": "Shops Act 1950 sections 38 39 Sunday trading",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `uksi/1985/39`, **The Family Practitioner Committees (Consequential Modifications) Order 1985** (1985, final, extent n/a)
+- `ukpga/1994/20`, **Sunday Trading Act 1994** (1994, revised, extent England, Wales)
+- `ukpga/1963/37`, **Children and Young Persons Act 1963** (1963, revised, extent United Kingdom)
+- `ukpga/1986/31`, **Airports Act 1986** (1986, revised, extent United Kingdom)
+- `ukpga/1965/35`, **Shops (Early Closing Days) Act 1965 (repealed 1.12.1994)** (1965, revised, extent England, Wales, Scotland)
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
+ "query": "shop premises retail sale of goods definition Scotland",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `ssi/2010/407/made`, **The Sale of Tobacco (Register of Tobacco Retailers) Regulations 2010** (2010, final, extent n/a)
+- `asp/2021/6`, **Protection of Workers (Retail and Age-restricted Goods and Services) (Scotland) Act 2021** (2021, revised, extent Scotland)
+- `uksi/1973/2133`, **The Electricity (Industrial and Commercial Use) (Control) (Northern Ireland) Order 1973** (1973, final, extent n/a)
+- `si/1948/1382 (S. 107)`, **The Town and Country Planning (Development Charge Exemptions) (Scotland) Regulations, 1948** (1948, revised, extent n/a)
+- `asp/2007/13`, **Christmas Day and New Year's Day Trading (Scotland) Act 2007** (2007, revised, extent Scotland)
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
+ "query": "Tenancy of Shops (Scotland) Act 1949",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `ukpga/1964/50`, **Tenancy of Shops (Scotland) Act 1964** (1964, final, extent n/a)
+- `ukpga/Geo6/12-13-14/25`, **†Citation, extent, interpretation and duration.** (1948, stub, extent n/a)
+- `uksi/1973/741`, **The Counter-Inflation (Business Rents) Order 1973** (1973, final, extent n/a)
+- `uksi/1974/1030`, **The Counter-Inflation (Business Rents) Order 1974** (1974, final, extent n/a)
+- `uksi/1974/1294`, **The Counter-Inflation (Business Rents) (Transition) Order 1974** (1974, final, extent n/a)
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "definition of shop large shop retail",
+ "legislation_id": "asp/2007/13",
+ "limit": 10
+}
+```
+
+### Large shops not to open on Christmas Day
+`http://www.legislation.gov.uk/asp/2007/13/section/1`
+
+Section 1) **Large shops not to open on Christmas Day**
+No large shop is to open for the purpose of making retail sales on Christmas Day unless it is exempted by section 3. 
+
+### Interpretation
+`http://www.legislation.gov.uk/asp/2007/13/section/7`
+
+Section 7) **Interpretation**
+In this Act— 
+	- “the 1968 Act” means the Medicines Act 1968 (c. 67);
+	- “alcohol” has the meaning given by section 2 of the Licensing (Scotland) Act 2005 (asp 16);
+	- ...
+	- “commercial airport” means any airport (within the meaning of section 82(1) of the Airports Act 1986 (c. 31)) at which facilities are provided for use by members of the general public travelling by air;
+	- “large shop” means a shop which has a relevant floor area exceeding 280 square metres;
+	- “on prescription” means in accordance with a prescription given by an appropriate practitioner, within the meaning of regulation 214(1) and (3) to (6) (sale or supply of prescription only medicines) of the Human Medicines Regulations 2012;
+	- “medicinal product” has the meaning given by section 130 of the 1968 Act;
+	- “motorway service area” means an area of land comprising service area development within the meaning of section 119(2) of the Roads (Scotland) Act 1984 (c. 54);
+	- “registered pharmacy” has the meaning given by section 74 of the 1968 Act;
+	- “relevant floor area” means so much of the floor area of a shop as is used for making retail sales or for the display of goods in connection with such sales;
+	- “retail sale” means any sale of goods for consumption or use, whether or not by the buyer, for purposes unconnected with a trade or business;
+	- “shop” means any premises within a building where there is carried on a trade or business consisting wholly or mainly of the retail sale of goods; and
+	- “trustee” has the meaning given by section 2 of the Trusts (Scotland) Act 1921 (c. 58).
+
+### Application of section 1 to New Year's Day
+`http://www.legislation.gov.uk/asp/2007/13/section/2`
+
+Section 2) **Application of section 1 to New Year's Day**
+
+1) The Scottish Ministers may, by order made by statutory instrument, provide that section 1 applies in relation to New Year's Day as it applies in relation to Christmas Day. 
+2) An order under subsection (1) is to be made only if a draft of the order has been laid before and approved by a resolution of the Scottish Parliament. 
+3) The Scottish Ministers may not lay a draft of an order under subsection (1) before the Parliament in pursuance of subsection (2) unless, having consulted the persons mentioned in subsection (4), they have laid before the Parliament— 
+	a) a report about the economic impact, and the impact on family life, of large shops opening for the purpose of making retail sales on New Year's Day; and 
+	b) a statement that they are of the view, having considered the matters in the report, that the order should be made and setting out their reasons for being of that view. 
+4) The persons referred to in subsection (3) are— 
+	a) every council constituted under section 2 of the Local Government etc. (Scotland) Act 1994 (c. 39); 
+	b) such persons as appear to the Scottish Ministers to be representative of the interests of those who carry on business; 
+	c) such persons as appear to the Scottish Ministers to be representative of those who work in large shops; and 
+	d) such other persons as the Scottish Ministers think fit. 
+
+### Offence
+`http://www.legislation.gov.uk/asp/2007/13/section/4`
+
+Section 4) **Offence**
+If section 1 is contravened— 
+	a) the occupier of the shop; and 
+	b) if different, the person responsible for controlling or managing the operations carried on at the shop on the day in question, shall be guilty of an offence and liable on summary conviction to a fine not exceeding £50,000. 
+
+### Exemptions
+`http://www.legislation.gov.uk/asp/2007/13/section/3`
+
+Section 3) **Exemptions**
+A shop is exempt from section 1 if— 
+	a) the trade or business carried on consists wholly or mainly of the sale of— 
+		i) meals, refreshments or alcohol for consumption on the premises on which they are sold; or 
+		ii) meals or refreshments prepared to order for consumption off those premises; 
+	b) it is a registered pharmacy and is open solely for the purpose of the dispensing of drugs, medicines or appliances on prescription; 
+	c) it is within a port, railway station or commercial airport; 
+	d) it is at a motorway service area; or 
+	e) the trade or business carried on consists wholly or mainly of the sale of fuel for motor vehicles. 
+
+### Short title
+`http://www.legislation.gov.uk/asp/2007/13/section/8`
+
+Section 8) **Short title**
+This Act may be cited as the Christmas Day and New Year's Day Trading (Scotland) Act 2007 
+
+### Offences by bodies corporate, etc.
+`http://www.legislation.gov.uk/asp/2007/13/section/5`
+
+Section 5) **Offences by bodies corporate, etc.**
+
+1) Where an offence under this Act committed by a body of persons— 
+	a) was committed with the consent or connivance of— 
+		i) a person concerned, or purporting to be concerned, in the management or control of the body; or 
+		ii) a relevant person; or 
+	b) was attributable to any neglect on the part of such person, that person, as well as the body, is guilty of the offence. 
+2) In this section— 
+	- a  “body of persons” means a body corporate, a partnership, a body of trustees or an unincorporated association other than a partnership; and
+	- “relevant person” means a director, secretary or other officer of a body corporate, a partner in a partnership, a trustee of a trust or any member of an unincorporated association.
+
+### Defence of due diligence
+`http://www.legislation.gov.uk/asp/2007/13/section/6`
+
+Section 6) **Defence of due diligence**
+The offence under section 4 is one of strict liability, but it shall be a defence for an accused to prove that the accused or a person under the control of the accused took all reasonable precautions and exercised all due diligence to avoid its commission. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "shop worker shop premises meaning retail trade or business",
+ "legislation_id": "ukpga/1996/18",
+ "limit": 10
+}
+```
+
+### Interpretation
+`http://www.legislation.gov.uk/ukpga/1996/18/section/43ZB`
+
+Section 43ZB) **Interpretation**
+
+1) In this Part— 
+	- “additional hours” has the meaning given in section 41A(2);
+	- “large shop” means a shop which has a relevant floor area exceeding 280 square metres;
+	- “objection notice” has the meaning given in section 41A(2);
+	- “regulations” means regulations made by the Secretary of State.
+2) In the definition of  “large shop” in subsection (1)— 
+	a) “shop” means any premises where there is carried on a trade or business consisting wholly or mainly of the sale of goods; 
+	b) “relevant floor area” means the internal floor area of so much of the large shop in question as consists of or is comprised in a building. 
+3) For the purposes of subsection (2), any part of the shop which is not used for the serving of customers in connection with the sale or display of goods is to be disregarded. 
+4) The references in subsections (2) and (3) to the sale of goods does not include— 
+	a) the sale of meals, refreshments or alcohol (within the meaning of the Licensing Act 2003 or, in relation to Scotland, the Licensing (Scotland) Act 2005 (asp 16)) for consumption on the premises on which they are sold, or 
+	b) the sale of meals or refreshments prepared to order for immediate consumption off those premises. 
+
+### Protected shop workers and betting workers.
+`http://www.legislation.gov.uk/ukpga/1996/18/section/36`
+
+Section 36) **Protected shop workers and betting workers.**
+
+1) Subject to subsection (5), a shop worker or betting worker is to be regarded as “protected” for the purposes of any provision of this Act if (and only if) subsection (2) or (3) applies to him. 
+2) This subsection applies to a shop worker or betting worker if— 
+	a) on the day before the relevant commencement date he was employed as a shop worker or a betting worker but not to work only on Sunday, 
+	b) he has been continuously employed during the period beginning with that day and ending with the day which, in relation to the provision concerned, is the appropriate date, and 
+	c) throughout that period, or throughout every part of it during which his relations with his employer were governed by a contract of employment, he was a shop worker or a betting worker. 
+3) This subsection applies to any shop worker or betting worker whose contract of employment is such that under it he— 
+	a) is not, and may not be, required to work on Sunday, and 
+	b) could not be so required even if the provisions of this Part were disregarded. 
+4) Where on the day before the relevant commencement date an employee’s relations with his employer had ceased to be governed by a contract of employment, he shall be regarded as satisfying subsection (2)(a) if— 
+	a) that day fell in a week which counts as a period of employment with that employer under section 212(2) or (3) or under regulations under section 219, and 
+	b) on the last day before the relevant commencement date on which his relations with his employer were governed by a contract of employment, the employee was employed as a shop worker or a betting worker but not to work only on Sunday. 
+5) A shop worker is not a protected shop worker, and a betting worker is not a protected betting worker, if— 
+	a) he has given his employer an opting-in notice on or after the relevant commencement date, and 
+	b) after giving the notice, he has expressly agreed with his employer to do shop work, or betting work, on Sunday or on a particular Sunday. 
+6) In this Act “opting-in notice”, in relation to a shop worker or a betting worker, means written notice, signed and dated by the shop worker or betting worker, in which the shop worker or betting worker expressly states that he wishes to work on Sunday or that he does not object to Sunday working. 
+7) Subject to subsection (8), in this Act “the relevant commencement date” means— 
+	a) in relation to a shop worker, 26th August 1994, and 
+	b) in relation to a betting worker, 3rd January 1995. 
+8) In any provision of this Act which applies to Scotland by virtue of section 1(5) of the Sunday Working (Scotland) Act 2003 (extension to Scotland of provisions which refer to shop workers and betting workers),  “the relevant commencement date” means, in relation to Scotland, the date on which that section came into force. 
+
+### Shop workers who refuse to work additional hours on Sunday
+`http://www.legislation.gov.uk/ukpga/1996/18/section/101ZA`
+
+Section 101ZA) **Shop workers who refuse to work additional hours on Sunday**
+
+1) Subsection (2) applies where a shop worker has given an objection notice that has not been withdrawn and he or she is dismissed. 
+2) The shop worker is to be regarded for the purposes of this Part as unfairly dismissed if the reason (or the principal reason) for the dismissal is that he or she refused, or proposed to refuse, to do shop work for additional hours on Sunday or on a particular Sunday. 
+3) Subsection (2) does not apply where the reason (or principal reason) for the dismissal is that the shop worker refused (or proposed to refuse) to do shop work for additional hours on any Sunday or Sundays falling before the end of the relevant period. 
+4) A shop worker who is dismissed is to be regarded for the purposes of this Part as unfairly dismissed if the reason (or principal reason) for the dismissal is that the worker gave (or proposed to give) an objection notice to the employer. 
+5) In this section— 
+	- “additional hours” and  “objection notice” have the meanings given by section 41A(2);
+	- “relevant period” means the period determined by section 43ZA(2)
+										(but subject to section 41D(3)).
+
+### Sunday working for shop workers: additional hours
+`http://www.legislation.gov.uk/ukpga/1996/18/section/45ZA`
+
+Section 45ZA) **Sunday working for shop workers: additional hours**
+
+1) Subsection (2) applies where a shop worker has given an objection notice to his or her employer and the notice has not been withdrawn. 
+2) The shop worker has the right not to be subjected to any detriment by any act, or any deliberate failure to act, by the employer done on the ground that the shop worker refused (or proposed to refuse) to do shop work for additional hours on Sunday or on a particular Sunday. 
+3) Subsection (2) does not apply to anything done on the ground that the shop worker refused (or proposed to refuse) to do shop work for additional hours on any Sunday or Sundays falling before the end of the relevant period. 
+4) A shop worker has the right not to be subjected to any detriment by any act, or any deliberate failure to act, by his or her employer on the ground that the shop worker gave (or proposed to give) an objection notice to the employer. 
+5) Subsections (2) and (4) do not apply where the detriment in question amounts to dismissal (within the meaning of Part 10). 
+6) For the purposes of this section, a shop worker who does not do shop work for additional hours on Sunday or on a particular Sunday is not to be regarded as having been subjected to any detriment by— 
+	a) a failure to pay remuneration in respect of doing shop work for additional hours on Sunday which the shop worker has not done, or 
+	b) a failure to provide any other benefit where the failure results from the application (in relation to a Sunday on which the shop worker has not done shop work for additional hours) of a contractual term under which the extent of the benefit varies according to the number of hours worked by, or the remuneration paid to, the shop worker. 
+7) Subsections (8) and (9) apply where— 
+	a) an employer offers to pay a sum specified in the offer to a shop worker if he or she agrees to do shop work for additional hours on Sunday or on a particular Sunday, and 
+	b) the shop worker— 
+		i) has given an objection notice to the employer that has not been withdrawn, or 
+		ii) is not obliged under a contract of employment to do shop work for additional hours on Sunday. 
+8) A shop worker to whom the offer is not made is not to be regarded for the purposes of this section as having been subjected to any detriment by any failure— 
+	a) to make the offer to the shop worker, or 
+	b) to pay the shop worker the sum specified in the offer. 
+9) A shop worker who does not accept the offer is not to be regarded for the purposes of this section as having been subjected to any detriment by any failure to pay the shop worker the sum specified in the offer. 
+10) In this section— 
+	- “additional hours” and  “objection notice” have the meanings given by section 41A(2);
+	- “relevant period” means the period determined by section 43ZA(2)
+										(but subject to section 41D(3)).
+
+### Opted-out shop workers and betting workers.
+`http://www.legislation.gov.uk/ukpga/1996/18/section/41`
+
+Section 41) **Opted-out shop workers and betting workers.**
+
+1) Subject to subsection (2), a shop worker or betting worker is to be regarded as “opted-out” for the purposes of any provision of this Act if (and only if)— 
+	a) he has given his employer an opting-out notice, 
+	b) he has been continuously employed during the period beginning with the day on which the notice was given and ending with the day which, in relation to the provision concerned, is the appropriate date, and 
+	c) throughout that period, or throughout every part of it during which his relations with his employer were governed by a contract of employment, he was a shop worker or a betting worker. 
+2) A shop worker is not an opted-out shop worker, and a betting worker is not an opted-out betting worker, if— 
+	a) after giving the opting-out notice concerned, he has given his employer an opting-in notice, and 
+	b) after giving the opting-in notice, he has expressly agreed with his employer to do shop work, or betting work, on Sunday or on a particular Sunday. 
+3) In this Act  “notice period”, in relation to an opted-out shop worker or an opted-out betting worker, means— 
+	a) in the case of an opted-out shop worker who does shop work in or about a large shop, the period of one month beginning with the day on which the opting-out notice concerned was given; 
+	b) in any other case, the period of three months beginning with that day. This subsection is subject to sections 41D(2) and 42(2). 
+
+### Notice of objection by shop workers to working additional hours on Sunday
+`http://www.legislation.gov.uk/ukpga/1996/18/section/41A`
+
+Section 41A) **Notice of objection by shop workers to working additional hours on Sunday**
+
+1) A shop worker may at any time give to his or her employer a written notice, signed and dated by the shop worker, to the effect that he or she objects to doing shop work for additional hours on Sunday. 
+2) In this Part— 
+	- “additional hours” means any number of hours of shop work that a shop worker is (or could be) required to work under a contract of employment on Sunday that are (or would be) in excess of the shop worker's normal Sunday working hours;
+	- “objection notice” means a notice given under subsection (1).
+3) The  “normal Sunday working hours” of a shop worker are to be calculated in accordance with regulations. 
+4) Regulations under this section may provide— 
+	a) for the calculation to be determined (for example) by reference to the average number of hours that the shop worker has worked on Sundays during a period specified or described in the regulations; 
+	b) for a calculation of the kind mentioned in paragraph (a) to be varied in special cases; 
+	c) for the right to give an objection notice not to be exercisable in special cases (and subsection (1) is subject to provision made by virtue of this paragraph). 
+5) Provision under subsection (4)(b) or (c) may, in particular, include provision— 
+	a) about how the calculation of normal Sunday working hours is to be made in the case of a shop worker who has not been employed for a sufficient period of time to enable a calculation to be made as otherwise provided for in the regulations; 
+	b) for the right to give an objection notice not to be exercisable by such a shop worker until he or she has completed a period of employment specified or described in the regulations. 
+6) But regulations under this section may not include provision preventing a shop worker who has been continuously employed under a contract of employment for a period of one year or more from giving to the employer an objection notice. 
+7) Regulations under this section may make different provision for different purposes. 
+
+### Shop workers.
+`http://www.legislation.gov.uk/ukpga/1996/18/section/232`
+
+Section 232) **Shop workers.**
+
+1) In this Act “shop worker” means an employee who, under his contract of employment, is or may be required to do shop work. 
+2) In this Act “shop work” means work in or about a shop  . . .   on a day on which the shop is open for the serving of customers. 
+3) Subject to subsection (4), in this Act “shop” includes any premises where any retail trade or business is carried on. 
+4) Where premises are used mainly for purposes other than those of retail trade or business and would not (apart from subsection (3)) be regarded as a shop, only such part of the premises as— 
+	a) is used wholly or mainly for the purposes of retail trade or business, or 
+	b) is used both for the purposes of retail trade or business and for the purposes of wholesale trade and is used wholly or mainly for those two purposes considered together, is to be regarded as a shop for the purposes of this Act. 
+5) In subsection (4)(b) “wholesale trade” means the sale of goods for use or resale in the course of a business or the hire of goods for use in the course of a business. 
+6) In this section “retail trade or business” includes— 
+	a) the business of a barber or hairdresser, 
+	b) the business of hiring goods otherwise than for use in the course of a trade or business, and 
+	c) retail sales by auction, but does not include catering business or the sale at theatres and places of amusement of programmes, catalogues and similar items. 
+7) In subsection (6) “catering business” means— 
+	a) the sale of meals, refreshments or alcohol  ... for consumption on the premises on which they are sold, or 
+	b) the sale of meals or refreshments prepared to order for immediate consumption off the premises; except that in Scotland  “alcohol” has the meaning given in section 2 of the Licensing (Scotland) Act 2005 and in paragraph (a) “alcohol” has the same meaning as in the Licensing Act 2003 . 
+8) In this Act— 
+	- “notice period”, in relation to an opted-out shop worker, has the meaning given by section 41(3),
+	- “opted-out”, in relation to a shop worker, shall be construed in accordance with section 41(1) and (2),
+	- “opting-in notice”, in relation to a shop worker, has the meaning given by section 36(6),
+	- “opting-out notice”, in relation to a shop worker, has the meaning given by section 40(2), and
+	- “protected”, in relation to a shop worker, shall be construed in accordance with section 36(1) to (5).
+
+### Explanatory statement: shop workers at commencement date
+`http://www.legislation.gov.uk/ukpga/1996/18/section/41C`
+
+Section 41C) **Explanatory statement: shop workers at commencement date**
+
+1) This section applies where— 
+	a) under a contract of employment a shop worker is or may be required to do shop work on Sundays, and 
+	b) the shop worker was employed under that contract on the day before the commencement date. 
+2) The shop worker's employer must give to the shop worker a written statement informing the shop worker of the rights mentioned in section 41B(2). 
+3) The statement must be given before the end of the period of two months beginning with the commencement date. 
+4) An employer does not fail to comply with subsections (2) and (3) in a case where, before the end of the period referred to in subsection (3), the shop worker has given to the employer an opting-out notice (and that notice has not been withdrawn). 
+5) A statement under this section must comply with such requirements as to form and content as regulations may provide. 
+6) Regulations under this section may make different provision for different purposes. 
+7) In this section  “commencement date” means the date appointed by regulations under section 44 of the Enterprise Act 2016 for the coming into force of section 33 of, and Schedule 5 to, that Act. 
+
+### Explanatory statement: persons who become shop workers
+`http://www.legislation.gov.uk/ukpga/1996/18/section/41B`
+
+Section 41B) **Explanatory statement: persons who become shop workers**
+
+1) This section applies where a person becomes a shop worker who, under a contract of employment, is or may be required to do shop work on Sundays. 
+2) The employer must give to the shop worker a written statement informing the shop worker of the following rights— 
+	a) the right to object to working on Sundays by giving the employer an opting-out notice (if section 40 applies to the shop worker); 
+	b) the right to object to doing shop work for additional hours on Sundays by giving the employer an objection notice. 
+3) The statement must be given before the end of the period of two months beginning with the day on which the person becomes a shop worker as mentioned in subsection (1). 
+4) An employer does not fail to comply with subsections (2) and (3) in a case where, before the end of the period referred to in subsection (3), the shop worker has given to the employer an opting-out notice (and that notice has not been withdrawn). 
+5) A statement under this section must comply with such requirements as to form and content as regulations may provide. 
+6) Regulations under this section may make different provision for different purposes. 
+
+### Introductory.
+`http://www.legislation.gov.uk/ukpga/1996/18/section/17`
+
+Section 17) **Introductory.**
+
+1) In the following provisions of this Part— 
+	- “cash shortage” means a deficit arising in relation to amounts received in connection with retail transactions, and
+	- “stock deficiency” means a stock deficiency arising in the course of retail transactions.
+2) In the following provisions of this Part “retail employment”, in relation to a worker, means employment involving (whether or not on a regular basis)— 
+	a) the carrying out by the worker of retail transactions directly with members of the public or with fellow workers or other individuals in their personal capacities, or 
+	b) the collection by the worker of amounts payable in connection with retail transactions carried out by other persons directly with members of the public or with fellow workers or other individuals in their personal capacities. 
+3) References in this section to a “retail transaction” are to the sale or supply of goods or the supply of services (including financial services). 
+4) References in the following provisions of this Part to a deduction made from wages of a worker in retail employment, or to a payment received from such a worker by his employer, on account of a cash shortage or stock deficiency include references to a deduction or payment so made or received on account of— 
+	a) any dishonesty or other conduct on the part of the worker which resulted in any such shortage or deficiency, or 
+	b) any other event in respect of which he (whether or not together with any other workers) has any contractual liability and which so resulted, in each case whether or not the amount of the deduction or payment is designed to reflect the exact amount of the shortage or deficiency. 
+5) References in the following provisions of this Part to the recovery from a worker of an amount in respect of a cash shortage or stock deficiency accordingly include references to the recovery from him of an amount in respect of any such conduct or event as is mentioned in subsection (4)(a) or (b). 
+6) In the following provisions of this Part “pay day”, in relation to a worker, means a day on which wages are payable to the worker. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "meaning of retail premises retail worker shop",
+ "legislation_id": "asp/2021/6",
+ "limit": 10
+}
+```
+
+### Meaning of “retail worker”
+`http://www.legislation.gov.uk/id/asp/2021/6/section/4`
+
+Section 4) **Meaning of  “retail worker”**
+
+1) In this Act,  “retail worker”— 
+	a) means a person— 
+		i) whose usual place of work is retail premises, or 
+		ii) whose usual place of work is not retail premises but who does retail work, 
+	b) includes, in relation to a business that owns or occupies any premises in which the person works, a person who— 
+		i) is an employee of the business, 
+		ii) is an owner of the business, or 
+		iii) works in the premises under arrangements made between the business and another person for the provision of staff, 
+	c) also includes a person who delivers goods from retail premises. 
+2) For the purposes of subsection (1), it is irrelevant whether or not the person receives payment for the work. 
+3) In proceedings for an offence under section 1, it is not necessary for the prosecutor to prove that the person charged with the offence knew or ought to have known any matter falling within subsection (1)(b) in relation to the person against whom the offence is alleged to have been committed. 
+
+### Meaning of “retail premises” and “retail work”
+`http://www.legislation.gov.uk/id/asp/2021/6/section/5`
+
+Section 5) **Meaning of  “retail premises” and  “retail work”**
+
+1) In this Act,  “retail premises” means premises that are used wholly or mainly for the sale or supply of goods, on a retail basis, to members of the public. 
+2) In this Act,  “retail work” means— 
+	a) in the case of a person whose usual place of work is retail premises, any work in those retail premises, 
+	b) in the case of a person whose usual place of work is not retail premises, work in connection with— 
+		i) the sale or supply of goods, on a retail basis, to members of the public, or 
+		ii) the sale or supply of services (including facilities for gambling) in respect of which a statutory age restriction applies, 
+	c) subject to subsection (3), in the case of a person who delivers goods from retail premises, work in connection with the sale or supply of goods, on a retail basis, to members of the public. 
+3) A person who delivers goods from retail premises is doing retail work only during the period beginning when the person arrives at a place where delivery of goods is to be effected and ending when the person leaves that place (whether or not goods have been delivered). 
+4) In subsection (2)(b)(ii),  “statutory age restriction” has the same meaning as in section 3(5). 
+5) In this section, references to working in premises includes working on any land forming part of the premises. 
+
+### Offence of assaulting etc. retail worker
+`http://www.legislation.gov.uk/id/asp/2021/6/section/1`
+
+Section 1) **Offence of assaulting etc. retail worker**
+
+1) It is an offence for a person to assault, threaten or abuse another person— 
+	a) who is a retail worker, and 
+	b) who is engaged, at the time, in retail work. 
+2) No offence is committed under subsection (1) unless the person who assaults, threatens or abuses knows or ought to know that the other person— 
+	a) is a retail worker, and 
+	b) is engaged, at the time, in retail work. 
+3) A person who commits an offence under subsection (1) is liable, on summary conviction, to imprisonment for a term not exceeding 12 months or a fine not exceeding the prescribed sum (or both). 
+4) Evidence from a single source is sufficient to establish, for the purposes of this section— 
+	a) whether a person is a retail worker, and 
+	b) whether the person is engaged, at the time, in retail work. 
+5) In subsection (3), the  “prescribed sum” has the meaning given by section 225(8) of the Criminal Procedure (Scotland) Act 1995. 
+
+### Behaviour constituting an offence under section 1
+`http://www.legislation.gov.uk/id/asp/2021/6/section/2`
+
+Section 2) **Behaviour constituting an offence under section 1**
+
+1) The offence under section 1 of threatening or abusing a retail worker is committed by a person only if the person— 
+	a) behaves in a threatening or abusive manner towards the worker, and 
+	b) intends by the behaviour to cause the worker or any other person fear or alarm or is reckless as to whether the behaviour would cause such fear or alarm. 
+2) Subsection (1) applies to— 
+	a) behaviour of any kind including, in particular, things said or otherwise communicated as well as things done, 
+	b) behaviour consisting of— 
+		i) a single act, or 
+		ii) a course of conduct. 
+
+### Short title
+`http://www.legislation.gov.uk/id/asp/2021/6/section/7`
+
+Section 7) **Short title**
+The short title of this Act is the Protection of Workers (Retail and Age-restricted Goods and Services) (Scotland) Act 2021. 
+
+### Aggravation in relation to enforcement of statutory age restriction
+`http://www.legislation.gov.uk/id/asp/2021/6/section/3`
+
+Section 3) **Aggravation in relation to enforcement of statutory age restriction**
+
+1) This section applies where, in proceedings for an offence under section 1, it is— 
+	a) specified in the complaint that the offence is aggravated by reason of the retail worker's enforcing a statutory age restriction, and 
+	b) proved that the offence is so aggravated. 
+2) The offence is so aggravated if the behaviour constituting the offence occurred because of the enforcement of a statutory age restriction. 
+3) Evidence from a single source is sufficient to prove that the offence is so aggravated. 
+4) Where this section applies, the court must— 
+	a) state on conviction that the offence is so aggravated, 
+	b) record the conviction in a way that shows that the offence is so aggravated, 
+	c) take the aggravation into account in determining the appropriate sentence, and 
+	d) state— 
+		i) where the sentence imposed in respect of the offence is different from that which the court would have imposed if the offence were not so aggravated, the extent of and the reasons for that difference, or 
+		ii) otherwise, the reasons for there being no such difference. 
+5) In this section— 
+	- “enforcement”, in relation to a statutory age restriction, includes— seeking information as to a person's age,considering information as to a person's age,refusing to sell or supply goods or services, for the purposes of complying with the restriction (and  “enforcing” is to be construed accordingly),
+	- “statutory age restriction” means a provision in an enactment making it an offence to sell or supply goods or services to a person under an age specified in that or another enactment.
+
+### Commencement
+`http://www.legislation.gov.uk/id/asp/2021/6/section/6`
+
+Section 6) **Commencement**
+
+1) This section, section 4 (except subsection (3)), section 5 and section 7 come into force on the day after Royal Assent. 
+2) The other provisions of this Act (including section 4(3)) come into force at the end of the period of 6 months beginning with the day of Royal Assent. 
 
 ---
 
@@ -346,106 +762,6 @@ Section 124) **Exempt premises**
 	- “examination station” has the meaning given in section 22A of that Act,
 	- “ferry service” means a service the principal purpose of which is the transport of passengers or goods over water,
 	- “international journey” means a journey with— a point of departure,a destination, orat least one port of call, outside the United Kingdom, and includes any part of such a journey.
-
----
-
-## `search_legislation_sections`, HTTP 200
-
-```json
-{
- "query": "definition of shop large shop retail",
- "legislation_id": "asp/2007/13",
- "limit": 10
-}
-```
-
-### Large shops not to open on Christmas Day
-`http://www.legislation.gov.uk/asp/2007/13/section/1`
-
-Section 1) **Large shops not to open on Christmas Day**
-No large shop is to open for the purpose of making retail sales on Christmas Day unless it is exempted by section 3. 
-
-### Interpretation
-`http://www.legislation.gov.uk/asp/2007/13/section/7`
-
-Section 7) **Interpretation**
-In this Act— 
-	- “the 1968 Act” means the Medicines Act 1968 (c. 67);
-	- “alcohol” has the meaning given by section 2 of the Licensing (Scotland) Act 2005 (asp 16);
-	- ...
-	- “commercial airport” means any airport (within the meaning of section 82(1) of the Airports Act 1986 (c. 31)) at which facilities are provided for use by members of the general public travelling by air;
-	- “large shop” means a shop which has a relevant floor area exceeding 280 square metres;
-	- “on prescription” means in accordance with a prescription given by an appropriate practitioner, within the meaning of regulation 214(1) and (3) to (6) (sale or supply of prescription only medicines) of the Human Medicines Regulations 2012;
-	- “medicinal product” has the meaning given by section 130 of the 1968 Act;
-	- “motorway service area” means an area of land comprising service area development within the meaning of section 119(2) of the Roads (Scotland) Act 1984 (c. 54);
-	- “registered pharmacy” has the meaning given by section 74 of the 1968 Act;
-	- “relevant floor area” means so much of the floor area of a shop as is used for making retail sales or for the display of goods in connection with such sales;
-	- “retail sale” means any sale of goods for consumption or use, whether or not by the buyer, for purposes unconnected with a trade or business;
-	- “shop” means any premises within a building where there is carried on a trade or business consisting wholly or mainly of the retail sale of goods; and
-	- “trustee” has the meaning given by section 2 of the Trusts (Scotland) Act 1921 (c. 58).
-
-### Application of section 1 to New Year's Day
-`http://www.legislation.gov.uk/asp/2007/13/section/2`
-
-Section 2) **Application of section 1 to New Year's Day**
-
-1) The Scottish Ministers may, by order made by statutory instrument, provide that section 1 applies in relation to New Year's Day as it applies in relation to Christmas Day. 
-2) An order under subsection (1) is to be made only if a draft of the order has been laid before and approved by a resolution of the Scottish Parliament. 
-3) The Scottish Ministers may not lay a draft of an order under subsection (1) before the Parliament in pursuance of subsection (2) unless, having consulted the persons mentioned in subsection (4), they have laid before the Parliament— 
-	a) a report about the economic impact, and the impact on family life, of large shops opening for the purpose of making retail sales on New Year's Day; and 
-	b) a statement that they are of the view, having considered the matters in the report, that the order should be made and setting out their reasons for being of that view. 
-4) The persons referred to in subsection (3) are— 
-	a) every council constituted under section 2 of the Local Government etc. (Scotland) Act 1994 (c. 39); 
-	b) such persons as appear to the Scottish Ministers to be representative of the interests of those who carry on business; 
-	c) such persons as appear to the Scottish Ministers to be representative of those who work in large shops; and 
-	d) such other persons as the Scottish Ministers think fit. 
-
-### Offence
-`http://www.legislation.gov.uk/asp/2007/13/section/4`
-
-Section 4) **Offence**
-If section 1 is contravened— 
-	a) the occupier of the shop; and 
-	b) if different, the person responsible for controlling or managing the operations carried on at the shop on the day in question, shall be guilty of an offence and liable on summary conviction to a fine not exceeding £50,000. 
-
-### Exemptions
-`http://www.legislation.gov.uk/asp/2007/13/section/3`
-
-Section 3) **Exemptions**
-A shop is exempt from section 1 if— 
-	a) the trade or business carried on consists wholly or mainly of the sale of— 
-		i) meals, refreshments or alcohol for consumption on the premises on which they are sold; or 
-		ii) meals or refreshments prepared to order for consumption off those premises; 
-	b) it is a registered pharmacy and is open solely for the purpose of the dispensing of drugs, medicines or appliances on prescription; 
-	c) it is within a port, railway station or commercial airport; 
-	d) it is at a motorway service area; or 
-	e) the trade or business carried on consists wholly or mainly of the sale of fuel for motor vehicles. 
-
-### Short title
-`http://www.legislation.gov.uk/asp/2007/13/section/8`
-
-Section 8) **Short title**
-This Act may be cited as the Christmas Day and New Year's Day Trading (Scotland) Act 2007 
-
-### Offences by bodies corporate, etc.
-`http://www.legislation.gov.uk/asp/2007/13/section/5`
-
-Section 5) **Offences by bodies corporate, etc.**
-
-1) Where an offence under this Act committed by a body of persons— 
-	a) was committed with the consent or connivance of— 
-		i) a person concerned, or purporting to be concerned, in the management or control of the body; or 
-		ii) a relevant person; or 
-	b) was attributable to any neglect on the part of such person, that person, as well as the body, is guilty of the offence. 
-2) In this section— 
-	- a  “body of persons” means a body corporate, a partnership, a body of trustees or an unincorporated association other than a partnership; and
-	- “relevant person” means a director, secretary or other officer of a body corporate, a partner in a partnership, a trustee of a trust or any member of an unincorporated association.
-
-### Defence of due diligence
-`http://www.legislation.gov.uk/asp/2007/13/section/6`
-
-Section 6) **Defence of due diligence**
-The offence under section 4 is one of strict liability, but it shall be a defence for an accused to prove that the accused or a person under the control of the accused took all reasonable precautions and exercised all due diligence to avoid its commission. 
 
 ---
 

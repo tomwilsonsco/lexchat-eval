@@ -23,6 +23,7 @@ Produces a dict with these keys:
 from __future__ import annotations
 
 import json
+import os
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -279,8 +280,14 @@ def audit_capture(
     error_message: str = ""
 
     try:
+        # A per-request timeout overrides the client's, so this is the value
+        # that actually governs the stream. It is a read timeout: how long the
+        # stream may go silent, not how long the response may take. Deep
+        # Research can pause longer than the 300s default while a single tool
+        # call runs, so keep it in step with LEXCHAT_TIMEOUT.
+        stream_timeout = float(os.getenv("LEXCHAT_TIMEOUT", "300"))
         with client.stream(
-            "POST", "/api/system/chat", json=chat_payload, timeout=300
+            "POST", "/api/system/chat", json=chat_payload, timeout=stream_timeout
         ) as response:
             response.raise_for_status()
 

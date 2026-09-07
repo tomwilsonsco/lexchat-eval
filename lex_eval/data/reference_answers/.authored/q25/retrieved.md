@@ -29,6 +29,26 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 
 ```json
 {
+ "query": "Social Security (Scotland) Act 2018 section 95 ancillary provision regulations",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `ssi/2019/406`, **The Social Security (Scotland) Act 2018 (Commencement No. 2, Transitory and Saving Provision and Commencement No. 4 and Saving Provision) Amendment Regulations 2019** (2019, final, extent n/a)
+- `ssi/2019/269`, **The Social Security (Scotland) Act 2018 (Commencement No. 5, Revocation and Saving Provision) Regulations 2019** (2019, final, extent n/a)
+- `uksi/2021/804`, **The Scotland Act 2016 (Social Security) (Consequential Provision) (Miscellaneous Amendment) Regulations 2021** (2021, final, extent n/a)
+- `ssi/2018/298`, **The Social Security (Scotland) Act 2018 (Commencement No. 2, Transitory and Saving Provision) Regulations 2018** (2018, revised, extent Scotland)
+- `uksi/2019/1439`, **The Scotland Act 2016 (Transitional) (Amendment) Regulations 2019** (2019, final, extent n/a)
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
  "query": "Disability Assistance Scottish Adult Disability Living Allowance Consequential Amendment Revocation and Saving Provision Regulations 2024",
  "year_from": null,
  "year_to": null,
@@ -42,3 +62,755 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 - `uksi/2025/224`, **The Social Security (Scotland) Act 2018 (Scottish Adult Disability Living Allowance) (Consequential Modifications) Order 2025** (2025, final, extent n/a)
 - `ssi/2025/100`, **The Social Security (Up-rating) (Miscellaneous Amendments) (Scotland) Regulations 2025** (2025, final, extent n/a)
 - `ssi/2023/346`, **The Disability Assistance (Miscellaneous Amendment) (Scotland) Regulations 2023** (2023, final, extent n/a)
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "ancillary provision incidental supplementary consequential transitional regulations",
+ "legislation_id": "asp/2018/9",
+ "limit": 10
+}
+```
+
+### Ancillary provision
+`http://www.legislation.gov.uk/asp/2018/9/section/95`
+
+Section 95) **Ancillary provision**
+The Scottish Ministers may by regulations make any incidental, supplementary, consequential, transitional, transitory or saving provision they consider appropriate for the purposes of, or in connection with, or for giving full effect to this Act or any provision made under it. 
+
+### Default provision in respect of offences
+`http://www.legislation.gov.uk/asp/2018/9/section/80A`
+
+Section 80A) **Default provision in respect of offences**
+
+1) Sections 71 to 73 (which establish offences) apply in connection with financial assistance given by virtue of top-up assistance regulations as they apply in connection with assistance given under section 24. 
+2) But subsection (1) is subject to any contrary provision in top-up assistance regulations. 
+3) Where they apply by virtue of subsection (1), sections 71 to 73 apply subject to the following modifications— 
+	a) a reference to assistance is to be read as a reference to financial assistance provided for by top-up assistance regulations, 
+	b) a reference to giving notice in accordance with section 56 is to be read as a reference to giving notice in accordance with top-up assistance regulations, 
+	c) sections 72(3) and 73(3) do not apply unless, in accordance with top-up assistance regulations, the Scottish Ministers have informed the person in question about the way in which notification of a change of circumstances is to be given. 
+4) For the avoidance of doubt, the reference in section 74 to an offence under this Act or any regulations made under it includes— 
+	a) an offence under any of sections 71 to 73 as applied by virtue of subsection (1), 
+	b) an offence under top-up assistance regulations. 
+5) In this section,  “top-up assistance regulations” means regulations under section 79. 
+
+### CARER'S ASSISTANCE REGULATIONS
+`http://www.legislation.gov.uk/asp/2018/9/schedule/2`
+
+SCHEDULE 2 CARER'S ASSISTANCE REGULATIONS (introduced by section 28) ## PART 1
+## ELIGIBILITY
+
+CHAPTER 1 ELIGIBILITY IS TO DEPEND ON BEING OR HAVING BEEN A CARER 
+1) 
+1) The regulations must be framed so that (subject to any provision of the kind described in paragraph 2) an individual's eligibility in respect of a given period depends on the individual having provided regular and substantial care during that period to another individual to whom a disability benefit is normally payable. 
+2) The regulations— 
+	a) are to set out the circumstances in which an individual is to be regarded as having provided regular and substantial care to another individual during a period, and 
+	b) may, in particular, do so by reference to whether or not the number of hours of care provided during the period exceeds (or is deemed to exceed) a threshold specified in the regulations. 
+3) In sub-paragraph (1),  “disability benefit” has the meaning given in the interpretation provision in Section F1 of Part 2 of schedule 5 of the Scotland Act 1998. 
+2) 
+1) The regulations may be framed so that, despite the criterion described in paragraph 1(1) not being fulfilled in relation to a given period, an individual may nevertheless be eligible in respect of that period. 
+2) Where the regulations allow an individual to be eligible in respect of a period in relation to which the criterion described in paragraph 1(1) is not fulfilled, they must be framed so that the individual's eligibility depends on the individual— 
+	a) having at some time provided care to another individual who has a disability, and 
+	b) as a result of doing so, having received— 
+		i) carer's assistance, 
+		ii) carer's allowance, or 
+		iii) invalid care allowance. 
+3) In sub-paragraph (2)(b),  “carer's allowance” and  “invalid care allowance” both mean an allowance payable under section 70 of the Social Security Contributions and Benefits Act 1992. CHAPTER 2 FURTHER CRITERIA *Carer's other activities*
+
+3) The regulations may make an individual's eligibility depend on— 
+	a) whether or not the individual is in— 
+		i) employment, or 
+		ii) education, 
+	b) the length of time the individual spends over a given period in— 
+		i) employment, or 
+		ii) education. *Multiple carers*
+
+4) The regulations may make an individual's eligibility depend on being the individual (or one of the individuals) selected through a process set out in the regulations in a case where more than one individual would otherwise be eligible as a result of providing care to the same cared-for person during a given period. *Residence and presence*
+
+5) The regulations may make an individual's eligibility depend on either or both— 
+	a) the individual, and 
+	b) the cared-for person, being resident and present in a particular place. *Age*
+
+6) The regulations may make an individual's eligibility depend on the age of either or both— 
+	a) the individual, and 
+	b) the cared-for person. *Financial circumstances*
+
+7) The regulations may make an individual's eligibility depend on the individual's financial circumstances. *Receipt of, or eligibility for, other types of State assistance*
+
+8) The regulations may make an individual's eligibility depend on the individual— 
+	a) being, or not being, in receipt of another type of assistance (whether under this Act or another enactment), 
+	b) being, or not being, eligible or entitled to receive such assistance. *Application within specified period*
+
+9) The regulations may provide that an individual ceases to be eligible in respect of a given period unless, by a deadline specified in the regulations— 
+	a) the individual has applied for carer's assistance in respect of the period, or 
+	b) the Scottish Ministers have become required to make a determination of the individual's entitlement to carer's assistance in respect of the period by regulations under section 52. ## PART 2
+## ASSISTANCE TO BE GIVEN
+
+*Meeting liabilities*
+
+10) The regulations may provide for the carer's assistance that is to be given to an individual to be given (in whole or in part) by way of— 
+	a) payment to another person in order to meet, or contribute towards meeting, any liability the individual has to that person, 
+	b) deduction from any liability the individual has to the Scottish Ministers under section 63. *Restriction on giving assistance in a form other than money*
+
+11) 
+1) The regulations may allow carer's assistance to be given to an individual in a form other than money only if the individual (or a person acting on the individual's behalf) has agreed to the assistance being given in that form. 
+2) If the regulations include provision of the kind mentioned in sub-paragraph (1), they must allow an individual (or a person acting on the individual's behalf) to withdraw agreement to being given carer's assistance in a form other than money at any time. 
+3) Despite sub-paragraph (1), the regulations may provide for carer's assistance to be given (in whole or in part) by way of deduction, at a reasonable level, from any liability the individual has to the Scottish Ministers under section 63 if the individual has unreasonably refused to agree to the assistance being given in that form. 
+4) For the purpose of sub-paragraph (3),  “reasonable level” means a level that is reasonable having regard to the financial circumstances of the individual. *Power to set value of assistance as nil*
+
+11A) 
+1) Provision may be made in the regulations for the value of the carer's assistance that is to be given to an individual in respect of a period to be £0, but— 
+	a) such provision must be framed so as to apply by reference to at least one of the following matters— 
+		i) the individual being resident and present in a particular place during the period, 
+		ii) the individual being in receipt of another type of assistance (whether under this Act or another enactment) during the period, and 
+	b) the Scottish Ministers may only make such provision where they consider that it would be in the interests of the individuals to whom it applies to be entitled to carer's assistance with a value of £0 in respect of a period rather than not being entitled to carer's assistance at all. 
+2) Nothing in sub-paragraph (1)(a) is to be taken to preclude provision being framed so as to apply by reference to further matters in addition to those mentioned there. ## PART 3
+## FINAL PROVISIONS
+
+*Generality of enabling power unaffected*
+
+12) Nothing in this schedule, apart from the following provisions, is to be taken to limit what may be prescribed in the regulations— 
+	a) Chapter 1 of Part 1, 
+	b) paragraphs 11 and 11A in Part 2. *Interpretation*
+
+13) In this schedule— 
+	- “cared-for person” means the individual by providing care to whom the individual whose eligibility is in question has fulfilled the criterion described in paragraph 1(1) or 2(2),
+	- “eligibility” means eligibility for carer's assistance and  “eligible” means eligible for carer's assistance,
+	- “the regulations” means regulations under section 28(2).
+
+### Commencement
+`http://www.legislation.gov.uk/asp/2018/9/section/99`
+
+Section 99) **Commencement**
+
+1) The following provisions come into force on the day after Royal Assent: this section and sections 95, 96, 97, 98 and 100. 
+2) The other provisions of this Act come into force on such day as the Scottish Ministers may by regulations appoint. 
+3) The power conferred by subsection (2) includes the power to make transitional, transitory or saving provision. 
+
+### Determination on basis of ongoing entitlement
+`http://www.legislation.gov.uk/asp/2018/9/section/51`
+
+Section 51) **Determination on basis of ongoing entitlement**
+
+1) The Scottish Ministers may by regulations— 
+	a) provide that a determination of an individual's entitlement to a specified type of assistance is to be made on the basis that the individual has ongoing entitlement to that type of assistance, and 
+	b) provide for exceptions to any provision made by virtue of paragraph (a). 
+2) Regulations making provision by virtue of subsection (1)(a) are also to— 
+	a) prescribe the time, or times, at which an individual is to become entitled to be given assistance under a determination made on the basis that the individual has ongoing entitlement,  ... 
+	aa) make provision, in accordance with schedule 11, about— 
+		i) the circumstances in which an individual who has an entitlement to assistance in respect of a period under such a determination is not to become entitled to be given some or all of that assistance at the time at which the individual otherwise would in accordance with provision under paragraph (a), and 
+		ii) in that event, how and when the individual is to become entitled to be given that assistance, and 
+	b) provide that a decision about what assistance the individual is to become entitled to be given under such a determination in respect of any future period is to be taken in accordance with the applicable regulations on the strength of such assumptions as are specified. 
+3) Without prejudice to the generality of subsection (2)(b), the assumptions that may be specified include an assumption that the eligibility rules prescribed in the applicable regulations will continue to be satisfied in an individual's case for a specified duration or indefinitely. 
+3A) Schedule 11 makes provision about the exercise of the power conferred by subsection (2)(aa). 
+4) In this section— 
+	- “the applicable regulations” means the regulations made under the section in Chapter 2 that describes the type of assistance in question,
+	- “specified” means specified by regulations under this section.
+
+### Carer's allowance supplement
+`http://www.legislation.gov.uk/asp/2018/9/section/81`
+
+Section 81) **Carer's allowance supplement**
+
+1) The Scottish Ministers must make a payment (a  “carer's allowance supplement”) to qualifying individuals in respect of each of the following periods of each financial year— 
+	a) 1 April to 30 September, and 
+	b) 1 October to 31 March. 
+1A) A qualifying individual is an individual to whom subsection (2) or (2A) applies. 
+2) This subsection applies to an individual who, on the qualifying date, was— 
+	a) in receipt of a carer’s allowance under section 70 of the Social Security Contributions and Benefits Act 1992 by virtue of article 4 (transitional provision) of the Regulatory Reform (Carer’s Allowance) Order 2002, and 
+	b) resident in Scotland. 
+2A) This subsection applies to an individual whom the Scottish Ministers have determined in accordance with Part 2 of the Carer’s Allowance Supplement and Young Carers Grants (Residence Requirements and Procedural Provisions) (EU Exit) (Scotland) Regulations 2020 ( S.S.I. 2020/475 )— 
+	a) met the eligibility conditions in subsection (9) on the qualifying date (where the qualifying date is before IP completion day), 
+	b) met the eligibility conditions in subsection (11) on the qualifying date (where the qualifying date is after IP completion day and the individual has rights arising from a relevant EU regulation), or 
+	c) met the eligibility conditions in subsection (13) on the qualifying date (where the qualifying date is after IP completion day and the individual has rights arising from the UK-Ireland convention mentioned in that subsection). 
+3) The qualifying date is a date determined by the Scottish Ministers falling within the period to which the payment relates. 
+4) The amount of a carer's allowance supplement is to be calculated according to the following formula (but see also subsection (4B)) — (
+JSA
+−
+CA
+)
+×
+26where—JSA is whichever is the higher of—the weekly amount specified in regulation 79(1)(c) of the Jobseeker's Allowance Regulations 1996 (S.I. 1996/207) as it has effect on the qualifying date, andthat amount as it would have effect on the qualifying date if it were adjusted for inflation in accordance with subsection (5), andCA is the weekly rate of carer's allowance specified in Part 3 of schedule 4 of the Social Security Contributions and Benefits Act 1992 as it has effect in Scotland on the qualifying date. 
+4B) The amount of a carer’s allowance supplement in respect of the period of 1 October 2021 to 31 March 2022 is £231.40 greater than that calculated according to the formula in subsection (4). 
+5) The Scottish Ministers must, before the start of each new tax year, beginning with the first new tax year beginning after this section comes into force— 
+	a) calculate what the weekly amount specified in regulation 79(1)(c) of the Jobseeker's Allowance Regulations 1996 (“the JSA Regulations”) would be if it were adjusted for inflation, 
+	b) publish a statement explaining how they have calculated inflation for this purpose. 
+6) In calculating the amount for the purpose of subsection (5)(a), the Scottish Ministers may take account of any change in the weekly amount specified in regulation 79(1)(c) of the JSA Regulations since this section came into force. 
+7) For the purposes of subsection (5), a tax year means a period beginning with 6 April in one year and ending with 5 April in the next. 
+8) The Scottish Ministers may by regulations modify this section so as to modify who is a qualifying individual for the purposes of this section. 
+9) An individual met the eligibility conditions referred to in subsection (2A)(a) on a given date if, on that date, the individual— 
+	a) was in receipt of— 
+		i) a carer’s allowance under section 70 of the Social Security Contributions and Benefits Act 1992,  ... 
+		ii) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+	b) was an individual— 
+		i) to whom a relevant EU Regulation applied, and 
+		ii) in respect of whom the United Kingdom was competent for payment of sickness benefits in cash for the purposes of Chapter 1 of Title III of the Regulation in question, 
+	c) was resident in— 
+		i) Switzerland, or 
+		ii) an EEA State other than the United Kingdom, and 
+	d) had a genuine and sufficient link to Scotland. 
+10) The reference in subsection (9)(d) to an individual’s link to Scotland being sufficient is to it being sufficiently close that if the individual were not entitled to the carer’s allowance supplement this section— 
+	a) would be incompatible with EU law, or 
+	b) would have been incompatible with EU law immediately before IP completion day. 
+11) An individual met the eligibility conditions referred to in subsection (2A)(b) on a given date if, on that date, the individual— 
+	a) was in receipt of— 
+		i) a carer’s allowance under section 70 of the Social Security Contributions and Benefits Act 1992,  ... 
+		ii) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+	b) was an individual— 
+		i) to whom the rules set out in a relevant EU regulation applied by virtue of— 
+			A) Title III of Part 2 of the EU withdrawal agreement, 
+			B) Part 3 or Article 23(4) of the Swiss citizens’ rights agreement (as defined in section 39(1) of the European Union (Withdrawal Agreement) Act 2020), 
+			C) Title III of the EEA EFTA separation agreement (as defined in that section),  ... 
+			D) the agreement constituted by the exchange of letters set out in the schedule of the Family Allowances, National Insurance and Industrial Injuries (Gibraltar) Order 1974 ( S.I. 1974/555 ) between the United Kingdom and Gibraltar, or 
+			E) the agreement constituted by the exchange of letters set out in the schedule of the Social Security (Gibraltar) Order 2024 ( S.I. 2024/149 ) between the United Kingdom and Gibraltar, and 
+		ii) in respect of whom the United Kingdom is, as a result, competent for payment of sickness benefits in cash, 
+	c) was resident in— 
+		i) Switzerland, 
+		ii) an EEA State, or 
+		iii) Gibraltar, and 
+	d) had a genuine and sufficient link to Scotland. 
+12) The reference in paragraph (d) of subsection (11) to an individual’s link to Scotland being sufficient is to it being sufficiently close that if the individual were not entitled to the carer’s allowance supplement this section would be incompatible with the applicable agreement mentioned in paragraph (b)(i) of that subsection. 
+13) An individual met the eligibility conditions referred to in subsection (2A)(c) on a given date if, on that date, the individual— 
+	a) was in receipt of— 
+		i) a carer’s allowance under section 70 of the Social Security Contributions and Benefits Act 1992,  ... 
+		ii) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+	b) was an individual— 
+		i) to whom the convention on social security between the Government of the United Kingdom of Great Britain and Northern Ireland and the Government of Ireland signed at Dublin on 1 February 2019, as modified from time to time in accordance with any provision of it, applied, and 
+		ii) in respect of whom the United Kingdom is, as a result, competent for payment of long term care benefits, 
+	c) was resident in Ireland, and 
+	d) had a genuine and sufficient link to Scotland. 
+14) The reference in paragraph (d) of subsection (13) to an individual’s link to Scotland being sufficient is to it being sufficiently close that if the individual were not entitled to the carer’s allowance supplement, this section would be incompatible with the convention mentioned in paragraph (b) of that subsection. 
+15) In this section— 
+	- “EEA State” means— a member State of the European Union, orany other State that is a party to the agreement on the European Economic Area signed at Oporto on 2 May 1992, together with the Protocol adjusting that Agreement signed at Brussels on 17 March 1993, as modified or supplemented from time to time, “EU law” has the meaning given by subsection (9) of section 126 of the Scotland Act 1998, or if that subsection has been repealed, the meaning given by that subsection immediately before its repeal,
+	- “relevant EU Regulation” means— one of the following Regulations—Council Regulation (EC) No 1408/71 of 14 June 1971 on the application of social security schemes to employed persons, to self-employed persons and to members of their families moving within the Community,Regulation (EC) No 883/2004 of the European Parliament and of the Council of 29April2004 on the coordination of social security systems, orin relation to an individual to whom the exchange of letters mentioned in subsection (11)(b)(i)(D)  or subsection (11)(b)(i)(E) applies, a Regulation mentioned in paragraph (a) as it forms part of domestic law by virtue of section 3 of the European Union (Withdrawal) Act 2018.
+
+### Power to repeal temporary provision
+`http://www.legislation.gov.uk/asp/2018/9/section/82`
+
+Section 82) **Power to repeal temporary provision**
+The Scottish Ministers may by regulations— 
+	a) repeal section 81 and revoke any regulations made under it, and 
+	b) repeal this section. 
+
+### EMPLOYMENT-INJURY ASSISTANCE REGULATIONS
+`http://www.legislation.gov.uk/asp/2018/9/schedule/7`
+
+SCHEDULE 7 EMPLOYMENT-INJURY ASSISTANCE REGULATIONS (introduced by section 33) ## PART 1
+## ELIGIBILITY
+
+CHAPTER 1 ELIGIBILITY IS TO DEPEND ON BEING INJURED OR CONTRACTING A DISEASE AT WORK 
+1) The regulations must be framed so that (subject to any provision of the kind described in paragraph 2) an individual's eligibility depends on the individual— 
+	a) having suffered a relevant personal injury caused by an accident arising out of and in the course of the individual's employment, or 
+	b) developing a relevant disease, or suffering a relevant personal injury, due to the nature of the individual's employment. 
+2) 
+1) The regulations may be framed so that, despite the criterion described in paragraph 1 not being fulfilled, an individual may nevertheless be eligible. 
+2) Where the regulations allow an individual to be eligible despite the criterion described in paragraph 1 not being fulfilled, they must be framed so that the individual's eligibility depends on the individual having, or having had, a relationship of a kind specified in the regulations to an individual who suffered a personal injury, or developed a disease, in the circumstances mentioned in paragraph 1. 
+3) 
+1) The regulations are to define the following terms for the purpose of determining entitlement to employment-injury assistance— 
+	a) employment, 
+	b) relevant personal injury, 
+	c) relevant disease. 
+2) The regulations may not define  “employment” so as to include employment, or training for employment, that is not  “relevant employment” as defined in the interpretation provision of Section F1 of Part 2 of schedule 5 of the Scotland Act 1998. 
+3) The regulations may define  “relevant personal injury” and  “relevant disease” by reference to the circumstances in which an injury is suffered or a disease is developed as well as by reference to its kind and severity. CHAPTER 2 FURTHER CRITERIA *Place where injury suffered or disease contracted*
+
+4) The regulations may make an individual's eligibility depend on where, geographically, the injury was suffered or the disease developed (or is deemed to have been suffered or developed). *Residence and presence*
+
+5) The regulations may make an individual's eligibility depend on the individual being resident and present in a particular place. *Age*
+
+6) The regulations may make an individual's eligibility depend on the individual's age. *Financial circumstances*
+
+7) Subject to paragraph 8, the regulations may not make an individual's eligibility depend on the financial circumstances of either or both— 
+	a) the individual, and 
+	b) anyone who lives with the individual. *Receipt of, or eligibility for, other types of State assistance*
+
+8) The regulations may make an individual's eligibility depend on the individual— 
+	a) being, or not being, in receipt of another type of assistance (whether under this Act or another enactment), 
+	b) being, or not being, eligible or entitled to receive such assistance. *Application within specified period*
+
+9) The regulations may provide that an individual ceases to be eligible on account of an injury being suffered or a disease developed unless, by a deadline specified in the regulations— 
+	a) the individual has applied for employment-injury assistance, or 
+	b) the Scottish Ministers have become required to make a determination of the individual's entitlement to employment-injury assistance by regulations under section 52. ## PART 2
+## ASSISTANCE TO BE GIVEN
+
+CHAPTER 1 VALUE *Nature of injury or disease*
+
+10) The regulations may make the value of the employment-injury assistance that is to be given to an individual depend on the— 
+	a) kind, and 
+	b) severity, of the injury or disease in respect of which the assistance is to be given. *Age*
+
+11) The regulations may make the value of the employment-injury assistance that is to be given to an individual depend on the individual's age. *Power to set value of assistance as nil*
+
+11A) 
+1) Provision may be made in the regulations for the value of the employment-injury assistance that is to be given to an individual in respect of a period to be £0, but— 
+	a) such provision must be framed so as to apply by reference to at least one of the following matters— 
+		i) the individual being resident and present in a particular place during the period, 
+		ii) the individual being in receipt of another type of assistance (whether under this Act or another enactment) during the period, and 
+	b) the Scottish Ministers may only make such provision where they consider that it would be in the interests of the individuals to whom it applies to be entitled to employment-injury assistance with a value of £0 in respect of a period rather than not being entitled to employment-injury assistance at all. 
+2) Nothing in sub-paragraph (1)(a) is to be taken to preclude provision being framed so as to apply by reference to further matters in addition to those mentioned there. CHAPTER 2 FORM *Meeting liabilities*
+
+12) The regulations may provide for the employment-injury assistance that is to be given to an individual to be given (in whole or in part) by way of— 
+	a) payment to another person in order to meet, or contribute towards meeting, any liability the individual has to that person, 
+	b) deduction from any liability the individual has to the Scottish Ministers under section 63. *Restriction on giving assistance in a form other than money*
+
+13) 
+1) The regulations may allow employment-injury assistance to be given to an individual in a form other than money only if the individual (or a person acting on the individual's behalf) has agreed to the assistance being given in that form. 
+2) If the regulations include provision of the kind mentioned in sub-paragraph (1), they must allow an individual (or a person acting on the individual's behalf) to withdraw agreement to being given employment-injury assistance in a form other than money at any time. 
+3) Despite sub-paragraph (1), the regulations may provide for employment-injury assistance to be given (in whole or in part) by way of deduction, at a reasonable level, from any liability the individual has to the Scottish Ministers under section 63 if the individual has unreasonably refused to agree to the assistance being given in that form. 
+4) For the purpose of sub-paragraph (3),  “reasonable level” means a level that is reasonable having regard to the financial circumstances of the individual. *Restriction on lump sums*
+
+14) The regulations may not provide for the employment-injury assistance that is to be given to an individual to be given by way of a lump-sum payment where the individual's entitlement arises on account of someone having, or having had— 
+	a) pneumoconiosis, 
+	b) byssinosis, 
+	c) diffuse mesothelioma, 
+	d) bilateral diffuse pleural thickening, or 
+	e) primary carcinoma of the lung where there is accompanying evidence of— 
+		i) asbestosis, 
+		ii) bilateral diffuse pleural thickening, or 
+		iii) both. ## PART 3
+## FINAL PROVISIONS
+
+*Generality of enabling power unaffected*
+
+15) Nothing in this schedule, apart from the following provisions, is to be taken to limit what may be prescribed in the regulations— 
+	a) Chapter 1 of Part 1, 
+	b) paragraph 7 in Chapter 2 of Part 1, 
+	ba) paragraph 11A in Chapter 1 of Part 2, 
+	c) paragraphs 13 and 14 in Chapter 2 of Part 2. *Interpretation*
+
+16) In this schedule— 
+	- “eligibility” means eligibility for employment-injury assistance, and  “eligible” means eligible for employment-injury assistance,
+	- “the regulations” means regulations under section 33(2).
+
+### SHORT-TERM ASSISTANCE REGULATIONS
+`http://www.legislation.gov.uk/asp/2018/9/schedule/10`
+
+SCHEDULE 10 SHORT-TERM ASSISTANCE REGULATIONS (introduced by section 36) ## PART 1
+## ELIGIBILITY
+
+*Entitlement to other assistance being reviewed*
+
+1) 
+1) The regulations must be framed so that an individual is eligible for short-term assistance if— 
+	a) the individual is, or was, entitled to a particular type of assistance (other than short-term assistance) under a determination made on the basis that the individual has ongoing entitlement, 
+	b) that determination has been superseded by a determination under section 37 with the result that the individual— 
+		i) is no longer entitled to the type of assistance in question, or 
+		ii) is entitled to less assistance of the type in question, 
+	c) the individual's entitlement to the type of assistance in question is under review, and 
+	d) any further eligibility rules prescribed in the regulations are satisfied in the individual's case. 
+2) An individual's entitlement to a particular type of assistance is under review within the meaning of sub-paragraph (1)(c) if— 
+	a) the individual has, under section 41, requested a re-determination of the individual's entitlement to the type of assistance in question and— 
+		i) the Scottish Ministers have yet to make a determination of the individual's entitlement under section 43, and 
+		ii) the individual has not, since requesting the re-determination, made an appeal to the First-tier Tribunal against a determination of the individual's entitlement, or 
+	b) the individual has, under section 46, appealed to the First-tier Tribunal against a determination of the individual's entitlement to the type of assistance in question and the First-tier Tribunal has yet to make a decision under section 49, or 
+	c) the First-tier Tribunal is considering, under section 48(1)(b), whether to give permission for the individual to bring an appeal against a determination of the individual's entitlement to the type of assistance in question. ## PART 2
+## ASSISTANCE TO BE GIVEN
+
+*Value and form of assistance where entitlement to other assistance under review*
+
+2) 
+1) This paragraph applies to any case in which an individual is eligible for short-term assistance by virtue of provision made in accordance with paragraph 1(1). 
+2) In this paragraph,  “the superseded determination” means the determination that has been superseded with one of the results mentioned in paragraph 1(1)(b), as a consequence of which the individual in question is eligible for short-term assistance. 
+3) In relation to a case to which this paragraph applies, the regulations must provide for the value of the short-term assistance given to an individual in respect of any period to be equal to— V1
+−
+V2where—V1 is the value of the assistance that the individual would have been given in respect of the period under the superseded determination had it not been superseded, andV2 is the value of the assistance that the individual is to be given in respect of the period under what is, at the time the individual becomes eligible for short-term assistance in respect of the period, the most recent determination of the individual's entitlement to the type of assistance to which the superseded determination relates. 
+4) In relation to a case to which this paragraph applies, the regulations must provide for the rules regarding the form in which short-term assistance is given to an individual to be the same as the rules governing the form in which the type of assistance to which the superseded determination relates may be given. ## PART 3
+## FINAL PROVISIONS
+
+*Generality of enabling power unaffected*
+
+3) Nothing in this schedule is to be taken to preclude the regulations from providing for an individual to be eligible for short-term assistance in circumstances other than those described in paragraph 1. *Interpretation*
+
+4) In this schedule,  “the regulations” means regulations under section 36(2). 
+
+### DISABILITY ASSISTANCE REGULATIONS
+`http://www.legislation.gov.uk/asp/2018/9/schedule/5`
+
+SCHEDULE 5 DISABILITY ASSISTANCE REGULATIONS (introduced by section 31) ## PART 1
+## ELIGIBILITY
+
+CHAPTER 1 ELIGIBILITY IS TO DEPEND ON HAVING, OR HAVING HAD, A DISABILITY 
+1) 
+1) The regulations must be framed so that (subject to any provision of the kind described in paragraph 2) an individual's eligibility in respect of a given period depends on the individual having, during that period— 
+	a) a physical or mental impairment that― 
+		i) has a significant and not short-term adverse effect on the individual's ability to carry out normal day-to-day activities, or 
+		ii) otherwise gives rise to a significant and not short-term need, or 
+	b) a terminal illness. 
+2) The regulations must provide that an individual is to be regarded as having a terminal illness for the purpose of determining entitlement to disability assistance if, having had regard to the guidance mentioned in sub-paragraph (3), it is the clinical judgement of an appropriate healthcare professional that the individual has a progressive disease that can reasonably be expected to cause the individual's death. 
+2A) The regulations may provide that, in the situation mentioned in sub-paragraph (2B), an individual who is not resident in the United Kingdom is to be regarded as having a terminal illness despite the clinical judgement described in sub-paragraph (2) not having been formed with regard to the guidance mentioned in sub-paragraph (3). 
+2B) The situation referred to in sub-paragraph (2A) is that it would not be reasonable in the circumstances to insist on a clinical judgement being provided that has been formed with regard to the guidance. 
+2C) The regulations are to define  “appropriate healthcare professional” for the purpose of determining entitlement to disability assistance on the basis of an individual having a terminal illness. 
+2D) In defining  “appropriate healthcare professional” the regulations— 
+	a) must provide that being a registered medical practitioner or registered nurse is a requirement for being an appropriate healthcare professional, 
+	b) may provide that being a registered member of a healthcare profession otherwise than as mentioned in paragraph (a) is a requirement for being an appropriate healthcare professional, 
+	c) may include additional requirements that a person must satisfy in order to be an appropriate healthcare professional, including by reference to a person's— 
+		i) skills, training, qualifications and experience, 
+		ii) professional relationship to the individual in question, 
+		iii) being authorised to act as an appropriate healthcare professional in relation to the individual in question by— 
+			A) a Health Board constituted under section 2(1)(a) of the National Health Service (Scotland) Act 1978, 
+			B) a Special Health Board constituted under section 2(1)(b) of that Act, 
+			C) the Scottish Ministers. 
+	d) may make different provision about the requirements for being an appropriate healthcare professional for the purposes of determining the entitlement to disability assistance of individuals who are resident in the United Kingdom and those who are not. 
+3) The Chief Medical Officer of the Scottish Administration is— 
+	a) to prepare and from time to time revise, and 
+	b) to make publicly available by such means as the Chief Medical Officer considers appropriate, guidance that sets out when a progressive disease can reasonably be expected to cause an individual's death for the purpose of determining entitlement to disability assistance. 
+4) Before preparing or revising guidance under sub-paragraph (3), the Chief Medical Officer must consult appropriate healthcare professionals (as defined in sub-paragraph (2C)) who are registered in the United Kingdom as members of a healthcare profession. 
+2) 
+1) The regulations may be framed so that, despite the criterion described in paragraph 1(1) not being fulfilled in respect of a given period, an individual may nevertheless be eligible in respect of that period. 
+2) Where the regulations allow an individual to be eligible in respect of a period in relation to which the criterion described in paragraph 1(1) is not fulfilled, they must be framed so that the individual's eligibility depends on the individual having had, during some other period, a physical or mental impairment of the kind described in paragraph 1(1)(a). CHAPTER 2 FURTHER CRITERIA *Nature and extent of disability and needs*
+
+3) The regulations may make an individual's eligibility depend on the nature and extent of— 
+	a) the individual's impairment, 
+	b) the needs of the individual in consequence of the impairment. *Residence and presence*
+
+4) The regulations may make an individual's eligibility depend on the individual being resident and present in a particular place. *Age*
+
+5) The regulations may make an individual's eligibility depend on the individual's age. *Financial circumstances*
+
+6) Subject to paragraph 7, the regulations may not make an individual's eligibility depend on the financial circumstances of either or both— 
+	a) the individual, and 
+	b) anyone who lives with the individual. *Receipt of, or eligibility for, other types of State assistance*
+
+7) The regulations may make an individual's eligibility depend on the individual— 
+	a) being, or not being, in receipt of another type of assistance (whether under this Act or another enactment), 
+	b) being, or not being, eligible or entitled to receive such assistance. *Application within specified period*
+
+8) The regulations may provide that an individual ceases to be eligible in respect of a given period unless, by a deadline specified in the regulations— 
+	a) the individual has applied for disability assistance in respect of the period, or 
+	b) the Scottish Ministers have become required to make a determination of the individual's entitlement to disability assistance in respect of the period by regulations under section 52. CHAPTER 3 SPECIAL RULES FOR TERMINAL ILLNESS CASES *No minimum period*
+
+9) The regulations may not make the eligibility of an individual who has a terminal illness depend on the individual having had the illness for any length of time. *No requirement for assessment*
+
+10) The regulations may not make the eligibility of an individual who has a terminal illness depend on the individual producing any evidence of that fact beyond a diagnosis by an appropriate healthcare professional (see paragraph 1(2C)) . *Eligibility from date of application*
+
+11) The regulations must be framed so that an individual who applies for disability assistance on the basis of having a terminal illness, and does have a terminal illness, is eligible, at the latest, from the day the application is made. *Entitlement to maximum amount*
+
+12) The regulations must be framed so that an individual who is eligible by reason of having a terminal illness is entitled to the maximum amount of the assistance that the individual is eligible for. ## PART 2
+## ASSISTANCE TO BE GIVEN
+
+CHAPTER 1 VALUE *Nature and extent of disability*
+
+13) The regulations may make the value of the disability assistance that is to be given to an individual depend on the nature and extent of― 
+	a) the individual's impairment, 
+	b) the needs of the individual in consequence of the impairment. *Age*
+
+14) The regulations may make the value of the disability assistance that is to be given to an individual depend on the individual's age. *Power to set value of assistance as nil*
+
+14A) 
+1) Provision may be made in the regulations for the value of the disability assistance that is to be given to an individual in respect of a period to be £0, but— 
+	a) such provision must be framed so as to apply by reference to at least one of the following matters— 
+		i) the individual being resident and present in a particular place during the period, 
+		ii) the individual being in receipt of another type of assistance (whether under this Act or another enactment) during the period, and 
+	b) the Scottish Ministers may only make such provision where they consider that it would be in the interests of the individuals to whom it applies to be entitled to disability assistance with a value of £0 in respect of a period rather than not being entitled to disability assistance at all. 
+2) Nothing in sub-paragraph (1)(a) is to be taken to preclude provision being framed so as to apply by reference to further matters in addition to those mentioned there. CHAPTER 2 FORM *Meeting liabilities*
+
+15) The regulations may provide for the disability assistance that is to be given to an individual to be given (in whole or in part) by way of— 
+	a) payment to another person in order to meet, or contribute towards meeting, any liability the individual has to that person, 
+	b) deduction from any liability the individual has to the Scottish Ministers under section 63. *Payment to someone else*
+
+16) The regulations may provide that, if the Scottish Ministers consider it appropriate in the circumstances, the disability assistance that is to be given to an individual may be given (in whole or in part) by way of payment to another person who is to use the payment to benefit the individual entitled to the assistance. *Restriction on giving assistance in a form other than money*
+
+17) 
+1) The regulations may allow disability assistance to be given to an individual in a form other than money only if the individual (or a person acting on the individual's behalf) has agreed to the assistance being given in that form. 
+2) If the regulations include provision of the kind mentioned in sub-paragraph (1), they must allow an individual (or a person acting on the individual's behalf) to withdraw agreement to being given disability assistance in a form other than money at any time. 
+3) Despite sub-paragraph (1), the regulations may provide for disability assistance to be given (in whole or in part) by way of deduction, at a reasonable level, from any liability the individual has to the Scottish Ministers under section 63 if the individual has unreasonably refused to agree to the assistance being given in that form. 
+4) For the purpose of sub-paragraph (3),  “reasonable level” means a level that is reasonable having regard to the financial circumstances of the individual. *Restriction on lump sums*
+
+18) The regulations may not provide for the disability assistance that is to be given to an individual to be given by way of a lump-sum payment where the individual's entitlement arises on account of the individual having, or having had— 
+	a) pneumoconiosis, 
+	b) byssinosis, 
+	c) diffuse mesothelioma, 
+	d) bilateral diffuse pleural thickening, or 
+	e) primary carcinoma of the lung where there is accompanying evidence of— 
+		i) asbestosis, 
+		ii) bilateral diffuse pleural thickening, or 
+		iii) both. ## PART 3
+## FINAL PROVISIONS
+
+*Generality of enabling power unaffected*
+
+19) Nothing in this schedule, apart from the following provisions, is to be taken to limit what may be prescribed in the regulations— 
+	a) Chapter 1 of Part 1, 
+	b) paragraph 6 in Chapter 2 of Part 1, 
+	c) Chapter 3 of Part 1, 
+	ca) paragraph 14A in Chapter 1 of Part 2, 
+	d) paragraphs 17 and 18 in Chapter 2 of Part 2. *Interpretation*
+
+20) In this schedule— 
+	- “eligibility” means eligibility for disability assistance and  “eligible” means eligible for disability assistance,
+	- “the regulations” means regulations under section 31(2).
+
+---
+
+## `get_legislation_text`, HTTP 200
+
+```json
+{
+ "legislation_id": "ssi/2024/311"
+}
+```
+
+Section 1) **Citation and commencement**
+These Regulations may be cited as the Disability Assistance (Scottish Adult Disability Living Allowance) (Consequential Amendment, Revocation and Saving Provision) Regulations 2024 and come into force on 21 March 2025. 
+
+Section 2) **Amendment of the Social Security (Invalid Care Allowance) Regulations 1976**
+In regulation 9(2)(b) (conditions relating to residence and presence in Great Britain) of the Social Security (Invalid Care Allowance) Regulations 1976  after head (ii), insert— 
+		iia) the care component of Scottish adult disability living allowance at the highest or middle rate in accordance with regulation 6(4)(a) or (b) of the Disability  Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  ; . 
+
+Section 3) **Amendment of the Council Tax (Discounts) (Scotland) Regulations 1992**
+In regulation 2(3)(c) (care workers) of the Council Tax (Discounts) (Scotland) Regulations 1992  after head (iiie)— 
+	a) omit “or”, and 
+	b) insert— 
+			iiif) the highest rate of the care component of Scottish adult disability living allowance in accordance with regulation 6(4)(a) of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  , or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations where the “earlier determination” referred to in paragraph 1(1)(a) of schedule 1 (entitlement to short-term assistance) of those Regulations awarded the highest rate of the care component of Scottish adult disability living allowance, or . 
+
+Section 4) **Amendment of the National Assistance (Assessment of Resources) Regulations 1992**
+
+1) The National Assistance (Assessment of Resources) Regulations 1992  are amended in accordance with paragraphs (2) to (4). 
+2) In regulation 2 (interpretation)— 
+	a) after the definition of “savings credit”, insert— 
+				- “Scottish adult disability living allowance” means disability assistance given in accordance with the Scottish Adult Disability Living Allowance Regulations,
+				- “Scottish Adult Disability Living Allowance Regulations” means the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  ,, 
+	b) in the definition of “short-term assistance” after “Pension Age Disability Payment Regulations” insert “or Part 1 of schedule 1 of the Scottish Adult Disability Living Allowance Regulations” . 
+3) In paragraph 3 of schedule 2 (sums to be disregarded in the calculation of earnings)— 
+	a) in sub-paragraph (2)(b)(i) after “mobility supplement,” insert “Scottish adult disability living allowance,” , 
+	b) after sub-paragraph (2)(b)(vi) insert— 
+			via) would be in receipt of the care component of Scottish adult disability living allowance had the amount of that component to which the individual is entitled not been reduced to £0 in accordance with regulation 22 (effect of admission to a care home on ongoing entitlement to care component) or regulation 27 (entitlement beginning while in alternative accommodation) of the Scottish Adult Disability Living Allowance Regulations due to the individual being resident in a care home for more than 28 days, or , 
+	c) after sub-paragraph (4) insert— 
+	5) In sub-paragraph (2)(b)(via), “care home” has the meaning given in regulation 2 of the Scottish Adult Disability Living Allowance Regulations. . 
+4) In schedule 3 (sums to be disregarded in the calculation of income other than earnings)— 
+	a) in paragraph 4, after “mobility component of any disability living allowance,” insert “the mobility component of Scottish adult disability living allowance, or any payment of short-term assistance where the “earlier determination” mentioned in paragraph 1(1)(a) of schedule 1 (entitlement to short-term assistance) of the Scottish Adult Disability Living Allowance Regulations awarded the mobility component of Scottish adult disability living allowance,” , 
+	b) in paragraph 6, after sub-paragraph (b) insert— 
+		ba) the care component of Scottish adult disability living allowance, 
+		bb) any payment of short-term assistance where the “earlier determination” mentioned in paragraph 1(1)(a) of schedule 1 (short-term assistance) of the Scottish Adult Disability Living Allowance Regulations awarded the care component of Scottish adult disability living allowance; . 
+
+Section 5) **Amendment of the Advice and Assistance (Scotland) Regulations 1996**
+
+1) The Advice and Assistance (Scotland) Regulations 1996  are amended in accordance with paragraphs (2) and (3). 
+2) In regulation 16 (payment of fees and outlays from property recovered or preserved) after paragraph (2)(ce) insert— 
+	cf) to Scottish adult disability living allowance given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2024  , or short-term assistance given in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations, . 
+3) In schedule 2 (assessment of disposable capital and disposable income), after paragraph 5(d)(azg) insert— 
+	azh) Scottish adult disability living allowance given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025 (“the 2025 Regulations”); 
+	azi) short-term assistance given in accordance with Part 1 of schedule 1 (short-term assistance) of the 2025 Regulations; . 
+
+Section 6) **Amendment of the Education (Student Loans) Regulations 1998**
+In the definition of “disability related benefits” in paragraph 1 of schedule 2 (terms of loans) of the Education (Student Loans) Regulations 1998  , after “disability living allowance,” insert “Scottish adult disability living allowance given in accordance with the Scottish Adult Disability Living Allowance Regulations 2025, or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations,” . 
+
+Section 7) **Amendment of the Disabled Persons (Badges for Motor Vehicles) (Scotland) Regulations 2000**
+
+1) The Disabled Persons (Badges for Motor Vehicles) (Scotland) Regulations 2000  are amended in accordance with paragraphs (2) and (3). 
+2) In regulation 4(2) (descriptions of disabled persons) after sub-paragraph (ae) insert— 
+	af) receives the higher rate of the mobility component of Scottish adult disability living allowance given in accordance with regulation 8 (mobility requirements: higher rate mobility component) of the Scottish Adult Disability Living Allowance Regulations 2025  , or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations where the “earlier determination” referred to in paragraph 1(1)(a) of schedule 1 (entitlement to short-term assistance) of those Regulations awarded the higher rate of the mobility component of Scottish adult disability living allowance, . 
+3) In regulation 6(2)(b) (fee for issue and period of issue of a badge)— 
+	a) in the opening words, after “4(2)(ad) insert “, 4(2)(af)” , 
+	b) in head (ii) after “higher rate of the mobility component of the disability living allowance,” insert “the higher rate of the mobility component of Scottish adult disability living allowance, or short-term assistance” . 
+
+Section 8) **Amendment of the Repayment of Student Loans (Scotland) Regulations 2000**
+In the definition of “disability related benefit” in regulation 2 (interpretation) of the Repayment of Student Loans (Scotland) Regulations 2000  , after “disability living allowance,” insert “Scottish adult disability living allowance given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025, short-term assistance given in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations,” . 
+
+Section 9) **Amendment of the Civil Legal Aid (Scotland) Regulations 2002**
+
+1) The Civil Legal Aid (Scotland) Regulations 2002  are amended in accordance with paragraphs (2) to (4). 
+2) In regulation 2 (interpretation) after the definition of “the 2023 Act” insert— 
+		- “the 2025 Regulations” means the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  ;. 
+3) In regulation 33(a) (payments out of property recovered or preserved: exceptions) after sub-paragraph (xxxi) insert— 
+		xxxii) by way of Scottish adult disability living allowance under the 2024 Regulations; 
+		xxxiii) short-term assistance given in accordance with Part 1 of schedule 1 (short-term assistance) of the 2024 Regulations; . 
+4) In paragraph 7 of schedule 2 (rules for computing disposable income), after sub-paragraph (b) insert— 
+	ba) Scottish adult disability living assistance given in accordance with the 2024 Regulations; 
+	bb) short-term assistance given in accordance with Part 1 of schedule 1 (short-term assistance) of the 2024 Regulations; . 
+
+Section 10) **Amendment of the Council Tax (Discounts) (Scotland) Consolidation and Amendment Order 2003**
+In article 4 (the severely mentally impaired) of the Council Tax (Discounts) (Scotland) Consolidation and Amendment Order 2003  , after paragraph (2)(dc), insert— 
+		dd) the care component of Scottish adult disability living allowance under regulation 6 of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  , payable at the highest rate under regulation 6(4)(a) or the middle rate under regulation 6(4)(b), or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations where the “earlier determination” referred to in paragraph 1(1)(a) of schedule 1 (entitlement to short-term assistance) of those Regulations awarded the highest or middle rate of the care component of Scottish adult disability living allowance; . 
+
+Section 11) **Amendment of the National Health Service (Travelling Expenses and Remission of Charges) (Scotland) (No. 2) Regulations 2003**
+In Table B in Part 2 of the schedule (calculation of requirements) of the National Health Service (Travelling Expenses and Remission of Charges) (Scotland) (No. 2) Regulations 2003  , in column 2 of the entry which modifies the table in schedule 2 of the Income Support (General) Regulations 1987, in sub-paragraph (1)(b) of the substituted paragraph 13A, after head (iib) insert— 
+		iic) in receipt of the highest rate of the care component of Scottish adult disability living allowance in accordance with regulation 6 (care component criterion: lowest, middle or highest rate care component) of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  (“the 2025 Regulations”) or would be in receipt of that component at that rate had the amount of that component to which the claimant is entitled not been reduced to £0 in accordance with regulation 22 (effect of admission to a care home on ongoing entitlement to care component) or regulation 27 (entitlement beginning while in alternative accommodation) of those Regulations, where the claimant is resident in a care home, 
+		iid) in receipt of short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of the 2025 Regulations where the “earlier determination” referred to in paragraph 1(1)(a) of schedule 1 (entitlement to short-term assistance) of those Regulations awarded the highest rate of the care component of Scottish disability living allowance, . 
+
+Section 12) **Amendment of the National Bus Travel Concession Scheme for Older and Disabled Persons (Eligible Persons and Eligible Services) (Scotland) Order 2006**
+
+1) The National Bus Travel Concession Scheme for Older and Disabled Persons (Eligible Persons and Eligible Services) (Scotland) Order 2006  is amended in accordance with paragraphs (2) and (3). 
+2) In article 2 (interpretation) after the definition of “personal independence payment” insert— 
+		- “Scottish adult disability living allowance” means disability assistance given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  ;. 
+3) In article 3 (eligible persons)— 
+	a) after paragraph (b)(ii) insert— 
+			iia) the higher rate of the mobility component of Scottish adult disability living allowance in accordance with regulation 8 of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025 (“the 2025 Regulations”), or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations where the “earlier determination” referred to in paragraph 1(1)(a) of that schedule awarded the higher rate of the mobility component of Scottish adult disability living allowance; 
+			iib) the highest or middle rate of the care component of Scottish adult disability living allowance in accordance with regulation 6 of the 2025 Regulations, or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations where the “earlier determination” referred to in paragraph 1(1)(a) of that schedule awarded the highest or middle rate of the care component of Scottish adult disability living allowance; , 
+	b) after paragraph (eb) insert— 
+		ec) the highest or middle rate of the care component of Scottish adult disability living allowance, or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2024 where the “earlier determination” referred to in paragraph 1(1)(a) of the schedule awarded the highest or middle rate of the care component of Scottish adult disability living allowance, , 
+	c) in paragraph (k)— 
+		i) after sub-paragraph (i) insert— 
+				ia) are in receipt of the highest or middle rate of the care component of Scottish adult disability living allowance in accordance with regulation 6(4)(a) or (b) of Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025, or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations where the “earlier determination” referred to in paragraph 1(1)(a) of the schedule awarded the highest or middle rate of the care component of Scottish adult disability living allowance; , 
+		ii) after sub-paragraph (iiib) insert— 
+				iiic) the highest or middle rate of the care component of Scottish adult disability living allowance, or short-term assistance in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations where the “earlier determination” referred to in paragraph 1(1)(a) of the schedule awarded the highest or middle rate of the care component of Scottish adult disability living allowance, . 
+
+Section 13) **Amendment of the Representation of the People (Absent Voting at Local Government Elections) (Scotland) Regulations 2007**
+In regulation 8(6) (additional requirements for applications for a proxy vote for a particular or indefinite period on grounds of blindness or other disability) of the Representation of the People (Absent Voting at Local Government Elections) (Scotland) Regulations 2007  — 
+	a) in sub-paragraph (b), after “effect in the application” insert “, or” , 
+	b) after sub-paragraph (b) insert— 
+		c) the applicant is in receipt of the higher rate of the mobility component of Scottish adult disability living allowance (payable in accordance with regulation 8 of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  , or short-term assistance (payable in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations) where the “earlier determination” referred to in paragraph 1(1)(a) of schedule 1 (entitlement to short-term assistance) of those Regulations awarded the higher rate of the mobility component of Scottish adult disability living allowance because of the disability  specified in the application and makes a statement to that effect in the application . 
+
+Section 14) **Amendment of the Council Tax Reduction (State Pension Credit) (Scotland) Regulations 2012**
+
+1) The Council Tax Reduction (State Pension Credit) (Scotland) Regulations 2012  are amended in accordance with paragraphs (2) to (9). 
+2) In regulation 2(1) (interpretation), after the definition of “savings credit” insert— 
+		- “Scottish adult disability living allowance” means— disability assistance given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025, and
+
+
+
+
+where short-term assistance is being given under Part 1 of schedule 1 (short-term assistance) of those Regulations, the “earlier determination” referred to in paragraph 1(1)(a) of the schedule is to be deemed to continue in payment for the purposes of these Regulations,. 
+3) In regulation 27(1)(j) (meaning of “income”), after head (iiic) insert— 
+		iiid) Scottish adult disability living allowance, . 
+4) In regulation 29 (treatment of child care charges)— 
+	a) after paragraph (11)(f)(ivzb), insert— 
+			ivzc) Scottish adult disability living allowance; , 
+	b) in paragraph (14)(a), after “disability living allowance” insert “, Scottish adult disability living allowance” . 
+5) In regulation 48 (non-dependant deductions)— 
+	a) after paragraph (6)(b)(iizb) insert— 
+			iizc) the care component of Scottish adult disability living allowance; , 
+	b) in paragraph (9)(a), after “disability living allowance” insert “, Scottish adult disability living allowance” . 
+6) In Part 3 (disability premiums) of schedule 1 (applicable amount)— 
+	a) in paragraphs 6(2), 7(2)(a)(i), 7(2)(b)(i) and 7(6)(a) after each occurrence of “the 1992 Act,” insert “the care component of Scottish adult disability living allowance at the highest or middle rate,” , 
+	b) in paragraph 7— 
+		i) in sub-paragraph (2)(b)(ii) after “the 1992 Act” insert “, the care component of Scottish adult disability living allowance at the highest or middle rate,” , 
+		ii) in sub-paragraph (7)(a) after the second occurrence of “the 1992 Act,” insert “the care component of Scottish adult disability living allowance at the highest or middle rate,” . 
+7) In schedule 2 (sums to be disregarded in the calculation of earnings) after paragraph 5(1)(a)(vb) insert— 
+	vc) Scottish adult disability living allowance; . 
+8) In Part 1 of schedule 4 (capital disregards) after paragraph 21(2)(eb) insert— 
+	ec) Scottish adult disability living allowance; . 
+9) In schedule 5 (amount of alternative maximum council tax reduction) in paragraph 2(a), after “disability living allowance,” insert “Scottish adult disability living allowance,” . 
+
+Section 15) **Amendment of the Home Energy Assistance Scheme (Scotland) Regulations 2013**
+
+1) Regulation 6 (person eligible to apply for a grant) of the Home Energy Assistance Scheme (Scotland) Regulations 2013  is amended in accordance with paragraphs (2) to (4). 
+2) In paragraph (6)(a)— 
+	a) omit “or” at the end of head (i), 
+	b) after head (iib) insert— 
+			iic) is or lives with a partner who is in receipt of the highest rate of the care component of Scottish adult disability living allowance in accordance with regulation 6 (care component criterion: lowest, middle or highest rate care component) of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  or the higher rate of the mobility component of Scottish adult disability living allowance in accordance with regulation 8 (mobility requirements: higher rate mobility component) of those Regulations, or . 
+3) In paragraphs (6)(b) and 8(b), after “disability living allowance” insert “, Scottish adult disability living allowance” . 
+4) In paragraph (9), after sub-paragraph (db) insert— 
+	dc) Scottish adult disability living allowance given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  ; . 
+
+Section 16) **Amendment of the Children’s Legal Assistance (Scotland) Regulations 2013**
+In paragraph 5 of schedule 1 (assessment of disposable income for the purposes of children’s legal aid) of the Children’s Legal Assistance (Scotland) Regulations 2013  , after sub-paragraph (l) insert— 
+	la) Scottish adult disability living allowance given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  , 
+	lb) short-term assistance given in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations, . 
+
+Section 17) **Amendment of the Scottish Parliament (Elections etc.) Order 2015**
+In paragraph 5(6) of schedule 3 (absent voting) of the Scottish Parliament (Elections etc.) Order 2015  — 
+	a) at the end of head (b) omit “or”, 
+	b) at the end of head (c) insert “or” , 
+	c) after head (c) insert— 
+		d) the application states that the applicant is in receipt of higher rate of the mobility component of Scottish adult disability living allowance (payable under regulation 8 of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  , or short-term assistance (payable in accordance with Part 1 of schedule 1 (short-term assistance) of those Regulations) where the “earlier determination” referred to in paragraph 1(1)(a) of schedule 1 (entitlement to short-term assistance) of those Regulations awarded the higher rate of the mobility component of Scottish adult disability living allowance because of the disability specified in the application, . 
+
+Section 18) **Amendment of the Council Tax Reduction (Scotland) Regulations 2021**
+
+1) The Council Tax Reduction (Scotland) Regulations 2021  are amended in accordance with paragraphs (2) to (6). 
+2) In regulation 4 (interpretation) after the definition of ““residential accommodation”” insert— 
+		- “Scottish adult disability living allowance” means— a Scottish adult disability living allowance given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025, and
+
+
+
+
+where short-term assistance is being given under Part 1 of schedule 1 (short-term assistance) of those Regulations, the “earlier determination” referred to in paragraph 1(1)(a) of schedule 1 is to be deemed to continue in payment for the purposes of these Regulations,. 
+3) In regulation 77 (treatment of childcare charges (applicants with no award of universal credit))— 
+	a) in paragraph (12)(f)— 
+		i) at the end of head (xi) omit “or”, 
+		ii) at the end of head (xii) insert “or” , 
+		iii) after head (xii) insert— 
+				xiii) Scottish adult disability living allowance, , 
+	b) in paragraph (15)(a) after “disability living allowance,” insert “Scottish adult disability living allowance,” . 
+4) In regulation 90 (non-dependant deductions)— 
+	a) in paragraph (6)(b)— 
+		i) at the end of head (vi) omit “or”, 
+		ii) after head (vii) insert— , or 
+			viii) the care component of Scottish adult disability living allowance. , 
+	b) in paragraph (9)(a), after “disability living allowance,” insert “Scottish adult disability living allowance,” . 
+5) In schedule 1 (applicable amount)— 
+	a) in paragraph 6(4) after “the 1992 Act,” insert “the care component of Scottish adult disability living allowance at the highest or middle rate,” , 
+	b) in paragraph 12(1)(a)— 
+		i) in sub-head (i) after “disability living allowance,” insert “Scottish adult disability living allowance,” , 
+		ii) after sub-head (iiib) insert— 
+				iiic) would be in receipt of Scottish adult disability living allowance were it not for regulation 22(2) (effect of admission to hospital on ongoing entitlement to Scottish adult disability living allowance) of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025, , 
+	c) in paragraph 13 in sub-paragraphs (2)(a)(i), (2)(b)(i), (2)(b)(ii), (4)(a) and 5(a) after “the 1992 Act,” insert “the care component of Scottish adult disability living allowance at the highest or middle rate,” , 
+	d) after paragraph 14(1)(g) insert— , 
+		h) the care component of Scottish adult disability living allowance at the highest rate is payable or would be payable were it not for regulation 22(2) (effect of admission to hospital on ongoing entitlement to adult disability payment) of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2024, in respect of the applicant or the applicant’s partner . 
+6) In schedule 2 (amount of second adult rebate) in paragraph 2(a) after “disability living allowance,” insert “Scottish adult disability living allowance,” . 
+
+Section 19) **Amendment of the Disability Assistance for Working Age People (Scotland) Regulations 2022**
+
+1) The Disability Assistance for Working Age People (Scotland) Regulations 2022  are amended in accordance with paragraphs (2) to (7). 
+2) In regulation 2 (interpretation) after the definition of “residential educational establishment” insert— 
+		- “Scottish Adult Disability Living Allowance” means disability assistance for adults given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  ,. 
+3) In regulation 4 (entitlement to other benefits)— 
+	a) at the end of paragraph (d) omit “or”, and 
+	b) at the end of paragraph (e) insert— , or 
+		f) Scottish Adult Disability Living Allowance . 
+4) In regulation 14(2)(b) (the relevant date: Adult Disability Payment after an interval)— 
+	a) at the end of head (iii) omit “or”, 
+	b) at the end of head (iv) insert “or” , 
+	c) after head (iv) insert— 
+			v) Scottish adult disability living allowance, . 
+5) In regulation 23 (exceptions: Adult Disability Payment after an interval and after reaching the relevant age)— 
+	a) in paragraph (1)(b)(ii) after “Disability Living Allowance” insert “or Scottish Adult Disability Living Allowance” , 
+	b) in paragraph (7)(a)— 
+		i) at the end of head (i) omit “or”, 
+		ii) at the end of head (ii) for “and” substitute “or” , 
+		iii) at the end of head (ii) insert— 
+				iii) the care component of Scottish Adult Disability Living Allowance, and . 
+6) In regulation 25(4) (determination of an award after the person has reached the relevant age)— 
+	a) at the end of (ii) omit “or”, 
+	b) at the end of (iii) for “and” substitute “or” , 
+	c) after head (iii) insert— 
+			iv) the mobility component of Scottish Adult Disability Living Allowance, and . 
+7) In regulation 26(12)(a) (entitlement under special rules for terminal illness)— 
+	a) at the end of head (iv) omit “or”, 
+	b) at the end of head (v) for “and” substitute “or” , 
+	c) after head (v) insert— 
+		vi) Scottish Adult Disability Living Allowance, and . 
+
+Section 20) **Amendment of the Carer’s Assistance (Carer Support Payment) (Scotland) Regulations 2023**
+
+1) The Carer’s Assistance (Carer Support Payment) (Scotland) Regulations 2023  are amended in accordance with paragraphs (2) to (4). 
+2) In regulation 2 (interpretation)— 
+	a) in the definition of “qualifying disability benefit”, after paragraph (d) insert— 
+		dia) the care component of Scottish Adult Disability Living Allowance at the middle or highest rate, , 
+	b) after the definition of “relevant EU Regulation”, insert— 
+				- “Scottish Adult Disability Living Allowance” means disability living allowance for adults given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  ,. 
+3) In regulation 6 (residence and presence conditions)— 
+	a) in paragraph (6)— 
+		i) at the end of sub-paragraph (ff) omit “or”, 
+		ii) at the end of sub-paragraph (gg) insert “, or” , 
+		iii) after sub-paragraph (6)(b)(iii)(gg) insert— 
+			hh) regulation 10(7), 12(2), 13 or 14 of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025 , 
+	b) after paragraph (7)(j) insert— 
+		k) Scottish Adult Disability Living Allowance by virtue of regulation 20 of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025 . 
+4) In regulation 23 (temporary stop in entitlement), in paragraph (4)(c)(i)— 
+	a) at the end of head (bb) omit “or”, 
+	b) at the end of head (cc) insert “or” , 
+	c) after head (cc) insert— 
+		dd) regulation 33(3)(a) of the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025, . 
+
+Section 21) **Amendment of the Disability Assistance for Older People (Scotland) Regulations 2024**
+
+1) The Disability Assistance for Older People (Scotland) Regulations 2024  are amended in accordance with paragraphs (2) to (4). 
+2) In regulation 2 (interpretation), after the definition of “relevant EU Regulation” insert— 
+		- “Scottish Adult Disability Living Allowance” means disability assistance for adults given in accordance with the Disability Assistance (Scottish Adult Disability Living Allowance) Regulations 2025  ,. 
+3) In regulation 4 (entitlement to other benefits)— 
+	a) at the end of paragraph (d) omit “or”, and 
+	b) at the end of paragraph (e) insert— or 
+		f) Scottish Adult Disability Living Allowance . 
+4) In regulation 18 (entitlement under special rules for terminal illness)— 
+	a) at the end of paragraph (11)(a)(iv) omit “or”, 
+	b) at the end of paragraph (11)(a)(v) for “and” substitute “or” , 
+	c) after paragraph (11)(a)(v) insert— 
+			vi) Scottish adult disability living allowance, and . 
+
+Section 22) **Revocation and saving provisions - the Disability Assistance for Working Age People (Transitional Provisions and Miscellaneous Amendment) (Scotland) Regulations 2022**
+
+1) Except where paragraph (2) applies, the Disability Assistance for Working Age People (Transitional Provisions and Miscellaneous Amendment) (Scotland) Regulations 2022  (“the ADP Transitional Regulations”) are revoked. 
+2) The ADP Transitional Regulations continue to have effect on and after 21 March 2025 for any individual on whom, prior to 21 March 2025, the Scottish Ministers have served a notice of intention to transfer to Adult Disability Payment under regulation 3 of those Regulations.

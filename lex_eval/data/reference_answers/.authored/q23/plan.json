@@ -1,9 +1,21 @@
 {
-  "scope_note": "REPLACE ME, 1-2 sentences on what this answer covers and what it deliberately excludes.",
+  "scope_note": "Covers whether the Social Security (Amendment) (Scotland) Act 2025 is in force, which provisions are commenced, and by which instruments. Covers the commencement instruments made under the Act. Limited to legislation.",
   "steps": [
     {
-      "title": "REPLACE ME, short imperative title for the step",
-      "detail": "REPLACE ME, what exactly to find, in domain terms (Acts, provisions, duties)."
+      "title": "Confirm the Act exists and retrieve it",
+      "detail": "Find the Social Security (Amendment) (Scotland) Act 2025 by title and by its citation 2025 asp 2, and confirm which identifier holds it."
+    },
+    {
+      "title": "Read the Act's commencement provision",
+      "detail": "Retrieve the commencement section and record which provisions come into force on Royal Assent, which are left to regulations, and whether regulations may make different provision for different purposes."
+    },
+    {
+      "title": "Find the commencement instruments",
+      "detail": "Search for commencement regulations made under the Act, and retrieve each one found, recording which sections it commences and from what date."
+    },
+    {
+      "title": "Report the position provision by provision",
+      "detail": "Set out which sections are in force and when, which remain uncommenced, and state the date the answer speaks as at, rather than giving a single yes or no."
     }
   ]
 }

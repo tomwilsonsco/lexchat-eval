@@ -40,8 +40,8 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 - `uksi/1975/1135`, **The Schools General (Scotland) Regulations 1975** (1975, final, extent n/a)
 - `uksi/1972/1090`, **The Rate Support Grant (Scotland) (Amendment) Regulations 1972** (1972, final, extent n/a)
 - `uksi/1970/705`, **The Rate Support Grant (Scotland) Amendment Regulations 1970** (1970, final, extent n/a)
-- `ukpga/1969/49`, **Education (Scotland) Act 1969** (1969, final, extent n/a)
 - `uksi/1972/59`, **EXPLANATORY NOTE (This Note is not part of the Regulations.)** (1972, stub, extent n/a)
+- `ukpga/1969/49`, **Education (Scotland) Act 1969** (1969, final, extent n/a)
 
 ---
 
@@ -69,7 +69,7 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 
 ```json
 {
- "query": "Education (Scotland) Act 1962 section 117 expenses regulations",
+ "query": "Education (Scotland) Act 1980 section 117",
  "year_from": null,
  "year_to": null,
  "limit": 5,
@@ -77,8 +77,32 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 }
 ```
 
-- `uksi/1970/1847`, **The Incidental Expenses (Scotland) (Amendment) Regulations 1970** (1970, final, extent n/a)
-- `uksi/1962/1294`, **The Education Authority Bursaries (Scotland) (Amendment No. 3) Provisional Regulations 1962** (1962, final, extent n/a)
-- `uksi/1959/1270`, **The Teachers (Special Allowances) (Scotland) Provisional Regulations 1959** (1959, final, extent n/a)
-- `uksi/1962/2086`, **The Students' Allowances (Scotland) Regulations 1962** (1962, final, extent n/a)
-- `uksi/1971/1537`, **The Milk and Meals (Education) (Scotland) Regulations 1971** (1971, final, extent n/a)
+- `uksi/1981/1557`, **The Education (Scotland) Act 1981 (Commencement No. 1) Order 1981** (1981, final, extent n/a)
+- `uksi/1988/632`, **The Personal Community Charge (Students) (Scotland) Regulations 1988** (1988, final, extent n/a)
+- `asp/2003/13`, **Mental Health (Care and Treatment) (Scotland) Act 2003** (2003, revised, extent Scotland)
+- `ssi/2012/102`, **The Public Services Reform (Recovery of Expenses in respect of Inspection of Independent Further Education Colleges and English Language Schools) (Scotland) Order 2012** (2012, final, extent n/a)
+- `uksi/1989/63`, **The Personal Community Charge (Exemptions) (Scotland) Regulations 1989** (1989, final, extent n/a)
+
+---
+
+## `get_legislation_text`, HTTP 404
+
+```json
+{
+ "legislation_id": "ukpga/1962/47"
+}
+```
+
+
+
+---
+
+## `get_legislation_text`, HTTP 404
+
+```json
+{
+ "legislation_id": "ukpga/Eliz2/10-11/47"
+}
+```
+
+

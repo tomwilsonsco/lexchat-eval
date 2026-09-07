@@ -1,10 +1,9 @@
 {
-  "_comment": "The statements Reference Answer Agreement scores a response against. Write only the points a correct answer MUST make, at most 5, most important first. Do not pad the list to reach 5: a statement no correct answer needs to make just lowers every score. Each must be one sentence, must stand on its own (the judge is shown these and the response under test, never the reference answer), and must say what the law is rather than what this document does. Delete the unused entries and this _comment key.",
   "statements": [
-    "REPLACE ME, statement 1, the most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 2, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 3, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 4, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 5, the next most important thing a correct answer must say (delete if not needed)."
+    "There is no single statutory definition of \"shop\" in Scots law: each Act defines the word for its own purposes, the definitions differ, and no comprehensive list can be given.",
+    "Sections 38 and 39 of the Shops Act 1950 are repealed and must not be presented as current law or as provisions that are in force.",
+    "Section 7 of the Christmas Day and New Year's Day Trading (Scotland) Act 2007 defines \"shop\" as any premises within a building where there is carried on a trade or business consisting wholly or mainly of the retail sale of goods, and \"large shop\" as a shop with a relevant floor area exceeding 280 square metres.",
+    "Section 232(3) of the Employment Rights Act 1996 provides that \"shop\" includes any premises where any retail trade or business is carried on, with section 232(4) treating only the retail part of mixed-use premises as the shop.",
+    "The Licensing (Scotland) Act 2005 contains no definition of \"shop\", so no such definition should be attributed to it."
   ]
 }

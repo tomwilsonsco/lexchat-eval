@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -327,6 +328,15 @@ def main() -> None:
         help="Number of concurrent threads (default: 10)",
     )
     parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="Seconds a response stream may go silent before it is abandoned "
+        "(default: 300). Deep Research can stream for longer than that and "
+        "still be working, so raise it for deep_research runs.",
+    )
+    parser.add_argument(
         "--retries",
         type=int,
         default=3,
@@ -357,6 +367,11 @@ def main() -> None:
         help="Path to the questions JSON file (default: lex_eval/data/questions.json)",
     )
     args = parser.parse_args()
+
+    # Read by get_authenticated_client(), which takes no arguments and is called
+    # once per worker thread, so the value is passed through the environment.
+    if args.timeout is not None:
+        os.environ["LEXCHAT_TIMEOUT"] = str(args.timeout)
 
     logging.basicConfig(
         level=logging.INFO,

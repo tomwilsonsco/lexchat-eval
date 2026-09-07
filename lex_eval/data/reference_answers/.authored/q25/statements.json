@@ -1,10 +1,9 @@
 {
-  "_comment": "The statements Reference Answer Agreement scores a response against. Write only the points a correct answer MUST make, at most 5, most important first. Do not pad the list to reach 5: a statement no correct answer needs to make just lowers every score. Each must be one sentence, must stand on its own (the judge is shown these and the response under test, never the reference answer), and must say what the law is rather than what this document does. Delete the unused entries and this _comment key.",
   "statements": [
-    "REPLACE ME, statement 1, the most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 2, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 3, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 4, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 5, the next most important thing a correct answer must say (delete if not needed)."
+    "The complete list of Scottish statutory instruments made under section 95 of the Social Security (Scotland) Act 2018 cannot be produced from the available legislation search tools, and a correct answer says so rather than presenting a partial or invented list as complete.",
+    "Section 95 of the Social Security (Scotland) Act 2018 is the ancillary provision power, letting the Scottish Ministers by regulations make incidental, supplementary, consequential, transitional, transitory or saving provision.",
+    "Instruments cannot be found by their enabling power using these tools, because the preamble reciting the powers exercised is not part of the retrievable text of an instrument.",
+    "The Disability Assistance (Scottish Adult Disability Living Allowance) (Consequential Amendment, Revocation and Saving Provision) Regulations 2024 (SSI 2024/311) were made under section 95 and their text contains the £ symbol.",
+    "Because section 95 is an ancillary power rather than a subject-matter power, instruments made under it share no common subject and are typically made under several powers at once, so no topic search will collect them."
   ]
 }

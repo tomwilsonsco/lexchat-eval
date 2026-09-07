@@ -1,9 +1,21 @@
 {
-  "scope_note": "REPLACE ME, 1-2 sentences on what this answer covers and what it deliberately excludes.",
+  "scope_note": "Covers what section 95 of the Social Security (Scotland) Act 2018 empowers, whether the instruments made under it can be identified with the available tools, and which of them can be confirmed to contain a £ symbol. Limited to legislation.",
   "steps": [
     {
-      "title": "REPLACE ME, short imperative title for the step",
-      "detail": "REPLACE ME, what exactly to find, in domain terms (Acts, provisions, duties)."
+      "title": "Read section 95 and establish what kind of power it is",
+      "detail": "Retrieve section 95 of the Social Security (Scotland) Act 2018 and record whether it is a subject-matter power or an ancillary provision power, since that determines how instruments made under it could be found."
+    },
+    {
+      "title": "Test whether instruments can be searched by enabling power",
+      "detail": "Retrieve the text of one or more Scottish statutory instruments and check whether the preamble reciting the powers exercised is part of the retrievable text."
+    },
+    {
+      "title": "Confirm individual instruments where possible",
+      "detail": "For any instrument identified as made under section 95, retrieve its full text and check whether it contains a £ symbol."
+    },
+    {
+      "title": "Report the limit rather than a partial list",
+      "detail": "State that the full population cannot be enumerated with these tools, give confirmed instruments as examples only, and point to where the enabling power is recorded."
     }
   ]
 }

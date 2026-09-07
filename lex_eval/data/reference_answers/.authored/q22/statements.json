@@ -1,10 +1,8 @@
 {
-  "_comment": "The statements Reference Answer Agreement scores a response against. Write only the points a correct answer MUST make, at most 5, most important first. Do not pad the list to reach 5: a statement no correct answer needs to make just lowers every score. Each must be one sentence, must stand on its own (the judge is shown these and the response under test, never the reference answer), and must say what the law is rather than what this document does. Delete the unused entries and this _comment key.",
   "statements": [
-    "REPLACE ME, statement 1, the most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 2, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 3, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 4, the next most important thing a correct answer must say (delete if not needed).",
-    "REPLACE ME, statement 5, the next most important thing a correct answer must say (delete if not needed)."
+    "The Care Reform (Scotland) Act 2025 is only partly in force: section 30 and the final Part came into force the day after Royal Assent, and the remaining provisions come into force only on a day appointed by the Scottish Ministers by regulations under section 39(2).",
+    "Commencement regulations have been made under the Act, so an answer stating that no commencement regulations have been made or identified is wrong.",
+    "Answering whether the Act is in force requires checking for commencement regulations made under section 39(2), not just reading the commencement section itself.",
+    "The Care Reform (Scotland) Act 2025 received Royal Assent on 22 July 2025, so the provisions commenced by section 39(1) came into force on 23 July 2025."
   ]
 }
