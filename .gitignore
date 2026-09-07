@@ -231,7 +231,14 @@ lexchat/
 
 # Local-only project instructions, not published to GitHub
 /CLAUDE.md
+/AGENTS.md
+/TOM_TO_DO.md
 
 # Personal Claude Code settings (hooks, permissions). Project-wide settings
 # would go in .claude/settings.json, which is not ignored.
 .claude/settings.local.json
+
+# Point-in-time findings: dated analysis, debugging notes and review status.
+# Written to be frozen, not maintained, so they are kept locally rather than
+# committed. Permanent docs live directly in lex_eval/docs/ and in decisions/.
+lex_eval/docs/findings/

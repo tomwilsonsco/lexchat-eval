@@ -98,7 +98,6 @@ regardless of how many others were genuine.
 **Only legislation.gov.uk URLs are read as Act ids.** A judgment link such as
 `caselaw.nationalarchives.gov.uk/uksc/2025/13` would otherwise become Act id `uksc/2025`, which no
 legislation tool call can ever have retrieved, so every case law citation was reported as fabricated.
-See `docs/case-law-issues.md` issue 3.
 
 **Why the parsing is fussy.** `search_legislation` returns its JSON results with a plain-text
 "[NEXT STEP: ...]" hint appended for the Worker, so reading the whole string as JSON fails. That went
@@ -153,7 +152,7 @@ be grounded "EXCLUSIVELY in case law" and never mentions legislation.gov.uk, whi
 citation protocol names both.
 
 **Why it is mode-dependent.** A single legislation-only rule failed every case law response outright,
-for citing judgments in exactly the format it was told to use. See `docs/case-law-issues.md` issue 3.
+for citing judgments in exactly the format it was told to use.
 
 ## Genuine Gap
 
@@ -320,6 +319,13 @@ draft reference", not "wrong in law"; only a lawyer's approval makes it the latt
 contradiction as a prompt to read the two texts side by side. Across the 43 stored responses, 10 were
 flagged; the four checked by hand were all genuine, including an answer that put a strategic plan in
 the wrong Part of an Act and one that turned the s.29(3) purpose test into "purpose or effect".
+
+**Known gap: there is no label for "must not appear".** The judge labels each statement stated,
+contradicted or missing, so an answer that cites law it should have left out contradicts nothing and
+loses no score. Writing the exclusion as a positive statement ("distinct from the UK Act") is a
+partial workaround, since it only fires if the answer engages with the distinction rather than
+quietly citing the wrong thing. Closing this properly is a metric change, so it goes through the
+process in `CLAUDE.md`.
 
 ## Plan Coverage
 

@@ -404,7 +404,7 @@ lex_eval/
 │   ├── deploy.db            # committed compact database for Streamlit Cloud
 │   ├── reference_answers/   # gold answers: q{id}.md + reference_answers.json
 │   └── verbose_logs/        # per-question capture audit logs (gitignored)
-├── docs/                    # gap analysis, reference-answer notes
+├── docs/                    # permanent docs; docs/findings/ is local, dated notes
 ├── metrics/                 # custom metric classes
 ├── reference/               # reference ("gold") answers
 │   ├── build.py             # the build script
@@ -418,6 +418,25 @@ lex_eval/
 ├── open_db_ui.py            # opens responses.db in browser UI
 └── run_evals.py             # Step 3 entry point
 ```
+
+## Documentation
+
+`lex_eval/docs/` holds the permanent documentation, the docs that answer "how does
+this work" and are kept up to date with the code:
+
+| Doc | What it covers |
+| --- | --- |
+| [Metrics](lex_eval/docs/metrics.md) | What each metric catches, how it scores, and why it is designed that way. |
+| [Reference answers](lex_eval/docs/reference-answers.md) | The reference ("gold") answer system: what is authored, what is generated. |
+| [Experiments](lex_eval/docs/experiments.md) | Running a gather as an experiment, scoring it, reading and comparing results. |
+| [Question set provenance](lex_eval/docs/question-set-provenance.md) | The fields recording where each question came from. |
+| [Decisions](lex_eval/docs/decisions/) | Decision records for choices made or still open. |
+
+`lex_eval/docs/findings/` is the other shelf, for docs that answer "what did we find
+on date X": a bug investigation, a review status, a report over one data export.
+Each opens with the date it describes and is frozen rather than maintained, so
+they are kept locally and are not committed. Nothing in the table above should
+depend on a findings file for a fact.
 
 ## A note on LLM judge models
 The judge LLM is accessed via OpenRouter, which provides access to hundreds of models from many providers. The default model is `openai/gpt-4o`, which offers a good balance of thoroughness and cost. More expensive or capable models may produce more critical judgments, leading to lower scores for reference agreement, response groundedness, and research groundedness.
