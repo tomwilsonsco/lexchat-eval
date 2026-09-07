@@ -4,7 +4,7 @@ Which step of a run is responsible for a poor answer?
 A reviewer looking at a column of red metric scores cannot tell whether the
 model reasoned badly or whether it was never shown the law. Those are different
 bugs owned by different people. This module answers that for one response, from
-data already captured, so the dashboard can say it in a line above the scores.
+data already captured, so the dashboard can say it in a line beside the scores.
 
 Four verdicts, worst first:
 
@@ -19,7 +19,7 @@ Four verdicts, worst first:
     Every Act the reference answer relied on was turned up by a search and
     cited in the answer, so no step lost any law. **This is not a pass.** A
     response can cite the right Acts and the wrong sections of them and still
-    land here; the metric rows below the flag are what judge that.
+    land here; the question's metric rows are what judge that.
 ``not_attributable``
     Nothing Citation Agreement could measure: no reference answer, an answer
     too short to judge, or a reference that records no legislation. Not a
@@ -74,13 +74,16 @@ NOT_ATTRIBUTABLE = "not_attributable"
 # measurable run and one that could not be measured reports the measurement.
 _ORDER = [TECH, SEARCH, MODEL, NO_LAW_LOST, NOT_ATTRIBUTABLE]
 
-# Shown above the metric rows when the fault is not the model's, so a reader
-# does not take the scores below as a verdict on its legal reasoning.
+# Shown under the flag when the fault is not the model's, so a reader does not
+# take the question's metric scores as a verdict on its legal reasoning.
 _CAVEAT = {
-    TECH: ("The run did not finish, so the scores below describe a partial answer."),
+    TECH: (
+        "The run did not finish, so this describes only the partial answer it "
+        "produced, as do the question's metric scores."
+    ),
     SEARCH: (
-        "No tool call in this run turned up this law, so the scores below "
-        "reflect what the answer did without it."
+        "No tool call in this run turned up this law, so the question's metric "
+        "scores reflect what the answer did without it."
     ),
 }
 
@@ -156,7 +159,7 @@ def attribution_for_record(
         "stage": NO_LAW_LOST,
         "detail": (
             "every Act the reference answer relied on was found and cited; "
-            "the scores below judge what the answer did with them"
+            "the question's metric scores judge what the answer did with them"
         ),
         "ids": [],
     }
@@ -179,5 +182,5 @@ def worst_attribution(
 
 def caveat(stage: str) -> str:
     """The sentence to show under the flag, or "" for stages that do not excuse
-    the scores beneath it."""
+    the question's metric scores."""
     return _CAVEAT.get(stage, "")

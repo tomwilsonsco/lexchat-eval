@@ -152,6 +152,89 @@ METRIC_DISPLAY_ORDER: list[str] = [name for _key, name, _tooltip in METRICS]
 METRIC_TOOLTIPS: dict[str, str] = {name: tip for _key, name, tip in METRICS}
 
 
+# What puts a question in the "needs attention" set. Written once because
+# the summary column and the checkbox that filters on it are the same rule.
+NEEDS_ATTENTION_HELP = (
+    "A question needs attention when a metric failed or could not be scored, "
+    "when no metric ran at all, or when a run ended without an answer or hit "
+    "the turn limit."
+)
+
+# Hover over help for the column headers of every table on the dashboard, one
+# dict per table. They are kept separate because the same header means
+# different things in different tables: "Error" counts failed attempts in the
+# outcomes table and holds one tool call's error message in the searches table.
+OUTCOME_COLUMNS: dict[str, str] = {
+    "Attempts": "Every captured run of this question, including repeats and runs that failed.",
+    "Answer": "Runs that returned an answer.",
+    "Clarification": "Runs where LexChat asked the user a clarifying question instead of researching.",
+    "Error": "Runs that failed with an error and produced no answer.",
+    "No answer": "Runs that ended with no error, no clarifying question and no answer text.",
+    "Turn-cap flags": "Runs where at least one research step was cut short at the server's turn limit, so that step returned no findings.",
+    "Reformatted": "Runs where the worker's report missed the required headings and LexChat asked the model to rewrite it once.",
+}
+
+QUESTION_COLUMNS: dict[str, str] = {
+    "Question": "The question id and the start of the question text.",
+    "Model": "The model LexChat had active when these runs were gathered.",
+    "Chat mode": "The LexChat mode used: research, deep research or conversational.",
+    "Research mode": "Which sources the question expects: legislation only, case law only, or both.",
+    "Experiment": "The label of the gather run these attempts belong to. Only runs in the same experiment are compared.",
+    "Type": "From the question set. A regression question reproduces a past failure, a positive control is one LexChat is expected to get right.",
+    "Reference agreement": "Reference Answer Agreement only: how many runs matched the reference answer's key statements, out of the runs it could score.",
+    "Attempts": OUTCOME_COLUMNS["Attempts"],
+    "Answers": OUTCOME_COLUMNS["Answer"],
+    "Clarifications": OUTCOME_COLUMNS["Clarification"],
+    "Errors": OUTCOME_COLUMNS["Error"],
+    "Turn-cap flags": OUTCOME_COLUMNS["Turn-cap flags"],
+    "Needs attention": NEEDS_ATTENTION_HELP,
+}
+
+SEARCH_COLUMNS: dict[str, str] = {
+    "Response": "Which attempt made this search. One question can have several.",
+    "Step": "Which research step made the call. Deep research numbers its steps, the other modes have one.",
+    "Tool": "The search tool called, for example search_legislation.",
+    "Arguments": "The arguments the tool was called with, including the search terms.",
+    "Outcome": "Results returned, Empty, Error, or Unknown / incomplete when the result was cut short or blocked by the tool call budget.",
+    "Returned": "How many items came back. This counts items, not relevance, and is blank when the count is unknown.",
+    "Cache reused": "True when the result came from a cache rather than a fresh API call.",
+    "Error": "The error the tool call returned, if any.",
+    "Later nonempty search in this step": "True when this search returned nothing but a repeat of the same tool later in the step did return results.",
+}
+
+COMPARISON_SUMMARY_COLUMNS: dict[str, str] = {
+    "Matched questions and modes": "How many question and mode combinations appear in both experiments. Only these are compared.",
+    "Baseline only": "Combinations gathered in the baseline experiment but not the candidate.",
+    "Candidate only": "Combinations gathered in the candidate experiment but not the baseline.",
+}
+
+COMPARISON_OUTCOME_COLUMNS: dict[str, str] = {
+    "Experiment": "Which side of the comparison the counts on this row come from.",
+    **OUTCOME_COLUMNS,
+}
+
+COMPARISON_CHANGE_COLUMNS: dict[str, str] = {
+    "Question": "The question id.",
+    "Question text": "The question as it was asked. Both experiments used this exact wording.",
+    "Chat mode": QUESTION_COLUMNS["Chat mode"],
+    "Research mode": QUESTION_COLUMNS["Research mode"],
+    "Metric": "The metric this row compares.",
+    "Baseline": "Passes out of measured runs in the baseline experiment, and how many of its runs the metric could not measure.",
+    "Candidate": "Passes out of measured runs in the candidate experiment, and how many of its runs the metric could not measure.",
+    "Baseline responses": "The response ids scored on the baseline side.",
+    "Candidate responses": "The response ids scored on the candidate side.",
+    "Change": "How the candidate compares with the baseline, or why the two cannot be compared.",
+}
+
+
+def _column_help(tooltips: dict[str, str]) -> dict:
+    """Turn a column name to description mapping into Streamlit column config."""
+    return {
+        name: st.column_config.Column(name, help=text)
+        for name, text in tooltips.items()
+    }
+
+
 def _is_scored(result: dict) -> bool:
     """Whether this row's score is a verdict, and so belongs in a mean.
 
@@ -657,11 +740,12 @@ def _reference_manifest_mtime() -> float:
 
 
 def _render_attribution_flag(response_records: list[dict]) -> None:
-    """One line above the metric rows saying which stage is at fault.
+    """One line saying which step lost the law, for one response.
 
     Always rendered when there are records to judge. An absent flag used to
     mean "no step lost any law" and was read as "nothing to report", so that
-    case now has its own label rather than being silence.
+    case now has its own label rather than being silence. No score is shown
+    here; the question's metric rows above hold those.
     """
     verdict = worst_attribution(
         response_records, _reference_answers(_reference_manifest_mtime())
@@ -707,7 +791,12 @@ def _reference_status_line() -> str:
 
 def _render_outcomes(records):
     counts = outcome_counts(records)
-    st.dataframe([counts], hide_index=True, width="stretch")
+    st.dataframe(
+        [counts],
+        hide_index=True,
+        width="stretch",
+        column_config=_column_help(OUTCOME_COLUMNS),
+    )
     st.caption(
         "Outcomes count all attempts. Turn-cap and reformat flags may overlap with answers or errors."
     )
@@ -787,9 +876,17 @@ def _question_detail(key, group, rows):
             st.markdown(f"#### {title}")
             _render_metric_rows(subset)
     if key[3] != "case_law_only":
-        with st.expander("Expected legislation: current-reference search attribution"):
+        with st.expander(
+            "Did this run find the legislation the reference answer relies on?"
+        ):
             st.caption(
-                "Uses the current reference, independently of a historical scoring selection. This checks Acts only, not judgments or legal correctness."
+                "For each Act the reference answer cites, this says where that Act was "
+                "lost: no search in the run found it, or a search found it and the "
+                "answer did not cite it. It reads the run's own stored tool calls and "
+                "answer, against the reference answer as it stands now, not the version "
+                "an older stored score was measured against. Acts only, so it says "
+                "nothing about sections, judgments, or whether the answer is legally "
+                "correct."
             )
             for rec in group:
                 st.caption(f"Response {rec['response_id']}")
@@ -800,7 +897,12 @@ def _question_detail(key, group, rows):
             "Counts describe returned items, not relevance. A later nonempty search is evidence of further results, not proof that the question was resolved."
         )
         if search_rows:
-            st.dataframe(search_rows, hide_index=True, width="stretch")
+            st.dataframe(
+                search_rows,
+                hide_index=True,
+                width="stretch",
+                column_config=_column_help(SEARCH_COLUMNS),
+            )
         else:
             st.info("No captured search facts for these attempts.")
         for rec in group:
@@ -897,10 +999,25 @@ def _compare_experiments(records, rows):
         "Matched question wording, snapshot and modes only. The latest shared scoring version is selected per metric; missing measurements remain visible. Two repeats describe observations, not statistical certainty."
     )
     summary, changes, outcomes = compare(*sides, apply_scope(rows))
-    st.dataframe([summary], hide_index=True, width="stretch")
-    st.dataframe(outcomes, hide_index=True, width="stretch")
+    st.dataframe(
+        [summary],
+        hide_index=True,
+        width="stretch",
+        column_config=_column_help(COMPARISON_SUMMARY_COLUMNS),
+    )
+    st.dataframe(
+        outcomes,
+        hide_index=True,
+        width="stretch",
+        column_config=_column_help(COMPARISON_OUTCOME_COLUMNS),
+    )
     if changes:
-        st.dataframe(changes, hide_index=True, width="stretch")
+        st.dataframe(
+            changes,
+            hide_index=True,
+            width="stretch",
+            column_config=_column_help(COMPARISON_CHANGE_COLUMNS),
+        )
     else:
         st.info("No matched metric results to compare.")
     with st.expander("Experiment conditions"):
@@ -1004,12 +1121,21 @@ def main() -> None:
     summaries = {
         key: _question_summary(key, group, rows) for key, group in groups.items()
     }
-    attention = st.checkbox("Only questions needing attention")
+    attention = st.checkbox(
+        "Only questions needing attention",
+        help="Hides questions where every run answered and every metric passed. "
+        + NEEDS_ATTENTION_HELP,
+    )
     keys = [
         key for key, row in summaries.items() if not attention or row["Needs attention"]
     ]
     keys.sort(key=lambda k: (not summaries[k]["Needs attention"], k))
-    st.dataframe([summaries[k] for k in keys], hide_index=True, width="stretch")
+    st.dataframe(
+        [summaries[k] for k in keys],
+        hide_index=True,
+        width="stretch",
+        column_config=_column_help(QUESTION_COLUMNS),
+    )
     if not keys:
         st.info("No questions match this selection.")
         return
