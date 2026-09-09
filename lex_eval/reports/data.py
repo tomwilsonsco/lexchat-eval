@@ -217,6 +217,54 @@ def question_groups(records: list[dict]) -> dict[tuple, list[dict]]:
     return dict(groups)
 
 
+def coverage(records: list[dict], rows: list[dict], metrics: list[tuple]) -> tuple:
+    """Which checks have a stored result for each question of one experiment.
+
+    Returns one row per question, counting the responses each check scored,
+    and the checks still missing a result for a response they cover. A check
+    writes a row even when it cannot measure a response, so a missing row
+    means the check has not been run. Checks that do not cover a question's
+    runs at all read "n/a" and are never reported as missing.
+    """
+    grouped = defaultdict(list)
+    for rec in records:
+        grouped[
+            (rec["question_id"], rec.get("chat_mode"), rec.get("research_mode"))
+        ].append(rec)
+    stored = defaultdict(set)
+    for row in rows:
+        stored[row["test_name"]].add(row["response_id"])
+    table = []
+    for key in sorted(grouped):
+        group = grouped[key]
+        ids = {r["response_id"] for r in group}
+        table.append(
+            {
+                "Question": f"Q{key[0]}",
+                "Chat mode": key[1],
+                "Research mode": key[2],
+                "Responses": len(group),
+                "Answered": sum(outcome(r) == "Answer" for r in group),
+                # Every response in a group shares the question's modes, so a
+                # check either covers all of them or none.
+                **{
+                    name: (
+                        "n/a"
+                        if exclusion(metric, group[0])
+                        else str(len(ids & stored[metric]))
+                    )
+                    for metric, name, _ in metrics
+                },
+            }
+        )
+    pending = []
+    for metric, _name, _tip in metrics:
+        covered = {r["response_id"] for r in records if not exclusion(metric, r)}
+        if covered - stored[metric]:
+            pending.append(metric)
+    return table, pending
+
+
 def run_numbers(records: list[dict]) -> dict:
     """Response id to run number for one question group, oldest run first.
 

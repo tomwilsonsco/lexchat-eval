@@ -29,17 +29,27 @@ def signature(row):
     )
 
 
-def compare(baseline, candidate, rows):
-    """Return matched verdicts and explicit exclusions; legacy versions cannot match."""
-    groups = []
-    for records in (baseline, candidate):
-        grouped = defaultdict(list)
-        for rec in records:
-            grouped[cohort_key(rec)].append(rec)
-        groups.append(grouped)
-    left, right = groups
-    matched = left.keys() & right.keys()
-    output = []
+def _cohorts(records):
+    grouped = defaultdict(list)
+    for rec in records:
+        grouped[cohort_key(rec)].append(rec)
+    return grouped
+
+
+def shared_cohorts(baseline, candidate):
+    """The question, wording and mode combinations present in both experiments."""
+    return _cohorts(baseline).keys() & _cohorts(candidate).keys()
+
+
+def _matched_entries(groups, matched, rows):
+    """One entry per matched cohort and metric, with the selected verdicts.
+
+    An entry either carries a reason it could not be compared, or the two
+    sides' response ids and their aggregated verdicts. Both the per question
+    table and the per check summary are built from these, so they select the
+    same scoring version and exclude the same rows.
+    """
+    entries = []
     for key in sorted(matched):
         ids = [{r["response_id"] for r in side[key]} for side in groups]
         metric_keys = {
@@ -54,23 +64,30 @@ def compare(baseline, candidate, rows):
                 ]
                 for side in ids
             ]
+            entry = {
+                "key": key,
+                "test_name": metric,
+                "metric_name": next(
+                    (
+                        r["metric_name"]
+                        for side in sides
+                        for r in side
+                        if r.get("metric_name")
+                    ),
+                    metric,
+                ),
+                "ids": ids,
+            }
             versions = [
                 {signature(r) for r in side if r.get("metric_version")}
                 for side in sides
             ]
             common = versions[0] & versions[1]
-            entry = {
-                "Question": f"Q{key[0]}",
-                "Question text": key[1],
-                "Chat mode": key[2],
-                "Research mode": key[3],
-                "Metric": metric,
-            }
             if not common:
-                output.append(
+                entries.append(
                     {
                         **entry,
-                        "Change": "Not comparable: scoring versions differ or are unknown",
+                        "excluded": "Not comparable: scoring versions differ or are unknown",
                     }
                 )
                 continue
@@ -95,41 +112,68 @@ def compare(baseline, candidate, rows):
                 if measured(r) and r.get("judge_llm")
             }
             if len(judges) > 1:
-                output.append(
-                    {**entry, "Change": "Not comparable: different actual judges"}
+                entries.append(
+                    {**entry, "excluded": "Not comparable: different actual judges"}
                 )
                 continue
-            totals = [aggregate_metrics(side)[0] for side in selected]
-            for label, total, side_ids, side in zip(
-                ("Baseline", "Candidate"), totals, ids, selected, strict=True
-            ):
-                entry[label] = (
-                    f"{total['pass_count']}/{total['measured_count']} measured passes; {len(side_ids) - total['measured_count']} unmeasured or missing"
-                )
-                entry[f"{label} responses"] = ", ".join(
-                    str(r["response_id"]) for r in side
-                )
-            if any(
-                t["measured_count"] != len(side_ids)
-                for t, side_ids in zip(totals, ids, strict=True)
-            ):
-                change = "Incomplete measurements"
-            else:
-                rates = [t["pass_count"] / t["measured_count"] for t in totals]
-                change = (
-                    "More passes"
-                    if rates[1] > rates[0]
-                    else (
-                        "Fewer passes"
-                        if rates[1] < rates[0]
-                        else (
-                            totals[0]["state"]
-                            if totals[0]["state"] == totals[1]["state"]
-                            else "Same pass frequency"
-                        )
-                    )
-                )
-            output.append({**entry, "Change": change})
+            entries.append(
+                {
+                    **entry,
+                    "excluded": None,
+                    "selected": selected,
+                    "totals": [aggregate_metrics(side)[0] for side in selected],
+                }
+            )
+    return entries
+
+
+def _direction(rates, states=None):
+    if rates[1] > rates[0]:
+        return "More passes"
+    if rates[1] < rates[0]:
+        return "Fewer passes"
+    if states and states[0] == states[1]:
+        return states[0]
+    return "Same pass frequency"
+
+
+def compare(baseline, candidate, rows):
+    """Return matched verdicts and explicit exclusions; legacy versions cannot match."""
+    groups = [_cohorts(records) for records in (baseline, candidate)]
+    left, right = groups
+    matched = left.keys() & right.keys()
+    output = []
+    for item in _matched_entries(groups, matched, rows):
+        key = item["key"]
+        entry = {
+            "Question": f"Q{key[0]}",
+            "Question text": key[1],
+            "Chat mode": key[2],
+            "Research mode": key[3],
+            "Metric": item["test_name"],
+        }
+        if item["excluded"]:
+            output.append({**entry, "Change": item["excluded"]})
+            continue
+        ids, totals = item["ids"], item["totals"]
+        for label, total, side_ids, side in zip(
+            ("Baseline", "Candidate"), totals, ids, item["selected"], strict=True
+        ):
+            entry[label] = (
+                f"{total['pass_count']}/{total['measured_count']} measured passes; {len(side_ids) - total['measured_count']} unmeasured or missing"
+            )
+            entry[f"{label} responses"] = ", ".join(str(r["response_id"]) for r in side)
+        if any(
+            t["measured_count"] != len(side_ids)
+            for t, side_ids in zip(totals, ids, strict=True)
+        ):
+            change = "Incomplete measurements"
+        else:
+            change = _direction(
+                [t["pass_count"] / t["measured_count"] for t in totals],
+                [t["state"] for t in totals],
+            )
+        output.append({**entry, "Change": change})
     summary = {
         "Matched questions and modes": len(matched),
         "Baseline only": len(left.keys() - right.keys()),
@@ -143,3 +187,89 @@ def compare(baseline, candidate, rows):
         for label, side in zip(("Baseline", "Candidate"), groups, strict=True)
     ]
     return summary, output, outcomes
+
+
+def _side_text(passes, measured_count, score_total, unmeasured):
+    mean = f"mean {score_total / measured_count:.2f}" if measured_count else "no mean"
+    text = f"{passes}/{measured_count} measured passes · {mean}"
+    return f"{text} · {unmeasured} unmeasured" if unmeasured else text
+
+
+# Every direction a check can end up in, in the order they are counted. Fixed
+# so a column keeps its place from one comparison to the next.
+CHANGE_STATES = (
+    "More passes",
+    "Fewer passes",
+    "Same pass frequency",
+    "Not measured",
+    "Not comparable",
+)
+
+
+def change_counts(summary_rows):
+    """How many checks moved which way, from the rows of `metric_summary`."""
+    counts = dict.fromkeys(CHANGE_STATES, 0)
+    for row in summary_rows:
+        counts[row["Change"]] = counts.get(row["Change"], 0) + 1
+    return {"Checks": len(summary_rows), **counts}
+
+
+def metric_summary(baseline, candidate, rows):
+    """One row per check, totalled over the questions both experiments answered.
+
+    Questions whose scoring versions or judges differ between the two sides are
+    counted in "Not compared" and are left out of the totals, so an unmatched
+    scoring version cannot look like a change.
+    """
+    groups = [_cohorts(records) for records in (baseline, candidate)]
+    matched = groups[0].keys() & groups[1].keys()
+    totals = {}
+    for item in _matched_entries(groups, matched, rows):
+        row = totals.setdefault(
+            item["test_name"],
+            {
+                "Check": item["metric_name"],
+                "sides": [
+                    dict(passes=0, measured=0, score=0.0, missing=0) for _ in (0, 1)
+                ],
+                "compared": 0,
+                "excluded": 0,
+            },
+        )
+        if item["excluded"]:
+            row["excluded"] += 1
+            continue
+        row["compared"] += 1
+        for side, total, ids in zip(
+            row["sides"], item["totals"], item["ids"], strict=True
+        ):
+            side["passes"] += total["pass_count"]
+            side["measured"] += total["measured_count"]
+            side["score"] += total["score"] * total["measured_count"]
+            side["missing"] += len(ids) - total["measured_count"]
+    output = []
+    for row in totals.values():
+        sides = row["sides"]
+        if not row["compared"]:
+            change = "Not comparable"
+        elif not all(side["measured"] for side in sides):
+            change = "Not measured"
+        else:
+            change = _direction([side["passes"] / side["measured"] for side in sides])
+        output.append(
+            {
+                "Check": row["Check"],
+                **{
+                    label: _side_text(
+                        side["passes"], side["measured"], side["score"], side["missing"]
+                    )
+                    for label, side in zip(
+                        ("Baseline", "Candidate"), sides, strict=True
+                    )
+                },
+                "Change": change,
+                "Questions compared": row["compared"],
+                "Not compared": row["excluded"],
+            }
+        )
+    return output

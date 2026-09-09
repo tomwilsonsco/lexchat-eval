@@ -5,7 +5,13 @@ import json
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from lex_eval.reports.comparison import compare
+from lex_eval.reports.comparison import (
+    change_counts,
+    compare,
+    metric_summary,
+    shared_cohorts,
+)
+from lex_eval.reports.data import coverage
 from lex_eval.reports.diagnostics import searches, search_summary
 from lex_eval.utils.db import get_connection, init_db, insert_response
 
@@ -49,29 +55,33 @@ def test_error_only_dashboard_renders(tmp_path):
 
 
 def record(rid, **overrides):
-    return dict(
-        response_id=rid,
-        question_id=1,
-        question="same wording",
-        chat_mode="research",
-        research_mode="legislation_only",
-        actual_output="answer",
-        **overrides,
+    return (
+        dict(
+            response_id=rid,
+            question_id=1,
+            question="same wording",
+            chat_mode="research",
+            research_mode="legislation_only",
+            actual_output="answer",
+        )
+        | overrides
     )
 
 
 def verdict(rid, passed, version="v1", **overrides):
-    return dict(
-        response_id=rid,
-        question_id=1,
-        test_name="reference_answer_agreement",
-        metric_name="Agreement",
-        metric_version=version,
-        threshold=0.6,
-        score=0.6,
-        passed=passed,
-        measured=True,
-        **overrides,
+    return (
+        dict(
+            response_id=rid,
+            question_id=1,
+            test_name="reference_answer_agreement",
+            metric_name="Agreement",
+            metric_version=version,
+            threshold=0.6,
+            score=0.6,
+            passed=passed,
+            measured=True,
+        )
+        | overrides
     )
 
 
@@ -104,6 +114,124 @@ def test_missing_measurement_stays_visible():
     )
     assert changes[0]["Change"] == "Incomplete measurements"
     assert "1 unmeasured or missing" in changes[0]["Candidate"]
+
+
+def test_metric_summary_totals_the_shared_questions():
+    baseline = [record(1), record(3, question_id=2, question="second")]
+    candidate = [record(2), record(4, question_id=2, question="second")]
+    rows = [
+        verdict(1, False, score=0.4),
+        verdict(2, True, score=0.8),
+        verdict(3, True, question_id=2, score=1.0),
+        verdict(4, True, question_id=2, score=0.6),
+    ]
+    row = metric_summary(baseline, candidate, rows)[0]
+    assert row["Questions compared"] == 2 and row["Not compared"] == 0
+    assert row["Baseline"] == "1/2 measured passes · mean 0.70"
+    assert row["Candidate"] == "2/2 measured passes · mean 0.70"
+    assert row["Change"] == "More passes"
+
+
+def test_change_counts_account_for_every_check():
+    baseline = [record(1), record(3, question_id=2, question="second")]
+    candidate = [record(2), record(4, question_id=2, question="second")]
+    rows = [
+        verdict(1, False),
+        verdict(2, True),
+        verdict(3, True, question_id=2, test_name="tool_usage", metric_name="Tool"),
+        verdict(4, True, question_id=2, test_name="tool_usage", metric_name="Tool"),
+    ]
+    totals = metric_summary(baseline, candidate, rows)
+    counts = change_counts(totals)
+    assert counts["Checks"] == len(totals) == 2
+    assert counts["More passes"] == 1 and counts["Same pass frequency"] == 1
+    assert sum(counts[state] for state in counts if state != "Checks") == 2
+
+
+def test_metric_summary_excludes_incompatible_versions_from_the_totals():
+    baseline = [record(1), record(3, question_id=2, question="second")]
+    candidate = [record(2), record(4, question_id=2, question="second")]
+    rows = [
+        verdict(1, False),
+        verdict(2, True),
+        verdict(3, False, question_id=2),
+        verdict(4, True, "v2", question_id=2),
+    ]
+    row = metric_summary(baseline, candidate, rows)[0]
+    assert row["Questions compared"] == 1 and row["Not compared"] == 1
+    assert row["Baseline"].startswith("0/1") and row["Candidate"].startswith("1/1")
+
+
+def test_metric_summary_reports_unmeasured_runs_beside_the_totals():
+    row = metric_summary(
+        [record(1)],
+        [record(2), record(3)],
+        [verdict(1, True), verdict(2, True)],
+    )[0]
+    assert row["Candidate"].endswith("1 unmeasured")
+
+
+def test_shared_questions_need_the_same_wording_and_snapshot():
+    baseline = [record(1), record(3, question_id=2, question="second")]
+    candidate = [
+        record(2),
+        record(4, question_id=2, question="second", question_hash="changed"),
+    ]
+    assert {key[0] for key in shared_cohorts(baseline, candidate)} == {1}
+
+
+def test_coverage_counts_stored_results_and_skips_checks_that_do_not_apply():
+    metrics = [
+        ("tool_usage", "Tool Usage", ""),
+        ("plan_coverage", "Plan Coverage (Deep research only)", ""),
+    ]
+    records = [
+        record(1, chat_mode="conversational"),
+        record(2, chat_mode="conversational"),
+    ]
+    table, pending = coverage(
+        records, [verdict(1, True, test_name="tool_usage")], metrics
+    )
+    assert table[0]["Responses"] == 2 and table[0]["Answered"] == 2
+    # One of the two responses has a Tool Usage row, neither has a deep
+    # research one, and a deep research check does not cover these runs.
+    assert table[0]["Tool Usage"] == "1"
+    assert table[0]["Plan Coverage (Deep research only)"] == "n/a"
+    assert pending == ["tool_usage"]
+
+
+def test_experiment_info_lists_an_unscored_experiment_and_its_command(tmp_path):
+    from lex_eval.utils.versioning import start_gather, link_response
+
+    path = tmp_path / "unscored.db"
+    conn = get_connection(path)
+    init_db(conn)
+    exp, gather = start_gather(
+        conn, label="probe", config={"label": "probe"}, question_ids=[1]
+    )
+    rid = insert_response(
+        conn,
+        dict(
+            question_id=1,
+            question="q",
+            llm_name="m",
+            timestamp="2026-09-07",
+            actual_output="answer",
+        ),
+    )
+    link_response(conn, rid, gather, exp, {"id": 1, "question": "q"})
+    conn.close()
+    app = AppTest.from_string(
+        f"from pathlib import Path\nfrom lex_eval.reports import streamlit_report as r\nr.RESPONSES_DB=Path({str(path)!r})\nr.main()"
+    )
+    app.run(timeout=30)
+    app.radio[0].set_value("Experiment info").run(timeout=30)
+    assert not app.exception
+    assert app.selectbox[0].options == [f"probe ({exp[:8]})"]
+    assert any("Tool Usage" in frame.value.columns for frame in app.dataframe)
+    assert app.code[0].value.startswith(
+        f"python lex_eval/run_evals.py --experiment {exp} --metrics "
+    )
 
 
 def test_search_recovery_and_errors_are_distinct():
@@ -242,7 +370,93 @@ def test_comparison_view_renders_recorded_experiments(tmp_path):
     assert any(
         "Matched questions and modes" in frame.value.columns for frame in app.dataframe
     )
-    assert any("Change" in frame.value.columns for frame in app.dataframe)
+    # The per check summary reads without opening a question, and the per
+    # question detail is still there behind its expander.
+    assert any("Questions compared" in frame.value.columns for frame in app.dataframe)
+    assert any("Question text" in frame.value.columns for frame in app.dataframe)
+
+
+def test_comparison_offers_only_the_questions_both_experiments_answered(tmp_path):
+    from lex_eval.utils.db import init_eval_table, insert_eval_result
+    from lex_eval.utils.versioning import start_gather, link_response, start_scoring
+
+    path = tmp_path / "shared.db"
+    conn = get_connection(path)
+    init_db(conn)
+    init_eval_table(conn, "tool_usage")
+    # The baseline asked both questions, the candidate only the first, which is
+    # the shape that used to empty the experiment list and reset the pickers.
+    for label, question_ids in (("baseline", [1, 2]), ("candidate", [1])):
+        exp, gather = start_gather(
+            conn, label=label, config={"label": label}, question_ids=question_ids
+        )
+        for qid in question_ids:
+            rid = insert_response(
+                conn,
+                dict(
+                    question_id=qid,
+                    question=f"q{qid}",
+                    llm_name="m",
+                    timestamp="2026-09-07",
+                    actual_output="answer",
+                ),
+            )
+            link_response(conn, rid, gather, exp, {"id": qid, "question": f"q{qid}"})
+            run = start_scoring(conn, dict(source_version="v1", judge={}))
+            insert_eval_result(
+                conn,
+                "tool_usage",
+                dict(
+                    response_id=rid,
+                    question_id=qid,
+                    question=f"q{qid}",
+                    llm_name="m",
+                    score=1.0,
+                    threshold=1.0,
+                    passed=True,
+                    scoring_run_id=run,
+                    metric_version="v1",
+                ),
+            )
+    # A third experiment nothing has been scored against has nothing to
+    # compare, so the pickers must leave it out.
+    exp, gather = start_gather(
+        conn, label="unscored", config={"label": "unscored"}, question_ids=[1]
+    )
+    rid = insert_response(
+        conn,
+        dict(
+            question_id=1,
+            question="q1",
+            llm_name="m",
+            timestamp="2026-09-07",
+            actual_output="answer",
+        ),
+    )
+    link_response(conn, rid, gather, exp, {"id": 1, "question": "q1"})
+    conn.close()
+    app = AppTest.from_string(
+        f"from pathlib import Path\nfrom lex_eval.reports import streamlit_report as r\nr.RESPONSES_DB=Path({str(path)!r})\nr.main()"
+    )
+    app.run(timeout=30)
+    app.radio[0].set_value("Compare experiments").run(timeout=30)
+    assert not app.exception
+    labels = [box.label for box in app.selectbox]
+    assert "Baseline experiment" in labels and "Candidate experiment" in labels
+    assert "Model" not in labels and "Research mode" not in labels
+    assert not any("unscored" in option for option in app.selectbox[0].options)
+    assert len(app.selectbox[0].options) == 2
+    questions = app.multiselect[0]
+    assert questions.options == ["Q1"]
+    chosen = [box.value for box in app.selectbox[:2]]
+    questions.set_value(["Q1"]).run(timeout=30)
+    assert not app.exception
+    # Choosing a question leaves both experiments as they were.
+    assert [box.value for box in app.selectbox[:2]] == chosen
+    # Experiment info lists every experiment, including the unscored one.
+    app.radio[0].set_value("Experiment info").run(timeout=30)
+    assert not app.exception
+    assert any("unscored" in option for option in app.selectbox[0].options)
 
 
 def _states_fixture(path):

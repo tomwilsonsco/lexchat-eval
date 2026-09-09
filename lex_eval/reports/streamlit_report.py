@@ -22,10 +22,16 @@ from lex_eval.reference.store import (
     reference_version,
 )
 from lex_eval.reports.attribution import caveat, worst_attribution
-from lex_eval.reports.comparison import compare
+from lex_eval.reports.comparison import (
+    change_counts,
+    compare,
+    metric_summary,
+    shared_cohorts,
+)
 from lex_eval.reports.diagnostics import searches, search_summary, plan_steps
 from lex_eval.reports.data import (
     NOT_MEASURED,
+    coverage,
     apply_scope,
     consistency_cohort,
     question_metadata,
@@ -271,6 +277,32 @@ COMPARISON_SUMMARY_COLUMNS: dict[str, str] = {
     "Matched questions and modes": "How many question and mode combinations appear in both experiments. Only these are compared.",
     "Baseline only": "Combinations gathered in the baseline experiment but not the candidate.",
     "Candidate only": "Combinations gathered in the candidate experiment but not the baseline.",
+}
+
+EXPERIMENT_INFO_COLUMNS: dict[str, str] = {
+    "Question": "The question id, as gathered in this experiment.",
+    "Chat mode": QUESTION_COLUMNS["Chat mode"],
+    "Research mode": QUESTION_COLUMNS["Research mode"],
+    "Responses": "How many responses this experiment gathered for the question.",
+    "Answered": "How many of those responses came back with answer text.",
+}
+
+COMPARISON_CHANGE_COUNT_COLUMNS: dict[str, str] = {
+    "Checks": "How many checks the table below reports, which is every check with a stored result on either side.",
+    "More passes": "Checks the candidate passed more often than the baseline, over the runs both sides measured.",
+    "Fewer passes": "Checks the candidate passed less often than the baseline.",
+    "Same pass frequency": "Checks that passed equally often on both sides.",
+    "Not measured": "Checks with nothing measured on one or both sides, for example a deep research check on conversational runs.",
+    "Not comparable": "Checks where no shared question could be compared, because the two sides used different scoring versions or different judges.",
+}
+
+COMPARISON_METRIC_COLUMNS: dict[str, str] = {
+    "Check": "The check these totals are for.",
+    "Baseline": "Baseline totals over the questions both experiments answered: measured passes out of measured runs, the mean of those scores, and how many runs the check could not measure.",
+    "Candidate": "The same totals for the candidate experiment.",
+    "Change": "How the candidate's pass frequency over measured runs compares with the baseline's. Runs that could not be measured are counted in the two columns before this one and are not part of the comparison.",
+    "Questions compared": "How many shared questions are in these totals.",
+    "Not compared": "Shared questions left out because the two sides used different scoring versions or different judges. They are in no total here.",
 }
 
 COMPARISON_OUTCOME_COLUMNS: dict[str, str] = {
@@ -1631,15 +1663,115 @@ def _question_detail(key, group, rows, scoring_label: str = "Latest stored"):
         )
 
 
-def _compare_experiments(records, rows):
+def _experiment_label(experiments: dict, value: str) -> str:
+    return f"{experiments[value].get('label', value)} ({value[:8]})"
+
+
+def _pick_experiment(container, label, options, key, experiments):
+    """A selectbox that keeps its choice when the options around it change.
+
+    Without a key Streamlit rebuilds the widget whenever its options change,
+    which is what made the candidate reset to the first experiment as soon as
+    anything else on the page moved.
+    """
+    if st.session_state.get(key) not in options:
+        st.session_state[key] = options[0]
+    return container.selectbox(
+        label,
+        options,
+        key=key,
+        format_func=lambda value: _experiment_label(experiments, value),
+    )
+
+
+def _experiment_info(records, rows):
+    """What one experiment holds: its questions, and which checks have scored them.
+
+    Every experiment is listed here, including one nothing has been scored
+    against, which is the case the comparison view cannot show.
+    """
     experiments = {
         r["experiment_id"]: r.get("experiment", {})
         for r in records
         if r.get("experiment_id")
     }
+    if not experiments:
+        st.info(
+            "No recorded experiments in this database. Legacy responses remain "
+            "available in the question review."
+        )
+        return
+    options = sorted(experiments, key=lambda e: _experiment_label(experiments, e))
+    chosen = _pick_experiment(st, "Experiment", options, "info_experiment", experiments)
+    group = [r for r in records if r.get("experiment_id") == chosen]
+    ids = {r["response_id"] for r in group}
+    stored = [row for row in rows if row["response_id"] in ids]
+    st.caption(
+        f"Gathered {min(r['timestamp'] for r in group)[:10]} to "
+        f"{max(r['timestamp'] for r in group)[:10]}"
+    )
+    st.dataframe(
+        [_display_counts(outcome_counts(group))],
+        hide_index=True,
+        width="stretch",
+        column_config=_column_help(OUTCOME_COLUMNS),
+    )
+    table, pending = coverage(group, stored, METRICS)
+    st.dataframe(
+        table,
+        hide_index=True,
+        width="stretch",
+        column_config=_column_help({**EXPERIMENT_INFO_COLUMNS, **METRIC_TOOLTIPS}),
+    )
+    st.caption(
+        "Each check column counts the responses that have a stored result for "
+        "that check, whatever the verdict was. A zero means the check has not "
+        "been run against that question; n/a means it does not cover those "
+        "runs, for example a deep research check on conversational runs."
+    )
+    if pending:
+        st.markdown(
+            f"**{len(pending)} check(s) cover a response here that has no "
+            "stored result.** Score them with:"
+        )
+        st.code(
+            f"python lex_eval/run_evals.py --experiment {chosen} "
+            f"--metrics {' '.join(pending)}",
+            language="bash",
+        )
+        st.caption(
+            "Add --dry-run first to see what it would score. Results already "
+            "stored are skipped. AI judge checks need OPENROUTER_API_KEY in "
+            "lex_eval/.env."
+        )
+    else:
+        st.caption(
+            "Every check that covers these runs has a stored result for every "
+            "response here."
+        )
+    with st.expander("Experiment conditions"):
+        st.json(
+            {
+                k: v
+                for k, v in experiments[chosen].get("config", {}).items()
+                if k != "questions"
+            }
+        )
+
+
+def _compare_experiments(records, rows):
+    # An experiment with no stored metric result has nothing to compare, so it
+    # is not offered here. Experiment info lists every experiment, scored or
+    # not, and says what is missing.
+    scored = {row["response_id"] for row in rows}
+    experiments = {
+        r["experiment_id"]: r.get("experiment", {})
+        for r in records
+        if r.get("experiment_id") and r["response_id"] in scored
+    }
     if len(experiments) < 2:
         st.info(
-            "Comparison needs two recorded experiments. Legacy responses remain available in the question review; dates alone do not establish matching conditions."
+            "Comparison needs two recorded experiments with stored metric results. Experiments that have not been scored are listed under Experiment info. Legacy responses remain available in the question review; dates alone do not establish matching conditions."
         )
         st.button(
             "Review repeated responses instead",
@@ -1648,45 +1780,94 @@ def _compare_experiments(records, rows):
             on_click=lambda: st.session_state.update(view="Review questions"),
         )
         return
-    options = sorted(experiments)
-    label = lambda value: f"{experiments[value].get('label', value)} ({value[:8]})"
+    # The two experiments come first: everything below, including which
+    # questions can be compared at all, follows from them.
+    options = sorted(experiments, key=lambda e: _experiment_label(experiments, e))
     left, right = st.columns(2)
-    baseline = left.selectbox("Baseline experiment", options, format_func=label)
-    candidate = right.selectbox(
-        "Candidate experiment", [e for e in options if e != baseline], format_func=label
+    baseline = _pick_experiment(
+        left, "Baseline experiment", options, "compare_baseline", experiments
+    )
+    candidate = _pick_experiment(
+        right,
+        "Candidate experiment",
+        [e for e in options if e != baseline],
+        "compare_candidate",
+        experiments,
     )
     sides = [
         [r for r in records if r.get("experiment_id") == exp]
         for exp in (baseline, candidate)
     ]
+    shared = shared_cohorts(*sides)
+    if not shared:
+        st.info(
+            "These two experiments have no question in common, asked with the "
+            "same wording and the same modes, so there is nothing to compare."
+        )
+        return
+    question_options = sorted({key[0] for key in shared})
+    st.session_state["compare_questions"] = [
+        q
+        for q in st.session_state.get("compare_questions", [])
+        if q in question_options
+    ]
+    chosen = st.multiselect(
+        "Questions",
+        question_options,
+        key="compare_questions",
+        format_func=lambda q: f"Q{q}",
+        help="Only the questions both experiments asked, with the same wording "
+        "and the same modes. Select none to use all of them.",
+    )
+    if chosen:
+        sides = [[r for r in side if r["question_id"] in chosen] for side in sides]
     st.caption(
         "Matched question wording, snapshot and modes only. The latest shared scoring version is selected per metric; missing measurements remain visible. Two repeats describe observations, not statistical certainty."
     )
-    summary, changes, outcomes = compare(*sides, apply_scope(rows))
+    scoped = apply_scope(rows)
+    summary, changes, outcomes = compare(*sides, scoped)
     st.dataframe(
         [summary],
         hide_index=True,
         width="stretch",
         column_config=_column_help(COMPARISON_SUMMARY_COLUMNS),
     )
+    totals = sorted(
+        metric_summary(*sides, scoped),
+        key=lambda row: _metric_sort_key({"metric_name": row["Check"]}),
+    )
+    if totals:
+        st.dataframe(
+            [change_counts(totals)],
+            hide_index=True,
+            width="stretch",
+            column_config=_column_help(COMPARISON_CHANGE_COUNT_COLUMNS),
+        )
+        st.dataframe(
+            totals,
+            hide_index=True,
+            width="stretch",
+            column_config=_column_help(COMPARISON_METRIC_COLUMNS),
+        )
     st.dataframe(
         [_display_counts(row) for row in outcomes],
         hide_index=True,
         width="stretch",
         column_config=_column_help(COMPARISON_OUTCOME_COLUMNS),
     )
-    if changes:
-        st.dataframe(
-            changes,
-            hide_index=True,
-            width="stretch",
-            column_config=_column_help(COMPARISON_CHANGE_COLUMNS),
-        )
-    else:
-        st.info("No matched metric results to compare.")
+    with st.expander("Per question detail"):
+        if changes:
+            st.dataframe(
+                changes,
+                hide_index=True,
+                width="stretch",
+                column_config=_column_help(COMPARISON_CHANGE_COLUMNS),
+            )
+        else:
+            st.info("No matched metric results to compare.")
     with st.expander("Experiment conditions"):
         for exp in (baseline, candidate):
-            st.write(label(exp))
+            st.write(_experiment_label(experiments, exp))
             st.json(
                 {
                     k: v
@@ -1695,10 +1876,10 @@ def _compare_experiments(records, rows):
                 }
             )
     matched_ids = {r["response_id"] for side in sides for r in side}
-    options = [r for r in records if r["response_id"] in matched_ids]
+    inspect = [r for r in records if r["response_id"] in matched_ids]
     selected = st.selectbox(
         "Inspect a response",
-        options,
+        inspect,
         format_func=lambda r: f"Response {r['response_id']}: Q{r['question_id']} ({r.get('experiment', {}).get('label', '')})",
     )
     _render_chat_interaction([selected])
@@ -1722,8 +1903,20 @@ def main() -> None:
         st.info("No response attempts in this database.")
         return
     view = st.radio(
-        "View", ["Review questions", "Compare experiments"], horizontal=True, key="view"
+        "View",
+        ["Review questions", "Compare experiments", "Experiment info"],
+        horizontal=True,
+        key="view",
     )
+    # The comparison view chooses its own experiments and then its own
+    # questions from what those two share, so the filters below, which narrow
+    # the records first, do not apply to it.
+    if view == "Compare experiments":
+        _compare_experiments(records, rows)
+        return
+    if view == "Experiment info":
+        _experiment_info(records, rows)
+        return
     active = {"Database": db_path.name}
     cols = st.columns(3)
     for col, field, label in zip(
@@ -1746,9 +1939,6 @@ def main() -> None:
         records = [r for r in records if r["question_id"] in selected_questions]
     ids = {r["response_id"] for r in records}
     rows = [r for r in rows if r["response_id"] in ids]
-    if view == "Compare experiments":
-        _compare_experiments(records, rows)
-        return
     experiments = {
         r.get("experiment_id")
         or "Legacy": r.get("experiment", {}).get("label", "Legacy, condition unknown")

@@ -137,15 +137,51 @@ was fixed or reproduced.
 
 ## Compare experiments
 
-The comparison view requires two recorded experiments. It matches question text,
-question snapshot, chat mode, and research mode, then selects the latest scoring
-version shared by both sides for each metric. Missing or incompatible results
-remain explicit; they cannot imply an improvement.
+The comparison view requires two recorded experiments with stored metric
+results; an experiment nothing has been scored against is listed under
+Experiment info instead. Choose the two first: the question filter below them
+offers only the questions both experiments asked, with the same wording,
+snapshot, chat mode and research mode, and selecting none uses all of them. The model and mode filters of the question review do not
+apply here, since both are properties of the experiments being compared.
+
+For each metric it selects the latest scoring version shared by both sides.
+Missing or incompatible results remain explicit; they cannot imply an
+improvement.
+
+Above the checks, one row counts how many of them the candidate passed more
+often, less often, or equally often, and how many could not be measured or
+compared at all.
+
+The summary has one row per check, totalled over the shared questions: measured
+passes out of measured runs, the mean of those scores, and how many runs the
+check could not measure, for each side. A shared question whose two sides used
+different scoring versions or different judges is counted under "Not compared"
+and is in none of those totals. The per question rows are behind
+**Per question detail**.
 
 Keep the model fixed when assessing a prompt change. A different model is a model
 comparison, and unknown deployment settings limit attribution in either case.
 Two repeats describe the observed outcomes, not statistical certainty. The
 comparison reports pass-frequency changes and execution outcomes separately.
+
+## Experiment info
+
+The **Experiment info** view lists every experiment, including one that has
+never been scored, which the comparison view cannot show. It reports the
+questions the experiment gathered, how many responses each returned an answer
+for, and, for every check, how many of those responses have a stored result.
+A check that does not cover a question's runs, for example a deep research
+check on conversational runs, reads "n/a" and is never reported as missing.
+
+Where a check still covers a response with no stored result, the view prints
+the command that scores it:
+
+```bash
+python lex_eval/run_evals.py --experiment EXPERIMENT_ID --metrics claim_support
+```
+
+Add `--dry-run` first to see what it would score. Results already stored are
+skipped, and AI judge checks need `OPENROUTER_API_KEY`.
 
 ## Storage and verification
 
