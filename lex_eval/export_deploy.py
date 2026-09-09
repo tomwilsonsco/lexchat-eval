@@ -17,8 +17,8 @@ export finishes by importing the copied tree in a subprocess that cannot see
 this repo, and reading the copied data through it. A gap fails the export
 rather than the deployed app.
 
-    python -m lex_eval.export_deploy --target ../lexchat-eval-streamlit
-    python -m lex_eval.export_deploy --target ../lexchat-eval-streamlit --push
+    python -m lex_eval.export_deploy
+    python -m lex_eval.export_deploy --push
 
 ``--push`` replaces the target's branch with a single commit, so the repo never
 accumulates Parquet blobs. Without it the tree is written and left for
@@ -181,22 +181,32 @@ def smoke_check(target: Path) -> None:
 
 
 def push(target: Path, branch: str) -> None:
-    """Replace *branch* with a single commit holding this build.
+    """Replace *branch* with a single parentless commit holding this build.
 
     Parquet is already compressed, so git cannot delta successive versions of
     it: every ordinary commit would add its full size to the repo forever. One
     replaced commit keeps the repo the size of one build.
+
+    The commit is built straight from the index rather than by checking out a
+    temporary branch, so this leaves nothing behind to collide with and can be
+    re-run after an interrupted attempt.
     """
 
     def run(*args: str) -> None:
         subprocess.run(["git", *args], cwd=target, check=True)
 
-    run("checkout", "--orphan", "_deploy_build")
+    def capture(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=target, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
     run("add", "-A")
-    run("commit", "-qm", f"deploy {date.today().isoformat()}")
-    run("push", "--force", "origin", f"_deploy_build:{branch}")
-    run("checkout", "-B", branch)
-    run("branch", "-D", "_deploy_build")
+    tree = capture("write-tree")
+    commit = capture("commit-tree", tree, "-m", f"deploy {date.today().isoformat()}")
+    run("push", "--force", "origin", f"{commit}:refs/heads/{branch}")
+    run("checkout", "-q", "-B", branch, commit)
+    # Left behind by a version of this script that used a temporary branch.
+    subprocess.run(["git", "branch", "-D", "_deploy_build"], cwd=target, check=False)
 
 
 def main() -> None:
@@ -235,6 +245,7 @@ def main() -> None:
     files = closure()
 
     if not args.skip_data:
+        print("Building deploy data from responses.db, this takes a minute...")
         make_deploy_db()
     if not any(DEPLOY_DATA.glob("*.parquet")):
         raise SystemExit(f"No Parquet found in {DEPLOY_DATA}; run without --skip-data")

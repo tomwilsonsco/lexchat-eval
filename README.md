@@ -189,41 +189,61 @@ deployment metadata, scoring previews, and the review-evidence export.
 
 ## Step 5 Build the deployed dashboard
 
-The dashboard is deployed from a separate public repository,
+To update the dashboard hosted on streamlit.io, run:
+
+```bash
+python -m lex_eval.export_deploy --push
+```
+
+That rebuilds the data, rebuilds the deploy repo from this one, and force-pushes
+it. streamlit.io redeploys from the new commit. Nothing else is needed.
+
+The dashboard is served from a separate public repository,
 [lexchat-eval-streamlit](https://github.com/tomwilsonsco/lexchat-eval-streamlit),
-so that opening the app from streamlit.io does not expose this one. That repo
-is a build output: nothing in it is edited by hand.
-
-First produce the data, as Parquet, one file per table:
-
-```bash
-python -m lex_eval.utils.db --deploy-db
-# Output: lex_eval/data/deploy/*.parquet
-
-# Custom output directory:
-python -m lex_eval.utils.db --deploy-db path/to/directory
-```
-
-`retrieval_context` is trimmed to 2,000 characters per item, and the retrieved
-text that nothing displays is dropped from `audit_json` and from each scoring
-run's reference snapshot. Parquet rather than DuckDB because DuckDB stores
-large text uncompressed, which made the copy too large to commit.
-`reports/data.py` reads either, so the dashboard is the same either way.
-
-Then build the deploy repo:
+so that opening the app from streamlit.io does not expose this one. That repo is
+a build output: nothing in it is edited by hand. Its checkout lives at
+`lexchat-eval-streamlit/` inside this repo and is gitignored, which is the
+default `--target`. Clone it there once:
 
 ```bash
-python -m lex_eval.export_deploy --target ../lexchat-eval-streamlit
-python -m lex_eval.export_deploy --target ../lexchat-eval-streamlit --push
+git clone git@github.com:tomwilsonsco/lexchat-eval-streamlit.git lexchat-eval-streamlit
 ```
 
-It copies every module the dashboard imports, the Parquet, and the reference
-answers reduced to the fields anything reads, writes `streamlit_app.py` and
-`requirements.txt`, then imports the copied tree in a subprocess that cannot
-see this repo. A module the copy is missing fails the export rather than the
-deployed app. `--push` replaces the target branch with a single commit, since
-Parquet cannot be delta-compressed and ordinary commits would grow that repo
-by a full copy every time.
+A sibling directory will not do, since only the repo directory itself is on
+persistent storage. Pass `--target` if you keep the checkout somewhere else.
+
+### What the one command does
+
+1. **Builds the data**, as Parquet, one file per table, into
+   `lex_eval/data/deploy/`. `retrieval_context` is trimmed to 2,000 characters
+   per item, and the retrieved text that nothing displays is dropped from
+   `audit_json` and from each scoring run's reference snapshot. Parquet rather
+   than DuckDB because DuckDB stores large text uncompressed, which made the
+   copy too large to commit. `reports/data.py` reads either, so the dashboard is
+   the same either way.
+2. **Builds the tree**: every module the dashboard imports, the Parquet, and the
+   reference answers reduced to the fields anything reads, plus a generated
+   `streamlit_app.py` and `requirements.txt`. The target is emptied first, so a
+   file dropped from this repo does not linger in the deployed one.
+3. **Proves it runs**, by importing the copied tree in a subprocess that cannot
+   see this repo. A module the copy is missing fails the export rather than the
+   deployed app.
+4. **Pushes**, if `--push` was given. The branch is replaced with a single
+   parentless commit, since Parquet cannot be delta-compressed and ordinary
+   commits would grow that repo by a full copy every time.
+
+### Flags
+
+| Flag | Effect |
+| --- | --- |
+| `--push` | Do step 4. Without it the tree is written and left for inspection, and you re-run with `--push` once it looks right. |
+| `--skip-data` | Skip step 1 and reuse the existing `lex_eval/data/deploy/*.parquet`. Use it on that second run. |
+| `--target DIR` | Deploy repo checkout to rebuild. Defaults to `lexchat-eval-streamlit/`. |
+| `--branch NAME` | Branch to replace. Defaults to `main`. |
+
+`python -m lex_eval.utils.db --deploy-db [directory]` builds only the Parquet.
+Step 1 above already calls it, so it is not a prerequisite of `export_deploy`;
+run it on its own only when you want the Parquet to look at.
 
 Neither `responses.db` nor `lex_eval/data/deploy/` is committed here.
 
