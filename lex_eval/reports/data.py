@@ -15,12 +15,36 @@ from lex_eval.utils.applicability import (
 )
 from lex_eval.utils.versioning import response_history
 
+# A Parquet file's name is the table it holds, and it is interpolated into a
+# CREATE VIEW, so only plain identifiers are accepted.
+_TABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _connect(path: Path):
+    """Open a results database: a DuckDB file, or a directory of Parquet.
+
+    The deploy copy is Parquet, one file per table. Reading it through views
+    means every query below is the same for both, so there is one dashboard
+    rather than one per storage format.
+    """
+    if not path.is_dir():
+        return duckdb.connect(str(path), read_only=True)
+    conn = duckdb.connect()
+    for file in sorted(path.glob("*.parquet")):
+        if not _TABLE_NAME_RE.match(file.stem):
+            continue
+        location = str(file).replace("'", "''")
+        conn.execute(
+            f"CREATE VIEW {file.stem} AS SELECT * FROM read_parquet('{location}')"
+        )
+    return conn
+
 
 def read_database(path: Path, metrics: list[tuple]) -> tuple[list[dict], list[dict]]:
     """Read old and current databases without running migrations."""
     if not path.exists():
         return [], []
-    with duckdb.connect(str(path), read_only=True) as conn:
+    with _connect(path) as conn:
         tables = {r[0] for r in conn.execute("SHOW TABLES").fetchall()}
         if "responses" not in tables:
             return [], []

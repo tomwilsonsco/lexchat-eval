@@ -55,10 +55,27 @@ from lex_eval.utils.db import (
 script_dir = Path(__file__).parent
 data_dir = script_dir.parent / "data"
 
-RESPONSES_DB = DEFAULT_DB
+# Where results are read from: the working database when there is one, and
+# otherwise the Parquet directory the deploy build writes. A deployed copy
+# ships only the Parquet, so it has to resolve without being told.
+RESPONSES_DB = DEFAULT_DB if DEFAULT_DB.exists() else data_dir / "deploy"
 
 
 DEFAULT_CHAT_MODE = "research"
+
+
+def _results_mtime(path: Path) -> int:
+    """Cache key for the results, whichever form they take.
+
+    A Parquet directory's own mtime does not move when a file inside it is
+    rewritten, so the newest file decides instead.
+    """
+    if path.is_dir():
+        return max(
+            (f.stat().st_mtime_ns for f in path.glob("*.parquet")),
+            default=0,
+        )
+    return path.stat().st_mtime_ns
 
 
 @st.cache_data
@@ -709,11 +726,77 @@ def _render_metric_body(
         _render_single_eval_result(raw, identity, records, show_reason=not covered(raw))
 
 
+# Readable headings for stored evidence fields. A field name is not always
+# enough on its own: "Statements" does not say whose statements they are,
+# which is the first thing a reviewer needs to know.
+_DETAIL_HEADINGS: dict[str, str] = {
+    "statements": "Reference answer statements",
+    "points": "Reference answer statements",
+    "claims": "Claims checked against the retrieved text",
+}
+
+# How a stored verdict reads on the page.
+_VERDICT_WORDS: dict[str, str] = {
+    "stated": "Stated",
+    "contradicted": "Contradicted",
+    "missing": "Not stated",
+    "supported": "Supported",
+    "unsupported": "Unsupported",
+}
+
+# Fields the verdict list already shows, so they are not repeated below it.
+_VERDICT_FIELDS = frozenset(
+    {"statements", "points", "claims", "contradicted_indexes", "contradiction_findings"}
+)
+
+
+def _verdict_items(details: dict) -> list[tuple[str, str, str]]:
+    """One (verdict, statement or claim, quote from the response) per item.
+
+    Reference Answer Agreement stores the statement text and the judge's
+    verdicts as two parallel lists, so neither says much alone: the statements
+    do not show how the response did, and the verdicts are bare indexes.
+    Claim Support already stores the two together.
+    """
+    items = details.get("points") or details.get("claims")
+    if not isinstance(items, list) or not all(isinstance(i, dict) for i in items):
+        return []
+    statements = details.get("statements") or []
+    contradicted = set(details.get("contradicted_indexes") or [])
+    # The contradiction judge call looks for nothing else, so its quote is the
+    # evidence for any contradiction the labelling call did not itself flag.
+    quotes = {
+        f["index"]: f["quote"]
+        for f in details.get("contradiction_findings") or []
+        if isinstance(f, dict) and f.get("contradicted") and f.get("quote")
+    }
+    rows = []
+    for position, item in enumerate(items, start=1):
+        index = item.get("index", position)
+        label = "contradicted" if index in contradicted else item.get("label", "")
+        text = item.get("claim") or (
+            statements[index - 1] if 0 < index <= len(statements) else ""
+        )
+        quote = quotes.get(index) or item.get("quote", "")
+        rows.append((_VERDICT_WORDS.get(label, label or "No verdict"), text, quote))
+    return rows
+
+
 def _render_details(details) -> None:
     """Stored per-claim evidence as prose, with the raw record still available."""
     if isinstance(details, dict):
+        verdicts = _verdict_items(details)
+        if verdicts:
+            key = "points" if details.get("points") else "claims"
+            st.markdown(f"**{_DETAIL_HEADINGS[key]}**")
+            for position, (verdict, text, quote) in enumerate(verdicts, start=1):
+                _reason_block(f"{position}. [{verdict}] {text}")
+                if quote:
+                    _reason_block(f"\u2003Response said: \u201c{quote}\u201d")
         for field, value in details.items():
-            heading = field.replace("_", " ").capitalize()
+            if verdicts and field in _VERDICT_FIELDS:
+                continue
+            heading = _DETAIL_HEADINGS.get(field, field.replace("_", " ").capitalize())
             if isinstance(value, str) and value:
                 st.markdown(f"**{heading}**")
                 _reason_block(value)
@@ -1896,9 +1979,12 @@ def main() -> None:
     with settings:
         db_path = Path(st.text_input("Results database", str(RESPONSES_DB)))
     if not db_path.exists():
-        st.info("No database at this path.")
+        st.info(
+            "No results at this path. Expected a DuckDB file, or a directory "
+            "of Parquet written by the deploy build."
+        )
         return
-    records, rows = load_dashboard(str(db_path), db_path.stat().st_mtime_ns)
+    records, rows = load_dashboard(str(db_path), _results_mtime(db_path))
     if not records:
         st.info("No response attempts in this database.")
         return

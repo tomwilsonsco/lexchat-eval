@@ -187,22 +187,45 @@ unknown experiment conditions.
 See [Experiments and reviewing results](lex_eval/docs/experiments.md) for commands,
 deployment metadata, scoring previews, and the review-evidence export.
 
-## Step 5 Compact database for deployment
+## Step 5 Build the deployed dashboard
 
-Produces a smaller copy of the database with `retrieval_context` trimmed to
-2,000 characters per item, suitable for committing to GitHub and deploying to
-Streamlit Cloud:
+The dashboard is deployed from a separate public repository,
+[lexchat-eval-streamlit](https://github.com/tomwilsonsco/lexchat-eval-streamlit),
+so that opening the app from streamlit.io does not expose this one. That repo
+is a build output: nothing in it is edited by hand.
+
+First produce the data, as Parquet, one file per table:
 
 ```bash
 python -m lex_eval.utils.db --deploy-db
-# Output: lex_eval/data/deploy.db
+# Output: lex_eval/data/deploy/*.parquet
 
-# Custom output path:
-python -m lex_eval.utils.db --deploy-db path/to/output.db
+# Custom output directory:
+python -m lex_eval.utils.db --deploy-db path/to/directory
 ```
 
-Commit `deploy.db` (not `responses.db`) to the repository. Configure
-Streamlit Cloud to point at `deploy.db`.
+`retrieval_context` is trimmed to 2,000 characters per item, and the retrieved
+text that nothing displays is dropped from `audit_json` and from each scoring
+run's reference snapshot. Parquet rather than DuckDB because DuckDB stores
+large text uncompressed, which made the copy too large to commit.
+`reports/data.py` reads either, so the dashboard is the same either way.
+
+Then build the deploy repo:
+
+```bash
+python -m lex_eval.export_deploy --target ../lexchat-eval-streamlit
+python -m lex_eval.export_deploy --target ../lexchat-eval-streamlit --push
+```
+
+It copies every module the dashboard imports, the Parquet, and the reference
+answers reduced to the fields anything reads, writes `streamlit_app.py` and
+`requirements.txt`, then imports the copied tree in a subprocess that cannot
+see this repo. A module the copy is missing fails the export rather than the
+deployed app. `--push` replaces the target branch with a single commit, since
+Parquet cannot be delta-compressed and ordinary commits would grow that repo
+by a full copy every time.
+
+Neither `responses.db` nor `lex_eval/data/deploy/` is committed here.
 
 ## Reference ("gold") answers
 
@@ -412,7 +435,7 @@ python -m lex_eval.utils.db --delete-response <ID>
 lex_eval/
 ├── data/
 │   ├── questions.json       # evaluation questions
-│   ├── deploy.db            # committed compact database for Streamlit Cloud
+│   ├── deploy/              # Parquet build output for the deploy repo (not committed)
 │   ├── reference_answers/   # gold answers: q{id}.md + reference_answers.json
 │   └── verbose_logs/        # per-question capture audit logs (gitignored)
 ├── docs/                    # permanent docs; docs/findings/ is local, dated notes

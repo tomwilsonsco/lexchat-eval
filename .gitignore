@@ -210,8 +210,14 @@ __marimo__/
 *.db
 
 
-# Local databases (deploy copy is intentionally committed; responses.db is not)
+# Local databases and build outputs. Neither is committed here: the deploy
+# data is Parquet, rebuilt by lex_eval/export_deploy.py, and it is committed
+# only in the separate public dashboard repo.
 lex_eval/data/responses.db
+lex_eval/data/deploy/
+
+# The deploy repo, cloned here so export_deploy.py can rebuild it.
+lexchat-eval-streamlit/
 lex_eval/data/debug_events.jsonl
 lex_eval/data/verbose_logs/
 

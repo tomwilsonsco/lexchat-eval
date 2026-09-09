@@ -3,6 +3,32 @@
 import json
 
 
+def _search_outcome(tool: dict, name: str) -> tuple[int | None, str | None]:
+    """How many items a search returned, and any error it reported.
+
+    Reads the stored result text when it is there. A deploy copy keeps the
+    count in ``result_count`` and folds the error into ``error`` instead of
+    carrying the text, so this reads that pair when the text has gone. The
+    count is None whenever it cannot be known either way.
+    """
+    error = tool.get("error")
+    if "result_count" in tool:
+        return tool["result_count"], error
+    raw = tool.get("raw_result")
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        parsed = None
+    items = (
+        parsed
+        if name == "search_legislation_sections"
+        else parsed.get("results") if isinstance(parsed, dict) else None
+    )
+    if not error and isinstance(parsed, dict):
+        error = parsed.get("error")
+    return (len(items) if isinstance(items, list) else None), error
+
+
 def searches(record: dict) -> list[dict]:
     audit = record.get("audit_json") or {}
     if isinstance(audit, str):
@@ -13,28 +39,15 @@ def searches(record: dict) -> list[dict]:
             name = tool.get("name", "")
             if not name.startswith("search_"):
                 continue
-            raw = tool.get("raw_result")
-            try:
-                parsed = json.loads(raw) if isinstance(raw, str) else raw
-            except (ValueError, TypeError):
-                parsed = None
-            items = (
-                parsed
-                if name == "search_legislation_sections"
-                else parsed.get("results") if isinstance(parsed, dict) else None
-            )
-            error = tool.get("error") or (
-                parsed.get("error") if isinstance(parsed, dict) else None
-            )
+            count, error = _search_outcome(tool, name)
             if error:
                 state, count = "Error", None
             elif tool.get("truncated") or tool.get("budget_blocked"):
                 state, count = "Unknown / incomplete", None
-            elif isinstance(items, list):
-                count = len(items)
+            elif count is not None:
                 state = "Empty" if not count else "Results returned"
             else:
-                state, count = "Unknown / incomplete", None
+                state = "Unknown / incomplete"
             rows.append(
                 {
                     "Response": record["response_id"],

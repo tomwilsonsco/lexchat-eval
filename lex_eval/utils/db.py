@@ -60,6 +60,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -1300,36 +1301,129 @@ def compact_db(path: Optional[Path] = None) -> Path:
 _DEPLOY_CONTEXT_CHARS = 2_000  # per context item
 
 
+def _slim_audit(audit_json: Optional[str]) -> Optional[str]:
+    """Drop the retrieved text from a stored audit trace.
+
+    The dashboard reads an audit for its searches and steps panel only, which
+    shows each delegation's title and report, each tool's name, arguments and
+    error, and how many items a search returned. It never shows the retrieved
+    text itself, and that text is most of the file: the LEX API responses
+    (``api_calls``) and the pre-summarisation tool results (``raw_result``).
+    Both go, along with ``final_result``, whose text the ``tools_called``
+    column already carries and is what the log actually renders. Each search's
+    item count is kept in ``result_count`` in place of
+    the text it was counted from, and any error the text carried folded into
+    the tool's own ``error`` so nothing is lost from the panel.
+
+    A copy slimmed this way can no longer re-derive retrieval context via
+    ``backfill_case_law_context``, which reads ``api_calls``. Run that against
+    ``responses.db``, which keeps the full trace.
+    """
+    if not audit_json:
+        return audit_json
+    try:
+        audit = json.loads(audit_json)
+    except (ValueError, TypeError):
+        logger.warning("audit_json is not valid JSON; copied unchanged")
+        return audit_json
+
+    from lex_eval.reports.diagnostics import _search_outcome
+
+    for delegation in audit.get("delegations", []):
+        for tool in delegation.get("tools", []):
+            name = tool.get("name", "")
+            if name.startswith("search_"):
+                count, error = _search_outcome(tool, name)
+                tool["result_count"] = count
+                if error:
+                    tool["error"] = error
+            tool.pop("raw_result", None)
+            tool.pop("api_calls", None)
+            tool.pop("final_result", None)
+    return json.dumps(audit)
+
+
+# Every field of a reference answer that anything downstream still reads: the
+# statements the dashboard shows, the review that decides whether a sign-off
+# holds, and the inputs to reference_fingerprint so a stored fingerprint can
+# still be recomputed. A reference's own tools_called and retrieval_context,
+# which are ~93% of each record, are read by nothing.
+_DEPLOY_REFERENCE_FIELDS = (
+    "question_id",
+    "question",
+    "research_mode",
+    "statements",
+    "review",
+    "reference_sha256",
+    "final_answer",
+    "sources_retrieved",
+    "cases_retrieved",
+)
+
+
+def _slim_reference(record: Dict[str, Any]) -> Dict[str, Any]:
+    """One reference answer reduced to the fields the dashboard still needs."""
+    return {k: record[k] for k in _DEPLOY_REFERENCE_FIELDS if k in record}
+
+
+def _slim_scoring_config(config_json: str) -> str:
+    """Drop the research evidence from a scoring run's reference snapshot.
+
+    Every scoring run embeds the whole reference manifest, so the same
+    evidence is stored once per run. The dashboard reads only each snapshot's
+    statements and fingerprint.
+    """
+    try:
+        config = json.loads(config_json)
+    except (ValueError, TypeError):
+        return config_json
+    references = config.get("references")
+    if isinstance(references, dict):
+        config["references"] = {
+            qid: _slim_reference(record) if isinstance(record, dict) else record
+            for qid, record in references.items()
+        }
+    return json.dumps(config)
+
+
 def make_deploy_db(
     source_path: Optional[Path] = None,
     output_path: Optional[Path] = None,
 ) -> Path:
     """
-    Write a deploy copy of the database with ``retrieval_context`` trimmed to
-    ``_DEPLOY_CONTEXT_CHARS`` characters per item.
+    Write a deploy copy of the database as Parquet, one file per table.
 
-    All other data (``actual_output``, ``tools_called``, ``eval_results``) is
-    copied verbatim.  The source database is never modified.
+    ``retrieval_context`` is trimmed to ``_DEPLOY_CONTEXT_CHARS`` per item, and
+    the retrieved text nothing displays is dropped from ``audit_json`` and from
+    each scoring run's reference snapshot. Everything the dashboard reads is
+    copied verbatim, and the source database is never modified.
+
+    Parquet rather than DuckDB because DuckDB stores large text uncompressed:
+    the same data is about nine times smaller this way, which is what makes the
+    copy small enough to commit. ``reports/data.py`` reads either.
 
     Args:
         source_path: Path to the source DB (default: ``data/responses.db``).
-        output_path: Destination path (default: ``data/deploy.db``).
+        output_path: Destination directory (default: ``data/deploy/``).
 
     Returns:
-        The path of the written deploy database.
+        The path of the written deploy directory.
     """
     source_path = source_path or DEFAULT_DB
-    output_path = output_path or (DATA_DIR / "deploy.db")
+    output_path = output_path or (DATA_DIR / "deploy")
 
     if not source_path.exists():
         raise FileNotFoundError(f"Source database not found: {source_path}")
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    if output_path.exists():
-        output_path.unlink()
+    output_path.mkdir(parents=True, exist_ok=True)
+    for stale in output_path.glob("*.parquet"):
+        stale.unlink()
 
+    # Built in a scratch DuckDB so the existing insert paths are reused, then
+    # exported. Nothing keeps the scratch file.
+    scratch = tempfile.TemporaryDirectory()
     src = get_connection(source_path, read_only=True)
-    dst = get_connection(output_path)
+    dst = get_connection(Path(scratch.name) / "build.db")
     try:
         # Recreate schema in the destination
         init_db(dst)
@@ -1352,6 +1446,7 @@ def make_deploy_db(
         ).fetchall()
 
         trimmed_count = 0
+        audit_saved = 0
         max_id = 0
         for row in rows:
             (
@@ -1395,6 +1490,9 @@ def make_deploy_db(
             if trimmed != ctx:
                 trimmed_count += 1
 
+            slim_audit = _slim_audit(audit_json)
+            audit_saved += len(audit_json or "") - len(slim_audit or "")
+
             max_id = max(max_id, response_id)
             dst.execute(
                 _INSERT_RESPONSE_WITH_ID,
@@ -1431,7 +1529,7 @@ def make_deploy_db(
                     local_cache_hits or 0,
                     memo_hits or 0,
                     audit_schema_version,
-                    audit_json,
+                    slim_audit,
                     research_plan_json,
                     bool(needs_clarification),
                     clarification_question,
@@ -1487,22 +1585,40 @@ def make_deploy_db(
         ):
             if table in source_tables:
                 rows = src.execute(f"SELECT * FROM {table}").fetchall()
+                if table == "scoring_runs":
+                    # config carries a full reference snapshot per run, and the
+                    # runs hold identical copies of it.
+                    rows = [(*row[:-1], _slim_scoring_config(row[-1])) for row in rows]
                 if rows:
                     placeholders = ", ".join("?" for _ in rows[0])
                     dst.executemany(
                         f"INSERT INTO {table} VALUES ({placeholders})", rows
                     )
         dst.execute("CHECKPOINT")
+
+        # One Parquet file per table, named for it, which is what
+        # reports/data.py::_connect turns back into views.
+        written = 0
+        for (name,) in dst.execute("SHOW TABLES").fetchall():
+            target = str(output_path / f"{name}.parquet").replace("'", "''")
+            dst.execute(
+                f"COPY {name} TO '{target}' "
+                "(FORMAT parquet, COMPRESSION zstd, COMPRESSION_LEVEL 9)"
+            )
+            written += 1
     finally:
         src.close()
         dst.close()
+        scratch.cleanup()
 
     before = source_path.stat().st_size / 1024 / 1024
-    after = output_path.stat().st_size / 1024 / 1024
+    after = sum(f.stat().st_size for f in output_path.glob("*.parquet")) / 1024 / 1024
     print(
-        f"Deploy DB written to {output_path}\n"
+        f"Deploy data written to {output_path}\n"
         f"  Source : {before:.1f} MB\n"
-        f"  Deploy : {after:.1f} MB ({trimmed_count} response row(s) trimmed, "
+        f"  Deploy : {after:.1f} MB across {written} Parquet file(s) "
+        f"({trimmed_count} response row(s) trimmed, "
+        f"{audit_saved / 1024 / 1024:.1f} MB of audit text dropped, "
         f"{eval_row_count} eval result row(s) copied)"
     )
     return output_path
@@ -1522,8 +1638,8 @@ if __name__ == "__main__":
     )
     _parser.add_argument(
         "--deploy-db",
-        metavar="OUTPUT",
-        help="Write a deploy copy with retrieval_context trimmed (default: data/deploy.db)",
+        metavar="OUTPUT_DIR",
+        help="Write the deploy data as Parquet, one file per table (default: data/deploy/)",
         nargs="?",
         const="",  # sentinel: use default path
     )

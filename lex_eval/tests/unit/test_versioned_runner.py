@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from lex_eval import run_evals
+from lex_eval.reports.data import _connect
 from lex_eval.utils import db, versioning
 
 pytestmark = pytest.mark.unit
@@ -89,7 +90,7 @@ def test_compatible_results_skip_and_changed_code_appends(tmp_path, monkeypatch)
 
 
 def test_deployment_copy_preserves_history_and_sparse_eval_ids(tmp_path):
-    source, target = tmp_path / "source.db", tmp_path / "deploy.db"
+    source, target = tmp_path / "source.db", tmp_path / "deploy"
     conn = db.get_connection(source)
     db.init_db(conn)
     exp, gather = versioning.start_gather(
@@ -128,9 +129,10 @@ def test_deployment_copy_preserves_history_and_sparse_eval_ids(tmp_path):
     before = source.read_bytes()
     db.make_deploy_db(source, target)
     assert source.read_bytes() == before
-    conn = db.get_connection(target, read_only=True)
-    assert conn.execute(
-        "SELECT e.id, v.scoring_run_id FROM eval_tool_usage e JOIN eval_versions v ON v.eval_id=e.id"
-    ).fetchall() == [(2, run)]
-    assert conn.execute("SELECT experiment_id FROM response_runs").fetchone()[0] == exp
-    conn.close()
+    with _connect(target) as conn:
+        assert conn.execute(
+            "SELECT e.id, v.scoring_run_id FROM eval_tool_usage e JOIN eval_versions v ON v.eval_id=e.id"
+        ).fetchall() == [(2, run)]
+        assert (
+            conn.execute("SELECT experiment_id FROM response_runs").fetchone()[0] == exp
+        )
