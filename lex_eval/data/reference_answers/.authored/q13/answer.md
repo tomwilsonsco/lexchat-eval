@@ -1,8 +1,8 @@
 ### 1. Summary Answer (BLUF)
 
-**The list is empty. No secondary legislation has ever been made under section 117 of the Education (Scotland) Act 1962.**
+**No instrument can be listed. Nothing retrieved connects any statutory instrument to section 117 of the Education (Scotland) Act 1962, so the answer is that no such instrument can be identified from these sources.**
 
-That is the whole answer, and it is the answer a correct response must reach. The failure this question exists to catch is the opposite: producing a list of real, correctly cited, correctly linked statutory instruments and asserting that each was made under section 117, when none of them was.
+The failure this question exists to catch is the opposite: producing a list of real, correctly cited, correctly linked statutory instruments and asserting that each was made under section 117, when nothing retrieved says so.
 
 A second, compounding problem sits underneath it. **The Education (Scotland) Act 1962 could not be retrieved at all** from the available legislation sources. Section 117 was never read. An answer that lists instruments made under a provision it could not open is not a partial answer, it is an invented one.
 
@@ -38,13 +38,15 @@ Every one of these is a real instrument. **None of them was retrieved with any e
 
 Listing any of them as "made under section 117" would be asserting a fact that was never retrieved. That is precisely the recorded failure mode for this question.
 
-#### 2.3 Why the correct answer is "none"
+#### 2.3 What the correct answer is
 
-The reviewer's position, and the answer against which a response should be measured, is that **no secondary legislation has ever been made under section 117 of the 1962 Act**. An enabling power that is never exercised is unremarkable: Acts routinely carry powers that are never used, and the 1962 Act was in any event overtaken by the consolidating Education (Scotland) Act 1980.
+The answer a response is measured against is that **no instrument can be identified as made under section 117 from the sources available**. The Act could not be read and no retrieved source connects any instrument to the power, so there is nothing to list.
+
+An enabling power that is never exercised is unremarkable: Acts routinely carry powers that are never used, and the 1962 Act was in any event overtaken by the consolidating Education (Scotland) Act 1980. **The reviewer's understanding is that the list is in fact empty.** That understanding comes from outside this research, so it is recorded here for the reviewer and is not part of what a response is scored against; a response is not marked down for declining to assert an empty list it cannot verify.
 
 So there are two acceptable shapes for a correct response, and one unacceptable one:
 
-- **Correct.** "No secondary legislation has been made under section 117 of the Education (Scotland) Act 1962; the list is empty."
+- **Correct.** "No secondary legislation can be identified as made under section 117 of the Education (Scotland) Act 1962."
 - **Also acceptable.** "I could not retrieve the Education (Scotland) Act 1962 or its section 117, so I cannot confirm what was made under it," said plainly and without a list.
 - **Wrong.** Any list of instruments presented as having been made under section 117.
 

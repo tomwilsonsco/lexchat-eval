@@ -7,7 +7,7 @@ The route to that answer is the Act's own commencement provision read with the c
 - **Section 130(1)** put only part of the Act on an appointed-day footing: sections 19 to 43, Parts II to V, sections 117 to 124 and part of section 125. Everything else came into force on Royal Assent, 19 November 1998.
 - **The Scotland Act 1998 (Commencement) Order 1998 ([uksi/1998/3178](http://www.legislation.gov.uk/id/uksi/1998/3178))** then commenced the rest. Article 2(1) brought all remaining provisions into force on **1 July 1999**, except those in Schedule 5, and article 3 names 1 July 1999 as **the principal appointed day**. The Schedule 5 provisions followed on **1 April 2000**.
 
-**In-force status must rest on legislation.** It is established by a commencement provision, a commencement instrument, or the absence of any commencement requirement, and by checking that the Act has not been repealed. A judgment that happens to apply an Act is corroboration at best. Most statutes have never been litigated, so the absence of case law proves nothing, and its presence proves only that the Act was in force at the time of the facts in that case, in the respects the court considered.
+**In-force status rests on legislation.** It is established by a commencement provision, a commencement instrument, or the absence of any commencement requirement, and by checking that the Act has not been repealed. A judgment applying the Act is legitimate corroboration and an answer is right to offer it as such; what it cannot do is carry the answer on its own, because most statutes have never been litigated and a judgment shows only that the provisions it considered were operative at the time of those events.
 
 ---
 
@@ -51,7 +51,7 @@ The reasoning does not run the other way, for three reasons:
 2. **A judgment is evidence of the past, and only of what it considered.** *For Women Scotland* shows the court treating section 29 and Schedule 5 as operative. It says nothing about section 130, section 120, or any other provision the court had no reason to look at, and nothing about a provision repealed since.
 3. **It answers a different question.** Courts decide the disputes in front of them. Commencement is decided by Parliament in the Act, and by the Minister in the commencement instrument.
 
-A statement that the Act is in force, supported only by a judgment that cites it, can be a correct conclusion reached by an unsound route. The correct answer, on the correct route, is section 130 plus the 1998 Order.
+A statement that the Act is in force, supported **only** by a judgment that cites it, can be a correct conclusion reached by an unsound route. The correct answer, on the correct route, is section 130 plus the 1998 Order, with the case law as corroboration if the answer wants it.
 
 #### 2.4 A note on searching for the Act
 

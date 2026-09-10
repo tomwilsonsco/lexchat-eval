@@ -4,5 +4,6 @@
   {"tool": "search_legislation", "args": {"query": "The Care Reform (Scotland) Act 2025 (Commencement No. 1) Regulations 2025"}},
   {"tool": "search_legislation", "args": {"query": "care reform commencement regulations national care service Scotland"}},
   {"tool": "search_legislation_sections", "args": {"query": "commencement coming into force short title", "legislation_id": "asp/2025/9"}},
-  {"tool": "get_legislation_text", "args": {"legislation_id": "asp/2025/9"}}
+  {"tool": "get_legislation_text", "args": {"legislation_id": "asp/2025/9"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "ssi/2025/388"}}
 ]

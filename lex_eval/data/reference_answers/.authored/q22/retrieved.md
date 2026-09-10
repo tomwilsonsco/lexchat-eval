@@ -384,6 +384,9 @@ The Scottish Ministers may by regulations modify—
 }
 ```
 
+### Care Reform (Scotland) Act 2025
+`http://www.legislation.gov.uk/id/asp/2025/9`
+
 Section 1) **Ministers to facilitate creation of records**
 
 1) The Scottish Ministers must exercise their powers under this Part so that every person who receives health care or a social service in Scotland can have a digital integrated care record. 
@@ -1185,3 +1188,15 @@ Section 39) **Commencement**
 
 Section 40) **Short title**
 The short title of this Act is the Care Reform (Scotland) Act 2025.
+
+---
+
+## `get_legislation_text`, HTTP 404
+
+```json
+{
+ "legislation_id": "ssi/2025/388"
+}
+```
+
+

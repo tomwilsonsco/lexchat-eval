@@ -1,5 +1,5 @@
 {
-  "scope_note": "Covers the process for reporting and publishing Scottish Water's accounts, cited to the subsection that carries each requirement. Limited to legislation. The diagnostic twin of question 7, where the same general public finance Act must be discovered rather than named.",
+  "scope_note": "Covers the process for reporting and publishing Scottish Water's reports and accounts, both tracks: the accounts under section 45 with the deadlines in the Public Finance and Accountability (Scotland) Act 2000, and the interim and whole-year reports under section 57. Cited to the subsection that carries each requirement. Limited to legislation. The diagnostic twin of question 7, where the same general public finance Act must be discovered rather than named.",
   "steps": [
     {
       "title": "Retrieve Scottish Water's accounts duty at subsection level",
@@ -12,6 +12,10 @@
     {
       "title": "Establish the auditor's obligations",
       "detail": "Identify the provisions governing who audits the account and what the auditor's report must set out."
+    },
+    {
+      "title": "Establish the reporting track and the laying duties",
+      "detail": "Retrieve the provisions requiring interim and whole-year reports on activities, what each must contain, who receives a copy, and which actor must publish the report and lay it before the Parliament."
     }
   ]
 }
