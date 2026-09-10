@@ -308,12 +308,16 @@ def retrieve(src: Path, searches: List[Dict[str, Any]], mode: str) -> int:
                         "",
                     ]
             elif call.tool == "get_legislation_text":
-                full = (
-                    call.response.get("full_text", "")
-                    if isinstance(call.response, dict)
-                    else ""
-                )
-                lines += [full, ""]
+                body = call.response if isinstance(call.response, dict) else {}
+                leg = body.get("legislation") or {}
+                # An instrument can be held with no section text at all, and a
+                # commencement instrument's description is then the only thing
+                # retrieved about it. Printing the full text alone loses it.
+                if leg.get("title"):
+                    lines += [f"### {leg['title']}", f"`{leg.get('uri', '')}`", ""]
+                if leg.get("description"):
+                    lines += [leg["description"], ""]
+                lines += [body.get("full_text", ""), ""]
             elif call.tool == "search_case_law":
                 results = (call.response or {}).get("results") or []
                 for case in results:

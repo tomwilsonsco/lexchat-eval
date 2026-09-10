@@ -1,6 +1,8 @@
 ### 1. Summary Answer (BLUF)
 
-**A comprehensive list cannot be given, and any answer that presents one is wrong.** Scots law has no general statutory definition of "shop". Each Act that needs the word defines it for its own purposes, the definitions differ from each other, and there is no index of them. The honest answer names the definitions that can be found and says the list is not exhaustive.
+**There is no general statutory definition of "shop" in Scots law.** Each Act that needs the word defines it for its own purposes, and the definitions differ from each other in ways that matter. An answer has to name the definitions it found and say which Act each belongs to.
+
+The definitions below are the ones these searches reached. They are not put forward as the whole population, and a longer list found by a wider search is a better answer, not a contradictory one.
 
 The second trap is currency. The **Shops Act 1950** is the statute most readily associated with this question, and **sections 38 and 39 of it are repealed**. Citing them as current law, or asserting that every provision relied on is in force, is the specific failure this question exists to catch.
 
@@ -76,7 +78,7 @@ Relatedly, the **Sunday Trading Act 1994** was returned with **extent "England, 
 ### 3. Jurisdiction & Status
 
 - **Extent.** The 2007 Act and the 2021 Act extend to Scotland. The Employment Rights Act 1996 was returned with United Kingdom extent and its shop worker provisions apply in Scotland. The Sunday Trading Act 1994 extends to England and Wales only.
-- **Not exhaustive.** These are the definitions found by the searches run. Others certainly exist in Scots law, in planning, rating, licensing and health and safety legislation among others. The correct answer states this limit rather than implying completeness.
+- **Not exhaustive.** These are the definitions found by the searches run. Others certainly exist in Scots law, in planning, rating, licensing and health and safety legislation among others. A response that lists more of them is going further than this answer, not disagreeing with it.
 - **Out of scope.** No definition is offered from the Shops Act 1950: it could not be retrieved, and the provisions usually cited from it are repealed.
 - **Not addressed.** Case law on the meaning of "shop" is outside this question's legislation-only scope.
 

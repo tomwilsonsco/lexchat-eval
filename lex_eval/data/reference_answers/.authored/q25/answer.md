@@ -8,7 +8,7 @@ The question asks for an intersection of two sets: instruments **made under sect
 
 So the population cannot be enumerated, and an answer that offers a list as if it were complete is misrepresenting the search it ran. The reviewers put the population at **33 instruments**; that figure comes from a source other than these tools.
 
-One member of the intersection can be confirmed by direct retrieval: **SSI 2024/311** was made under section 95 and its text contains the £ symbol.
+One instrument gets as close as these tools allow: **SSI 2024/311** is an ancillary-provision instrument under the 2018 Act whose retrieved text contains the £ symbol. Its preamble is not retrievable either, so even here the enabling power cannot be read off the text.
 
 ---
 
@@ -44,9 +44,11 @@ The enabling power is recorded only in that missing preamble. Section searching 
 
 This is a **tool limitation, not a gap in the law**. The information exists on legislation.gov.uk; it is simply not in what these tools return. That distinction belongs in the answer, because it tells the user where to go instead rather than leaving them thinking the question is unanswerable in principle.
 
-#### 2.3 What can be confirmed
+#### 2.3 What can be confirmed, and what still cannot
 
-**SSI 2024/311**, the Disability Assistance (Scottish Adult Disability Living Allowance) (Consequential Amendment, Revocation and Saving Provision) Regulations 2024, was made under section 95 and **its text contains the £ symbol**. Its title is itself the signature of an ancillary-power instrument: "Consequential Amendment, Revocation and Saving Provision" tracks the language of section 95 almost word for word.
+**SSI 2024/311**, the Disability Assistance (Scottish Adult Disability Living Allowance) (Consequential Amendment, Revocation and Saving Provision) Regulations 2024, was retrieved in full and **its text contains the £ symbol**. Its title is the signature of an ancillary-power instrument: "Consequential Amendment, Revocation and Saving Provision" tracks the language of section 95 almost word for word.
+
+What the retrieval does **not** show is that it was made under section 95. Its preamble is missing in exactly the way described at 2.2, so the enabling power is inferred from the title and subject matter, not read. That is the same limitation this answer relies on elsewhere, and it applies here too.
 
 Its opening provision:
 
@@ -72,6 +74,7 @@ Confirming one member of a set is not enumerating the set. It shows the answer i
 - **The £ criterion.** Testable only once an instrument is identified. It cannot be used to narrow a search, because the tools do not offer full-text search across instruments.
 - **Population size.** The figure of 33 instruments is the reviewers' count and is not derived from the retrieval here. It is recorded to show the scale of what is being missed, not cited as a retrieved fact.
 - **Not addressed.** How many of the 33 contain the £ symbol is not stated. Only SSI 2024/311 was retrieved and checked.
+- **Outside the audit trail.** The reviewer's record has SSI 2024/311 made under section 95, and the population at 33 instruments. Neither can be read from the retrieval here, so both are recorded for the reviewer and are not part of what a response is scored against.
 
 ---
 
@@ -79,4 +82,4 @@ Confirming one member of a set is not enumerating the set. It shows the answer i
 
 - [Social Security (Scotland) Act 2018, s.95 - Ancillary provision](http://www.legislation.gov.uk/asp/2018/9/section/95)
 - [Social Security (Scotland) Act 2018, s.99 - Commencement](http://www.legislation.gov.uk/asp/2018/9/section/99)
-- The Disability Assistance (Scottish Adult Disability Living Allowance) (Consequential Amendment, Revocation and Saving Provision) Regulations 2024, `ssi/2024/311` (full text retrieved; contains the £ symbol)
+- The Disability Assistance (Scottish Adult Disability Living Allowance) (Consequential Amendment, Revocation and Saving Provision) Regulations 2024, `ssi/2024/311` (full text retrieved; contains the £ symbol; preamble, and so the enabling power, not retrievable)

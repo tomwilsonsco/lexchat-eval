@@ -789,6 +789,11 @@ Section 26) **Regulation-making powers**
 }
 ```
 
+### The Social Security (Amendment) (Scotland) Act 2025 (Commencement No. 1 and Saving and Transitional Provisions) Regulations 2025
+`http://www.legislation.gov.uk/id/ssi/2025/119`
+
+These Regulations bring sections 2, 9, 17, 20, 21, 22, and 23 of the Social Security (Scotland) (Amendment) Act 2025 (“the Act”) into force on 10 May 2025.
+
 No text content available for this legislation.
 
 ---
