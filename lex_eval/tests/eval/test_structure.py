@@ -28,6 +28,7 @@ from lex_eval.metrics.structure import (
     StepCompletionMetric,
 )
 from lex_eval.utils.collector import attach_metric
+from lex_eval.utils.applicability import exclusion
 from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
     load_records,
@@ -54,6 +55,23 @@ _skip_no_api_key = pytest.mark.skipif(
     _judge is None,
     reason="Configured judge API key not set (check lex_eval/.env)",
 )
+
+
+def _gate_scope(request, record, key):
+    reason = exclusion(key, record)
+    if reason:
+        attach_metric(
+            request,
+            record=record,
+            test_name=key,
+            metric_name=key.replace("_", " ").title(),
+            score=0.0,
+            threshold=1.0,
+            passed=False,
+            measured=False,
+            reason=reason,
+        )
+        pytest.skip(reason)
 
 
 @pytest.mark.parametrize(
@@ -100,6 +118,8 @@ def test_mandatory_structure(request, record):
         reason=metric.reason,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason
 
 
@@ -133,6 +153,8 @@ def test_citation_passthrough(request, record):
         reason=metric.reason,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason
 
 
@@ -150,6 +172,7 @@ def test_citation_grounding(request, record):
     Records with no delegate_research call automatically score 0.0.
     Records with no citation URLs at all score 1.0 (nothing to ground).
     """
+    _gate_scope(request, record, "citation_grounding")
     test_case = record_to_test_case(record)
     metric = CitationGroundingMetric(threshold=1.0)
     metric.measure(test_case)
@@ -165,6 +188,8 @@ def test_citation_grounding(request, record):
         reason=metric.reason,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason
 
 
@@ -183,6 +208,7 @@ def test_citation_read(request, record):
     Records with no delegate_research call automatically score 0.0.
     Records with no legislation.gov.uk citations score 1.0 (nothing to check).
     """
+    _gate_scope(request, record, "citation_read")
     test_case = record_to_test_case(record)
     metric = CitationReadMetric(threshold=1.0)
     metric.measure(test_case)
@@ -198,6 +224,8 @@ def test_citation_read(request, record):
         reason=metric.reason,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason
 
 
@@ -233,6 +261,8 @@ def test_citation_domain(request, record):
         reason=metric.reason,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason
 
 
@@ -252,6 +282,7 @@ def test_genuine_gap(request, record):
     Conversational records accept a plain-English disclosure in full, since
     their Worker prompt mandates no exact wording.
     """
+    _gate_scope(request, record, "genuine_gap")
     test_case = record_to_test_case(record)
     research_mode = record.get("research_mode", "legislation_only")
     metric = GenuineGapMetric(
@@ -272,6 +303,8 @@ def test_genuine_gap(request, record):
         reason=metric.reason,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason
 
 
@@ -301,6 +334,7 @@ def test_step_completion(request, record):
         )
         pytest.skip(_NOT_DEEP_RESEARCH)
 
+    _gate_scope(request, record, "step_completion")
     test_case = record_to_test_case(record)
     metric = StepCompletionMetric(threshold=1.0)
     metric.measure(test_case)
@@ -316,6 +350,8 @@ def test_step_completion(request, record):
         reason=metric.reason,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason
 
 
@@ -347,6 +383,7 @@ def test_report_integration(request, record):
         )
         pytest.skip(_NOT_DEEP_RESEARCH_INTEGRATION)
 
+    _gate_scope(request, record, "report_integration")
     test_case = record_to_test_case(record)
     metric = ReportIntegrationMetric(model=_judge, threshold=1.0)
     _judge.last_model, _judge.total_usage_tokens = None, None
@@ -365,4 +402,6 @@ def test_report_integration(request, record):
         judge_tokens=_judge.total_usage_tokens,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason

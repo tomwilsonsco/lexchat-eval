@@ -28,6 +28,7 @@ def attach_metric(
     judge_tokens: Optional[int] = None,
     measured: Optional[bool] = None,
     reference: Optional[Dict[str, Any]] = None,
+    details: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Attach metric result data to the pytest test item.
@@ -66,6 +67,7 @@ def attach_metric(
         reference_version(reference) if reference else (None, None)
     )
     request.node._metric_data = {
+        "details": details,
         "response_id": record.get("response_id"),
         "llm_name": record["llm_name"],
         "question_id": record["question_id"],

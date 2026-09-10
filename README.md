@@ -137,9 +137,12 @@ python lex_eval/run_evals.py -v
 ```
 
 Each metric writes to its own `eval_<metric>` table in `lex_eval/data/responses.db`.
-By default, a response already scored for a metric is skipped for it, use
-`--overwrite` to clear and force re-running, or `--append` to re-run without
-clearing (useful for testing a metric's determinism).
+By default, only scores with compatible code, judge configuration, and reference
+versions are skipped. Normal rescoring preserves historical rows. Use `--dry-run`
+to preview pending work without writes or judge calls, especially before the first
+judge sweep over legacy results whose scoring version is unknown. `--append`
+repeats compatible measurements too; `--overwrite` explicitly clears selected
+results and cannot be combined with an experiment filter.
 
 ### Evaluation requirements
 
@@ -159,24 +162,90 @@ clearing (useful for testing a metric's determinism).
 streamlit run lex_eval/reports/streamlit_report.py
 ```
 
-The dashboard reads directly from `lex_eval/data/responses.db`.
+The dashboard reads `lex_eval/data/responses.db` without modifying it. Filter by
+model, chat mode, research mode, and experiment, then inspect questions and their
+failure stages. The question table leads with what needs attention, failed checks,
+measurement gaps and execution warnings, and clicking a row opens that question.
+Stored contradiction failures stay failures, mixed repeats remain mixed, and
+clarification, errors, halts, and report repair are shown separately. A check with
+no verdict says whether it does not apply, could not be measured, is not
+comparable, or was never scored against that response. Every panel names a
+response the same way, repeat answers can be read side by side with their own
+check results, and the review evidence exports as JSON and as a readable
+Markdown report carrying each score's provenance. Reviewer notes typed into the
+export panel are kept for the browser session against that question.
 
-## Step 5 Compact database for deployment
+Use `--label` and `--experiment-id` when gathering to identify repeat sweeps.
+Scoring runs have their own identity, so rejudging an answer cannot count as an
+extra response. The comparison view matches questions and compatible scoring
+versions across two recorded experiments that have been scored. Experiment info
+lists every experiment, scored or not, with the questions it gathered, which
+checks have a result for each of them, and the `run_evals.py` command for the
+checks still missing one. Existing results remain labelled as legacy, with
+unknown experiment conditions.
 
-Produces a smaller copy of the database with `retrieval_context` trimmed to
-2,000 characters per item, suitable for committing to GitHub and deploying to
-Streamlit Cloud:
+See [Experiments and reviewing results](lex_eval/docs/experiments.md) for commands,
+deployment metadata, scoring previews, and the review-evidence export.
+
+## Step 5 Build the deployed dashboard
+
+To update the dashboard hosted on streamlit.io, run:
 
 ```bash
-python -m lex_eval.utils.db --deploy-db
-# Output: lex_eval/data/deploy.db
-
-# Custom output path:
-python -m lex_eval.utils.db --deploy-db path/to/output.db
+python -m lex_eval.export_deploy --push
 ```
 
-Commit `deploy.db` (not `responses.db`) to the repository. Configure
-Streamlit Cloud to point at `deploy.db`.
+That rebuilds the data, rebuilds the deploy repo from this one, and force-pushes
+it. streamlit.io redeploys from the new commit. Nothing else is needed.
+
+The dashboard is served from a separate public repository,
+[lexchat-eval-streamlit](https://github.com/tomwilsonsco/lexchat-eval-streamlit),
+so that opening the app from streamlit.io does not expose this one. That repo is
+a build output: nothing in it is edited by hand. Its checkout lives at
+`lexchat-eval-streamlit/` inside this repo and is gitignored, which is the
+default `--target`. Clone it there once:
+
+```bash
+git clone git@github.com:tomwilsonsco/lexchat-eval-streamlit.git lexchat-eval-streamlit
+```
+
+A sibling directory will not do, since only the repo directory itself is on
+persistent storage. Pass `--target` if you keep the checkout somewhere else.
+
+### What the one command does
+
+1. **Builds the data**, as Parquet, one file per table, into
+   `lex_eval/data/deploy/`. `retrieval_context` is trimmed to 2,000 characters
+   per item, and the retrieved text that nothing displays is dropped from
+   `audit_json` and from each scoring run's reference snapshot. Parquet rather
+   than DuckDB because DuckDB stores large text uncompressed, which made the
+   copy too large to commit. `reports/data.py` reads either, so the dashboard is
+   the same either way.
+2. **Builds the tree**: every module the dashboard imports, the Parquet, and the
+   reference answers reduced to the fields anything reads, plus a generated
+   `streamlit_app.py` and `requirements.txt`. The target is emptied first, so a
+   file dropped from this repo does not linger in the deployed one.
+3. **Proves it runs**, by importing the copied tree in a subprocess that cannot
+   see this repo. A module the copy is missing fails the export rather than the
+   deployed app.
+4. **Pushes**, if `--push` was given. The branch is replaced with a single
+   parentless commit, since Parquet cannot be delta-compressed and ordinary
+   commits would grow that repo by a full copy every time.
+
+### Flags
+
+| Flag | Effect |
+| --- | --- |
+| `--push` | Do step 4. Without it the tree is written and left for inspection, and you re-run with `--push` once it looks right. |
+| `--skip-data` | Skip step 1 and reuse the existing `lex_eval/data/deploy/*.parquet`. Use it on that second run. |
+| `--target DIR` | Deploy repo checkout to rebuild. Defaults to `lexchat-eval-streamlit/`. |
+| `--branch NAME` | Branch to replace. Defaults to `main`. |
+
+`python -m lex_eval.utils.db --deploy-db [directory]` builds only the Parquet.
+Step 1 above already calls it, so it is not a prerequisite of `export_deploy`;
+run it on its own only when you want the Parquet to look at.
+
+Neither `responses.db` nor `lex_eval/data/deploy/` is committed here.
 
 ## Reference ("gold") answers
 
@@ -386,16 +455,17 @@ python -m lex_eval.utils.db --delete-response <ID>
 lex_eval/
 ├── data/
 │   ├── questions.json       # evaluation questions
-│   ├── deploy.db            # committed compact database for Streamlit Cloud
+│   ├── deploy/              # Parquet build output for the deploy repo (not committed)
 │   ├── reference_answers/   # gold answers: q{id}.md + reference_answers.json
 │   └── verbose_logs/        # per-question capture audit logs (gitignored)
-├── docs/                    # gap analysis, reference-answer notes
+├── docs/                    # permanent docs; docs/findings/ is local, dated notes
 ├── metrics/                 # custom metric classes
 ├── reference/               # reference ("gold") answers
 │   ├── build.py             # the build script
 │   ├── lex_client.py        # the LEX and Find Case Law tools, as LexChat calls them
 │   └── store.py             # manifest + Markdown for review
 ├── reports/
+│   ├── review_export.py     # review pack as a readable Markdown report
 │   └── streamlit_report.py  # Streamlit dashboard
 ├── tests/                   # pytest evaluation suites
 ├── utils/                   # shared utilities (db, client, capture, judge)
@@ -403,6 +473,25 @@ lex_eval/
 ├── open_db_ui.py            # opens responses.db in browser UI
 └── run_evals.py             # Step 3 entry point
 ```
+
+## Documentation
+
+`lex_eval/docs/` holds the permanent documentation, the docs that answer "how does
+this work" and are kept up to date with the code:
+
+| Doc | What it covers |
+| --- | --- |
+| [Metrics](lex_eval/docs/metrics.md) | What each metric catches, how it scores, and why it is designed that way. |
+| [Reference answers](lex_eval/docs/reference-answers.md) | The reference ("gold") answer system: what is authored, what is generated. |
+| [Experiments](lex_eval/docs/experiments.md) | Running a gather as an experiment, scoring it, reading and comparing results. |
+| [Question set provenance](lex_eval/docs/question-set-provenance.md) | The fields recording where each question came from. |
+| [Decisions](lex_eval/docs/decisions/) | Decision records for choices made or still open. |
+
+`lex_eval/docs/findings/` is the other shelf, for docs that answer "what did we find
+on date X": a bug investigation, a review status, a report over one data export.
+Each opens with the date it describes and is frozen rather than maintained, so
+they are kept locally and are not committed. Nothing in the table above should
+depend on a findings file for a fact.
 
 ## A note on LLM judge models
 The judge LLM is accessed via OpenRouter, which provides access to hundreds of models from many providers. The default model is `openai/gpt-4o`, which offers a good balance of thoroughness and cost. More expensive or capable models may produce more critical judgments, leading to lower scores for reference agreement, response groundedness, and research groundedness.
@@ -415,7 +504,7 @@ Research showed that `google/gemini-2.5-flash-lite` was too weak for judge tasks
 
 | Metric | Description |
 |--------|-------------|
-| Tool Usage | Are all of delegate research, search legislation and search legislation sections used, in the correct order (`search_legislation` then `search_legislation_sections` then `get_legislation_text` if needed), and does the Worker stick to that order rather than looping back to an earlier step later in the same run? |
+| Tool Usage | Did the run delegate research and use the expected tools? Legislation checks retain their mode-specific order rules. Case-law-only runs require delegation and either a case-law search or direct judgment lookup; mixed-mode scores cover legislation tools only. |
 | Research Output Structure | Does the worker agent return the findings to the manager with the requested headers. Not measured in conversational mode, where the worker is told not to use those headers. |
 | Reference Links | Are all reference links found by the researcher included in the final answer given to the user. |
 | Citation Grounding | Does every Act cited in the researcher's report correspond to legislation the run's own tool calls actually retrieved, rather than one invented by the model. |

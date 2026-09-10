@@ -20,7 +20,6 @@ Whether the response actually answers the question is measured by the
 import re
 
 import pytest
-from lex_eval.testcase import LLMTestCase
 
 from lex_eval.metrics import (
     ClaimSupportMetric,
@@ -203,6 +202,7 @@ def test_response_groundedness(request, record):
         record=record,
         test_name="response_groundedness",
         metric_name="Response Groundedness",
+        details=getattr(metric, "details", None),
         score=metric.score,
         threshold=metric.threshold,
         passed=metric.is_successful(),
@@ -212,6 +212,8 @@ def test_response_groundedness(request, record):
         judge_tokens=_judge.total_usage_tokens,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), (
         f"Response Groundedness score {metric.score:.2f} < {metric.threshold}: "
         f"{metric.reason}"
@@ -269,6 +271,7 @@ def test_claim_support(request, record):
         record=record,
         test_name="claim_support",
         metric_name="Claim Support",
+        details=getattr(metric, "details", None),
         score=metric.score,
         threshold=metric.threshold,
         passed=metric.is_successful(),
@@ -278,6 +281,8 @@ def test_claim_support(request, record):
         judge_tokens=_judge.total_usage_tokens,
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), (
         f"Claim Support score {metric.score:.2f} < {metric.threshold}: "
         f"{metric.reason}"

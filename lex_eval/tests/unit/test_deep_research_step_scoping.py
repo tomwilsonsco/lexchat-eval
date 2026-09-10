@@ -48,6 +48,29 @@ class _JudgeNotInvoked:
 
 
 class TestStepCompletionRequiresOwnCitation:
+    def test_empty_or_case_law_steps_do_not_dilute_a_legislation_failure(self):
+        tools = _step("No citation", _search_sections("asp/2021/3")) + _step(
+            "A case-law report"
+        )
+        metric = StepCompletionMetric()
+        metric.measure(
+            LLMTestCase(input="q", actual_output="final", tools_called=tools)
+        )
+        assert metric.score == 0.0
+        assert not metric.is_successful()
+
+    def test_no_eligible_steps_is_not_measured(self):
+        metric = StepCompletionMetric()
+        metric.measure(
+            LLMTestCase(
+                input="q",
+                actual_output="final",
+                tools_called=_step("A case-law report"),
+            )
+        )
+        assert metric.reason.startswith("Not measured:")
+        assert not metric.is_successful()
+
     def test_citing_a_sibling_steps_act_still_fails(self):
         """Step 1 retrieves Act A and cites nothing of its own; step 2
         retrieves Act B. Step 1's report links to Act B (a sibling's Act,
@@ -103,5 +126,6 @@ class TestReportIntegrationScopingRequiresOwnCitation:
         )
         metric = ReportIntegrationMetric(model=_JudgeNotInvoked())
         metric.measure(case)
-        assert metric.is_successful()
+        assert not metric.is_successful()
+        assert metric.reason.startswith("Not measured:")
         assert "nothing to check" in metric.reason

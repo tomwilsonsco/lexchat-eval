@@ -540,6 +540,7 @@ class TestMakeDeployDbPreservesIds:
     deleted response, or later eval rows point at the wrong response."""
 
     def test_ids_survive_a_gap(self, tmp_path):
+        from lex_eval.reports.data import _connect
         from lex_eval.utils.db import (
             get_connection,
             init_db,
@@ -565,12 +566,11 @@ class TestMakeDeployDbPreservesIds:
         conn.commit()
         conn.close()
 
-        deploy = tmp_path / "deploy.db"
+        deploy = tmp_path / "deploy"
         make_deploy_db(source_path=src, output_path=deploy)
 
-        conn = get_connection(deploy, read_only=True)
-        ids = {r[0] for r in conn.execute("SELECT id FROM responses").fetchall()}
-        conn.close()
+        with _connect(deploy) as conn:
+            ids = {r[0] for r in conn.execute("SELECT id FROM responses").fetchall()}
         assert ids == {1, 3}
 
 

@@ -25,7 +25,6 @@ import json
 import logging
 import os
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -366,6 +365,18 @@ def main() -> None:
         metavar="PATH",
         help="Path to the questions JSON file (default: lex_eval/data/questions.json)",
     )
+    parser.add_argument(
+        "--experiment-id",
+        help="Join an existing experiment with unchanged configuration",
+    )
+    parser.add_argument(
+        "--label", default="Gather", help="Human-readable experiment label"
+    )
+    parser.add_argument(
+        "--deployment-config",
+        type=Path,
+        help="JSON snapshot of deployed build, prompts, and non-secret settings; unknown when omitted",
+    )
     args = parser.parse_args()
 
     # Read by get_authenticated_client(), which takes no arguments and is called
@@ -405,7 +416,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Get active LLM from LexChat API
     # ------------------------------------------------------------------
-    model_name, _ = get_active_model()
+    model_name, model_provider = get_active_model()
     if model_name is None:
         logger.error(
             "No active model found in LexChat. Set one in the admin portal before "
@@ -414,7 +425,7 @@ def main() -> None:
         sys.exit(1)
     logger.info("Active LLM (manager/worker): %s", model_name)
 
-    summ_model_name, _ = get_summarisation_model()
+    summ_model_name, summ_provider = get_summarisation_model()
     if summ_model_name is None:
         summ_model_name = model_name
     if summ_model_name == model_name:
@@ -428,6 +439,14 @@ def main() -> None:
     questions = load_questions(questions_path)
     logger.info("Loaded %d questions", len(questions))
 
+    question_snapshot = [
+        {
+            **q,
+            "chat_mode": q.get("chat_mode", args.chat_mode),
+            "research_mode": q.get("research_mode", "legislation_only"),
+        }
+        for q in questions
+    ]
     if args.question_id is not None:
         wanted = set(args.question_id)
         questions = [q for q in questions if q["id"] in wanted]
@@ -437,6 +456,54 @@ def main() -> None:
             logger.error("No question found with id(s)=%s", sorted(missing))
             sys.exit(1)
         logger.info("Filtered to question ID(s) %s", sorted(found))
+
+    from lex_eval.utils.versioning import (
+        start_gather,
+        finish_run,
+        link_response,
+        revision,
+        capture_version,
+    )
+
+    deployment = (
+        json.loads(args.deployment_config.read_text())
+        if args.deployment_config
+        else None
+    )
+    experiment_id, gather_run_id = start_gather(
+        db_conn,
+        label=args.label,
+        experiment_id=args.experiment_id,
+        question_ids=[q["id"] for q in questions],
+        config={
+            "model": model_name,
+            "provider": model_provider,
+            "summarisation_model": summ_model_name,
+            "summarisation_provider": summ_provider,
+            "deployment": deployment,
+            "capture_revision": revision(),
+            "capture_version": capture_version(),
+            "questions": question_snapshot,
+        },
+    )
+    logger.info("Experiment %s; gather run %s", experiment_id, gather_run_id)
+    snapshot_by_id = {q["id"]: q for q in question_snapshot}
+
+    def save_response(conn, record):
+        conn.execute("BEGIN TRANSACTION")
+        try:
+            rid = insert_response(conn, record)
+            link_response(
+                conn,
+                rid,
+                gather_run_id,
+                experiment_id,
+                snapshot_by_id[record["question_id"]],
+            )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
 
     # No per-question skip check exists, every question is (re-)gathered on each
     # run. --overwrite clears prior responses first; otherwise runs are appended.
@@ -491,7 +558,7 @@ def main() -> None:
                 q = futures[future]
                 try:
                     result = future.result()
-                    insert_response(db_conn, result)
+                    save_response(db_conn, result)
                     # Error records are signalled by an "error" key (and may not
                     # set is_error), so check both to avoid logging failures as OK.
                     # A clarification request is a valid outcome, not an error.
@@ -511,7 +578,7 @@ def main() -> None:
                     )
                 except Exception as exc:
                     logger.error("Q%d failed: %s", q["id"], exc)
-                    insert_response(
+                    save_response(
                         db_conn,
                         {
                             "question_id": q["id"],
@@ -547,6 +614,12 @@ def main() -> None:
     finally:
         if debug_fh:
             debug_fh.close()
+        finish_run(
+            db_conn,
+            "gather_runs",
+            gather_run_id,
+            "interrupted" if sys.exc_info()[0] else "finished",
+        )
         db_conn.close()
 
     logger.info("Done gathering responses.")
