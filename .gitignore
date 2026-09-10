@@ -216,6 +216,9 @@ __marimo__/
 lex_eval/data/responses.db
 lex_eval/data/deploy/
 
+#session transcripts from usage
+lex_eval/data/session_transcripts
+
 # The deploy repo, cloned here so export_deploy.py can rebuild it.
 lexchat-eval-streamlit/
 lex_eval/data/debug_events.jsonl
