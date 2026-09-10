@@ -41,6 +41,16 @@ def shared_cohorts(baseline, candidate):
     return _cohorts(baseline).keys() & _cohorts(candidate).keys()
 
 
+def matched_entries(baseline, candidate, rows):
+    """The selected verdicts for every matched cohort and check.
+
+    The evidence panel calls this so it shows the exact stored rows the
+    totals were built from, rather than reselecting scores of its own.
+    """
+    groups = [_cohorts(records) for records in (baseline, candidate)]
+    return _matched_entries(groups, groups[0].keys() & groups[1].keys(), rows)
+
+
 def _matched_entries(groups, matched, rows):
     """One entry per matched cohort and metric, with the selected verdicts.
 
@@ -147,22 +157,24 @@ def compare(baseline, candidate, rows):
         key = item["key"]
         entry = {
             "Question": f"Q{key[0]}",
-            "Question text": key[1],
             "Chat mode": key[2],
             "Research mode": key[3],
-            "Metric": item["test_name"],
+            "Check": item["metric_name"],
         }
         if item["excluded"]:
             output.append({**entry, "Change": item["excluded"]})
             continue
         ids, totals = item["ids"], item["totals"]
+        responses = {}
         for label, total, side_ids, side in zip(
             ("Baseline", "Candidate"), totals, ids, item["selected"], strict=True
         ):
             entry[label] = (
                 f"{total['pass_count']}/{total['measured_count']} measured passes; {len(side_ids) - total['measured_count']} unmeasured or missing"
             )
-            entry[f"{label} responses"] = ", ".join(str(r["response_id"]) for r in side)
+            responses[f"{label} responses"] = ", ".join(
+                str(r["response_id"]) for r in side
+            )
         if any(
             t["measured_count"] != len(side_ids)
             for t, side_ids in zip(totals, ids, strict=True)
@@ -173,7 +185,7 @@ def compare(baseline, candidate, rows):
                 [t["pass_count"] / t["measured_count"] for t in totals],
                 [t["state"] for t in totals],
             )
-        output.append({**entry, "Change": change})
+        output.append({**entry, "Change": change, **responses})
     summary = {
         "Matched questions and modes": len(matched),
         "Baseline only": len(left.keys() - right.keys()),
@@ -197,6 +209,11 @@ def _side_text(passes, measured_count, score_total, unmeasured):
 
 # Every direction a check can end up in, in the order they are counted. Fixed
 # so a column keeps its place from one comparison to the next.
+# What the per check summary's direction column is called. It compares how
+# often a check passed, which can move the other way from the mean score, so
+# the header says which of the two it is.
+PASS_FREQUENCY_CHANGE = "Change in pass frequency"
+
 CHANGE_STATES = (
     "More passes",
     "Fewer passes",
@@ -210,7 +227,8 @@ def change_counts(summary_rows):
     """How many checks moved which way, from the rows of `metric_summary`."""
     counts = dict.fromkeys(CHANGE_STATES, 0)
     for row in summary_rows:
-        counts[row["Change"]] = counts.get(row["Change"], 0) + 1
+        state = row[PASS_FREQUENCY_CHANGE]
+        counts[state] = counts.get(state, 0) + 1
     return {"Checks": len(summary_rows), **counts}
 
 
@@ -267,7 +285,7 @@ def metric_summary(baseline, candidate, rows):
                         ("Baseline", "Candidate"), sides, strict=True
                     )
                 },
-                "Change": change,
+                PASS_FREQUENCY_CHANGE: change,
                 "Questions compared": row["compared"],
                 "Not compared": row["excluded"],
             }

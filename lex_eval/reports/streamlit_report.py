@@ -23,8 +23,11 @@ from lex_eval.reference.store import (
 )
 from lex_eval.reports.attribution import caveat, worst_attribution
 from lex_eval.reports.comparison import (
+    PASS_FREQUENCY_CHANGE,
     change_counts,
+    cohort_key,
     compare,
+    matched_entries,
     metric_summary,
     shared_cohorts,
 )
@@ -317,7 +320,7 @@ COMPARISON_METRIC_COLUMNS: dict[str, str] = {
     "Check": "The check these totals are for.",
     "Baseline": "Baseline totals over the questions both experiments answered: measured passes out of measured runs, the mean of those scores, and how many runs the check could not measure.",
     "Candidate": "The same totals for the candidate experiment.",
-    "Change": "How the candidate's pass frequency over measured runs compares with the baseline's. Runs that could not be measured are counted in the two columns before this one and are not part of the comparison.",
+    PASS_FREQUENCY_CHANGE: "How often the candidate passed compared with the baseline, over the runs both sides measured. This is not the movement in the mean score, which is shown in the two columns before it and can go the other way. Runs that could not be measured are not part of either.",
     "Questions compared": "How many shared questions are in these totals.",
     "Not compared": "Shared questions left out because the two sides used different scoring versions or different judges. They are in no total here.",
 }
@@ -326,20 +329,6 @@ COMPARISON_OUTCOME_COLUMNS: dict[str, str] = {
     "Experiment": "Which side of the comparison the counts on this row come from.",
     **OUTCOME_COLUMNS,
 }
-
-COMPARISON_CHANGE_COLUMNS: dict[str, str] = {
-    "Question": "The question id.",
-    "Question text": "The question as it was asked. Both experiments used this exact wording.",
-    "Chat mode": QUESTION_COLUMNS["Chat mode"],
-    "Research mode": QUESTION_COLUMNS["Research mode"],
-    "Metric": "The metric this row compares.",
-    "Baseline": "Passes out of measured runs in the baseline experiment, and how many of its runs the metric could not measure.",
-    "Candidate": "Passes out of measured runs in the candidate experiment, and how many of its runs the metric could not measure.",
-    "Baseline responses": "The response ids scored on the baseline side.",
-    "Candidate responses": "The response ids scored on the candidate side.",
-    "Change": "How the candidate compares with the baseline, or why the two cannot be compared.",
-}
-
 
 def _column_help(tooltips: dict[str, str], widths: dict | None = None) -> dict:
     """Turn a column name to description mapping into Streamlit column config.
@@ -674,7 +663,10 @@ def _identity_short(response_id, identity: dict | None) -> str:
 
 
 def _render_metric_body(
-    m: dict, identity: dict | None = None, records: dict | None = None
+    m: dict,
+    identity: dict | None = None,
+    records: dict | None = None,
+    evidence_for_passes: bool = False,
 ) -> None:
     """Per-response detail for one metric, in the question's own run order."""
     identity = identity or {}
@@ -723,7 +715,13 @@ def _render_metric_body(
         return
 
     for raw in rows:
-        _render_single_eval_result(raw, identity, records, show_reason=not covered(raw))
+        _render_single_eval_result(
+            raw,
+            identity,
+            records,
+            show_reason=not covered(raw),
+            evidence_for_passes=evidence_for_passes,
+        )
 
 
 # Readable headings for stored evidence fields. A field name is not always
@@ -846,6 +844,7 @@ def _render_single_eval_result(
     records: dict | None = None,
     evidence: bool = True,
     show_reason: bool = True,
+    evidence_for_passes: bool = False,
 ) -> None:
     """One raw eval result entry, headed by the response it belongs to."""
     heading = _response_heading(r.get("response_id", "unknown"), identity)
@@ -869,11 +868,12 @@ def _render_single_eval_result(
         if r.get("scope_note"):
             st.caption(r["scope_note"])
         rec = (records or {}).get(r.get("response_id"))
-        # Only where a reviewer has something to check. A passing row's answer
+        # Question review focuses evidence on failures. Comparison also opens
+        # passing answers so reviewers can investigate improvements. A passing row's answer
         # is still in "Response to user", the comparison and the research log,
         # and repeating every answer and Worker report once per check made the
         # page many times larger than the reading it supports.
-        if evidence and rec is not None and not passing:
+        if evidence and rec is not None and (not passing or evidence_for_passes):
             _render_evidence(r, rec, heading)
         elif r.get("details"):
             _render_details(r["details"])
@@ -1842,10 +1842,78 @@ def _experiment_info(records, rows):
         )
 
 
+def _render_comparison_evidence(entries, sides, labels, records_by_id, changes):
+    """The stored scores behind one check on one question, on both sides.
+
+    Fed by the same selection the totals above are built from, so an
+    individual verdict here always belongs to the counts it is part of. The
+    rows are rendered by the question review's own metric panel, so a reason,
+    its evidence and a missing result read the same in both views.
+    """
+    st.markdown("#### Evidence for one check")
+    st.caption(
+        "The stored scores behind the tables above, on the scoring version "
+        "this comparison selected. Nothing here is rescored."
+    )
+    names = sorted(
+        {entry["metric_name"] for entry in entries},
+        # Name breaks the tie so a check the display order does not list keeps
+        # the same place from one comparison to the next.
+        key=lambda name: (_metric_sort_key({"metric_name": name}), name),
+    )
+    if not names:
+        st.info("No matched check to inspect.")
+        return
+    check = st.selectbox("Check", names)
+    for_check = [entry for entry in entries if entry["metric_name"] == check]
+    with st.expander("Per question detail", expanded=True):
+        st.caption(
+            "Results for the selected check. Select a question below for its modes, responses and evidence."
+        )
+        st.table(
+            [
+                {
+                    column: row.get(column, "Not compared")
+                    for column in ("Question", "Baseline", "Candidate", "Change")
+                }
+                for row in changes
+                if row["Check"] == check
+            ]
+        )
+    key = st.selectbox(
+        "Question",
+        [entry["key"] for entry in for_check],
+        format_func=lambda k: f"Q{k[0]} · {k[2]} · {k[3]}",
+    )
+    entry = next(item for item in for_check if item["key"] == key)
+    st.caption(key[1])
+    if entry["excluded"]:
+        st.markdown(
+            f":gray[**{entry['excluded']}**] &nbsp; :gray[These runs are in no "
+            "total above.]"
+        )
+        return
+    for column, label, side, total in zip(
+        st.columns(2), labels, sides, entry["totals"], strict=True
+    ):
+        with column:
+            st.markdown(f"**{label}**")
+            identity = _identity([r for r in side if cohort_key(r) == key])
+            st.markdown(_metric_row_label(total))
+            _render_metric_body(
+                total, identity, records_by_id, evidence_for_passes=True
+            )
+
+
 def _compare_experiments(records, rows):
     # An experiment with no stored metric result has nothing to compare, so it
     # is not offered here. Experiment info lists every experiment, scored or
     # not, and says what is missing.
+    st.markdown(
+        "Compare results from two recorded configurations on the questions "
+        "both asked. Review changes in pass frequency and average score, then "
+        "inspect the responses and stored reasons behind them."
+    )
     scored = {row["response_id"] for row in rows}
     experiments = {
         r["experiment_id"]: r.get("experiment", {})
@@ -1909,6 +1977,7 @@ def _compare_experiments(records, rows):
     )
     scoped = apply_scope(rows)
     summary, changes, outcomes = compare(*sides, scoped)
+    st.markdown("#### Coverage")
     st.dataframe(
         [summary],
         hide_index=True,
@@ -1920,6 +1989,7 @@ def _compare_experiments(records, rows):
         key=lambda row: _metric_sort_key({"metric_name": row["Check"]}),
     )
     if totals:
+        st.markdown("#### Results by check")
         st.dataframe(
             [change_counts(totals)],
             hide_index=True,
@@ -1932,22 +2002,25 @@ def _compare_experiments(records, rows):
             width="stretch",
             column_config=_column_help(COMPARISON_METRIC_COLUMNS),
         )
+        st.caption(
+            "How often a check passed and its mean score can move in opposite "
+            "directions, so both are shown. Neither says the answers are more "
+            "legally correct."
+        )
+    st.markdown("#### Run outcomes")
     st.dataframe(
         [_display_counts(row) for row in outcomes],
         hide_index=True,
         width="stretch",
         column_config=_column_help(COMPARISON_OUTCOME_COLUMNS),
     )
-    with st.expander("Per question detail"):
-        if changes:
-            st.dataframe(
-                changes,
-                hide_index=True,
-                width="stretch",
-                column_config=_column_help(COMPARISON_CHANGE_COLUMNS),
-            )
-        else:
-            st.info("No matched metric results to compare.")
+    _render_comparison_evidence(
+        matched_entries(*sides, scoped),
+        sides,
+        [_experiment_label(experiments, exp) for exp in (baseline, candidate)],
+        {r["response_id"]: r for side in sides for r in side},
+        changes,
+    )
     with st.expander("Experiment conditions"):
         for exp in (baseline, candidate):
             st.write(_experiment_label(experiments, exp))
@@ -1958,6 +2031,7 @@ def _compare_experiments(records, rows):
                     if k != "questions"
                 }
             )
+    st.markdown("#### Full research log for one response")
     matched_ids = {r["response_id"] for side in sides for r in side}
     inspect = [r for r in records if r["response_id"] in matched_ids]
     selected = st.selectbox(
@@ -1994,6 +2068,12 @@ def main() -> None:
         horizontal=True,
         key="view",
     )
+    if view == "Review questions":
+        st.markdown(
+            "Investigate individual answers and the evidence behind their "
+            "scores. Select a question to review its failures, repeated "
+            "attempts and research activity."
+        )
     # The comparison view chooses its own experiments and then its own
     # questions from what those two share, so the filters below, which narrow
     # the records first, do not apply to it.

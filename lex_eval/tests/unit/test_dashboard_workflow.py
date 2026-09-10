@@ -6,8 +6,10 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from lex_eval.reports.comparison import (
+    PASS_FREQUENCY_CHANGE,
     change_counts,
     compare,
+    matched_entries,
     metric_summary,
     shared_cohorts,
 )
@@ -129,7 +131,9 @@ def test_metric_summary_totals_the_shared_questions():
     assert row["Questions compared"] == 2 and row["Not compared"] == 0
     assert row["Baseline"] == "1/2 measured passes · mean 0.70"
     assert row["Candidate"] == "2/2 measured passes · mean 0.70"
-    assert row["Change"] == "More passes"
+    # The header names which of the two movements it reports: the means are
+    # equal here while the pass frequency rose.
+    assert row[PASS_FREQUENCY_CHANGE] == "More passes"
 
 
 def test_change_counts_account_for_every_check():
@@ -169,6 +173,37 @@ def test_metric_summary_reports_unmeasured_runs_beside_the_totals():
         [verdict(1, True), verdict(2, True)],
     )[0]
     assert row["Candidate"].endswith("1 unmeasured")
+
+
+def test_evidence_gets_the_rows_the_totals_were_built_from():
+    """The shared scoring version, not the newest row either side happens to hold.
+
+    The baseline was rescored under v2 and the candidate was not, so "latest
+    stored" would read v2 against v1. The comparison selects v1 on both sides,
+    and the evidence panel has to be handed that same v1 row.
+    """
+    baseline = [record(1)]
+    candidate = [record(2)]
+    shared = verdict(1, False, score=0.4, id=1, run_at="2026-09-01")
+    rescored = verdict(1, True, "v2", score=0.9, id=3, run_at="2026-09-08")
+    rows = [shared, rescored, verdict(2, True, score=0.8, id=2, run_at="2026-09-02")]
+
+    entry = matched_entries(baseline, candidate, rows)[0]
+    assert [[r["id"] for r in side] for side in entry["selected"]] == [[1], [2]]
+    assert entry["totals"][0]["raw_results"] == [shared]
+    # The same selection the per question table reports, so an individual
+    # verdict below always belongs to the counts above it.
+    _, changes, _ = compare(baseline, candidate, rows)
+    assert changes[0]["Baseline"].startswith("0/1")
+    assert changes[0]["Change"] == "More passes"
+
+
+def test_evidence_for_an_uncomparable_check_carries_its_reason():
+    entry = matched_entries(
+        [record(1)], [record(2)], [verdict(1, False), verdict(2, True, "v2")]
+    )[0]
+    assert entry["excluded"].startswith("Not comparable")
+    assert "totals" not in entry
 
 
 def test_shared_questions_need_the_same_wording_and_snapshot():
@@ -339,7 +374,7 @@ def test_comparison_view_renders_recorded_experiments(tmp_path):
                 question="q",
                 llm_name="m",
                 timestamp="2026-09-07",
-                actual_output="answer",
+                actual_output=f"{label} answer",
             ),
         )
         link_response(conn, rid, gather, exp, {"id": 1, "question": "q"})
@@ -373,7 +408,21 @@ def test_comparison_view_renders_recorded_experiments(tmp_path):
     # The per check summary reads without opening a question, and the per
     # question detail is still there behind its expander.
     assert any("Questions compared" in frame.value.columns for frame in app.dataframe)
-    assert any("Question text" in frame.value.columns for frame in app.dataframe)
+    detail = app.table[0].value
+    assert list(detail.columns) == ["Question", "Baseline", "Candidate", "Change"]
+    assert detail["Baseline"].iloc[0].startswith("0/1")
+    assert detail["Candidate"].iloc[0].startswith("1/1")
+    panels = [e for e in app.expander if e.label.startswith("Inspect evidence")]
+    assert len(panels) == 2  # Both the failing baseline and passing candidate.
+    for panel, label, other in zip(
+        panels, ("baseline", "candidate"), ("candidate", "baseline"), strict=True
+    ):
+        text = " ".join(m.value for m in panel.markdown)
+        assert f"{label} answer" in text
+        assert f"{other} answer" not in text
+    # The evidence panel is on the page, and it selects a check and a question.
+    assert [box.label for box in app.selectbox][2:4] == ["Check", "Question"]
+    assert any("Failed" in str(item.value) for item in app.markdown)
 
 
 def test_comparison_offers_only_the_questions_both_experiments_answered(tmp_path):

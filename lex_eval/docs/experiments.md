@@ -156,8 +156,29 @@ The summary has one row per check, totalled over the shared questions: measured
 passes out of measured runs, the mean of those scores, and how many runs the
 check could not measure, for each side. A shared question whose two sides used
 different scoring versions or different judges is counted under "Not compared"
-and is in none of those totals. The per question rows are behind
-**Per question detail**.
+and is in none of those totals. Its direction column is named **Change in pass
+frequency**, because how often a check passed and its mean score can move in
+opposite directions. The per question rows are behind **Per question detail**
+beneath the selected check. The table shows only that check, with both sides and the change in
+wrapping columns. Modes and response identities appear in the question evidence
+below.
+
+**Evidence for one check** is where a change is explained. Select a check and
+one of the questions both experiments asked, and the stored scores for that
+check appear side by side, baseline on the left and candidate on the right:
+each response's own verdict, score, threshold, reason, stored passage evidence,
+the reference used, and the scoring run and judge that produced it. Responses
+with no stored result are named rather than counted as passes. Both passing
+and failing results offer a collapsed **Inspect evidence** panel, so a reviewer
+can investigate improvements as well as failures.
+
+Those rows are the ones the totals above were built from, on the same scoring
+version the comparison selected, so an individual verdict always reconciles
+with the counts it belongs to. The comparison's own selection is not replaced
+by the question review's "Latest stored", which can be a newer scoring version
+that only one side holds. A check that could not be compared shows why, and its
+runs are in no total. Below the panel, **Full research log for one response**
+opens one response's complete tool call log.
 
 Keep the model fixed when assessing a prompt change. A different model is a model
 comparison, and unknown deployment settings limit attribution in either case.
