@@ -1,11 +1,17 @@
 {
-  "verified": false,
-  "verified_by": null,
-  "verified_at": null,
-  "verdict": null,
-  "citations_reviewed": false,
-  "required_citations": [],
-  "corrections": "",
-  "notes": "",
-  "signed_reference_sha256": null
+  "verified": true,
+  "verified_by": "Corsino San Miguel/Steve Dewar",
+  "verified_at": "2026-09-18",
+  "verdict": "Approve",
+  "citations_reviewed": true,
+  "required_citations": [
+    "ukpga/1998/46",
+    "ukpga/1998/46/section/130",
+    "uksi/1998/3178/article/2",
+    "uksi/1998/3178/article/3",
+    "uksi/1998/3178/schedule/5"
+  ],
+  "corrections": "The Scotland Act 1998 commencement order is listed but not any of the Scotland Act 2012 or 2016 commencement orders/regulations. There are 17 other such instruments - https://www.legislation.gov.uk/primary+secondary?title=%22The%20Scotland%20Act%22%20Commencement",
+  "notes": "as above",
+  "signed_reference_sha256": "2f47d559847a0f4c"
 }

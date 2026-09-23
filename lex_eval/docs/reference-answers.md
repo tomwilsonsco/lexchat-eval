@@ -154,8 +154,36 @@ The decision lives in `.authored/q{id}/review.json` and nowhere else:
 `verdict` is `Approve` or `Changes required`, and only `Approve` can turn `verified` on.
 `citations_reviewed` separates "the lawyer has not considered the citations" from "the lawyer confirms
 that none is mandatory". Leave `signed_reference_sha256` as `null` when recording a fresh approval:
-the sync stamps it with the version the lawyer saw, so clearing it back to `null` is how a maintainer
-records that a changed version has been re-confirmed.
+`--render-only` stamps it with the record's current fingerprint, so clearing it back to `null` is how a
+maintainer records that a changed version has been re-confirmed.
+
+### Transcribing a returned review
+
+Returned Word documents go in `lex_eval/data/reference_answers/reviews/`, which is gitignored: they are
+binary and carry reviewers' names, and `review.json` is the committed record of the decision.
+
+1. **Check the document is of the current version.** Compare the "Reference version" in its section 6
+   with `reference_sha256` in `reference_answers.json`. If they differ, the answer changed after the
+   document was sent, and the review applies to something no longer in the record.
+2. **Section 3, key statements.** Accept on every statement means `statements.json` is left alone.
+   An Amend goes into `statements.json` as written.
+3. **Section 4, citations.** Every provision marked Required goes into `required_citations`, as its
+   provision id (e.g. `ukpga/1987/26/section/33a`) or its legislation.gov.uk URL. Background and
+   Remove are left out. A reviewer remark such as "link broken, but citation required" still means
+   Required.
+4. **Section 5, decision.** `verdict` is `Approve` or `Changes required`, whatever spelling the
+   reviewer used. `verified` is true only for `Approve`. `verified_by` and `verified_at` (as
+   `YYYY-MM-DD`) come from the reviewer and date lines, `citations_reviewed` is true when section 4
+   was marked up, and "what is wrong" and "notes" are copied word for word into `corrections` and
+   `notes`.
+5. **Leave `signed_reference_sha256` as `null`** and run `--render-only`. Do not copy in the
+   Reference version from step 1. The fingerprint includes `citations_reviewed` and the required
+   citations, so recording the markup always moves it, and the old value would read `Stale`.
+6. **Confirm** that `--render-only` reports `Verified` for the question. Anything else comes with the
+   list of problems stopping the approval from counting.
+
+A comment in `corrections` or `notes` does not by itself change the answer or statements. Acting on
+it is a later edit, and that edit makes the sign-off `Stale` until the reviewer sees the new version.
 
 ### What makes an approval count
 

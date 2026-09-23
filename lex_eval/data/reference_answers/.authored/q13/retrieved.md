@@ -29,7 +29,7 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 
 ```json
 {
- "query": "Education (Scotland) Act 1962 section 117 regulations",
+ "query": "Education (Scotland) Act 1962 regulations made under section 117",
  "year_from": null,
  "year_to": null,
  "limit": 5,
@@ -37,51 +37,179 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 }
 ```
 
+- `uksi/1962/1294`, **The Education Authority Bursaries (Scotland) (Amendment No. 3) Provisional Regulations 1962** (1962, final, extent n/a)
 - `uksi/1975/1135`, **The Schools General (Scotland) Regulations 1975** (1975, final, extent n/a)
-- `uksi/1972/1090`, **The Rate Support Grant (Scotland) (Amendment) Regulations 1972** (1972, final, extent n/a)
-- `uksi/1970/705`, **The Rate Support Grant (Scotland) Amendment Regulations 1970** (1970, final, extent n/a)
-- `uksi/1972/59`, **EXPLANATORY NOTE (This Note is not part of the Regulations.)** (1972, stub, extent n/a)
-- `ukpga/1969/49`, **Education (Scotland) Act 1969** (1969, final, extent n/a)
+- `uksi/1962/2086`, **EXPLANATORY NOTE** (1962, stub, extent n/a)
+- `uksi/1962/2195`, **The Nurses (Scotland) (Amendment) Rules 1962 Approval Instrument 1962** (1962, final, extent n/a)
+- `uksi/1967/29`, **The Teachers (Colleges of Education) (Scotland) Regulations 1967** (1967, final, extent n/a)
 
 ---
 
-## `search_legislation`, HTTP 200
+## `search_legislation_sections`, HTTP 200
 
 ```json
 {
- "query": "Education (Scotland) Act 1962 consolidation",
- "year_from": null,
- "year_to": null,
- "limit": 5,
- "include_text": false
+ "query": "section 117 power to make regulations",
+ "legislation_id": "ukpga/Eliz2/10-11/47",
+ "limit": 10
 }
 ```
 
-- `ukpga/1963/21`, **Education (Scotland) Act 1963** (1963, final, extent n/a)
-- `uksi/1963/2111`, **The National Insurance (Modification of Teachers Superannuation) (Scotland) Regulations 1963** (1963, final, extent n/a)
-- `ukpga/1980/44`, **Education (Scotland) Act 1980** (1980, revised, extent Scotland)
-- `ukpga/1971/42`, **Education (Scotland) Act 1971** (1971, final, extent n/a)
-- `ukpga/1965/7`, **Education (Scotland) Act 1965** (1965, final, extent n/a)
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/117135.`
+
+Section 117) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/67101.`
+
+Section 67) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/111116`
+
+Section 111) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/102110.`
+
+Section 102) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/128.`
+
+Section 1) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### Power of education authorities to prohibit or restrict employment of children.
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/137`
+
+Section 137) **Power of education authorities to prohibit or restrict employment of children.**
+
+1) If it appears to an education authority that the employment of a child attending a school under their management is or is likely to be prejudicial to his health or otherwise to render him unfit to obtain the full benefit of the education provided for him, the authority shall serve upon the parent and upon any person who is employing him for the time being a notice prohibiting the employment of the child in any employment or imposing such restrictions upon the employment of the child as appear to them to be expedient in the interests of the child: Provided that if the parent or the employer feels aggrieved by the prohibition or restriction, he may appeal to the Secretary of State, who shall have power to confirm, vary or annul the notice as he thinks fit. 
+2) An education authority may, by notice in writing served upon the parent or employer of any child attending a school under their management, require the parent or employer to provide the authority, within such period as may be specified in the notice, with such information as appears to the authority to be necessary for the purpose of enabling them to ascertain whether the child is being employed in such a manner as to be or to be likely to be prejudicial to his health or to render him unfit to obtain the full benefit of the education provided for him. 
+3) Any person who knowingly employs a child in contravention of any prohibition or restriction imposed under subsection (1) of this section, or who fails to comply with the requirements of a notice served under subsection (2) of this section, shall be guilty of an offence against this section, and liable on conviction by a court of summary jurisdiction to a fine not exceeding level 3 on the standard scale , or, in the case of a second or subsequent offence, not exceeding level 3 on the standard scale . 
+4) Subsections (1) and (3) of section thirty-six of the Act of 1937 (which relate to powers of entry for the enforcement of the provisions of Part III of that Act with respect to the employment of children), shall apply with respect to the provisions of any notice served under this section as they apply with respect to the provisions of the said Part III. 
+
+### Children not to be employed in factories, mines, or quarries.
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/136`
+
+Section 136) **Children not to be employed in factories, mines, or quarries.**
+No child shall be employed— 
+	a) in any factory to which the  Factories Act 1961 applies; or 
+	b) at any mine or quarry within the meaning of the  Mines and Quarries Act 1954; and those Acts respectively shall have effect as respects Scotland as if this section, so far as it relates to the subject matter thereof, were incorporated therein. 
+
+### General definitions.
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/145`
+
+Section 145) **General definitions.**
+In this Act, unless the context otherwise requires, the following expressions have the meanings respectively assigned to them:— 
+	- (1)—(6) . . .
+	- (7) “Act of 1937” means the  Children and Young Persons (Scotland) Act 1937, except in Part IV and the Third Schedule;
+	- (8)—(15C) . . .
+	- (16) “Education authority” means a council constituted under section 2 of the Local Government etc. (Scotland) Act 1994 , and “area” in relation to an education authority shall be construed accordingly;
+	- (17) . . .
+	- (18) “Employment” includes employment in any labour exercised by way of trade or for purposes of gain whether the gain be to the child or to the young person or to any other person, and a person who assists in a trade or occupation carried on for profit shall be deemed to be employed notwithstanding that he receives no reward for his labour; and “employ” shall be construed accordingly;
+	- (19) “Employer” includes a parent who employs his children;
+	- (19A)—(32) . . .
+	- (33) “Parent” includes guardian and any person who is liable to maintain or has parental responsibilities (within the meaning of section 1(3) of the Children (Scotland) Act 1995) in relation to, or has the care of, a child or young person;
+	- (34)—(41B) . . .
+	- (42) “School” means an institution for the provision of primary or secondary education or both primary and secondary education being a public school, a grant-aided school or an independent school, and includes a nursery school and a special school; and the expression “school” where used without qualification includes any such school or all such schools as the context may require, but does not include an establishment or residential establishment within the meaning of the Social Work (Scotland) Act 1968 ;
+	- (43)—(49) . . .
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/2966E.`
+
+Section 29) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### Commencement.
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/148`
+
+Section 148) **Commencement.**
+
+1) . . .  
+2) The provisions of this Act set forth in the second column of the Ninth Schedule shall respectively come into operation on the days mentioned opposite to them in the third column of the said Schedule, and, where days are to be appointed by the Secretary of State for the coming into operation of any of the said provisions, he may appoint different days for different purposes and different provisions. 
 
 ---
 
-## `search_legislation`, HTTP 200
+## `search_legislation_sections`, HTTP 200
 
 ```json
 {
- "query": "Education (Scotland) Act 1980 section 117",
- "year_from": null,
- "year_to": null,
- "limit": 5,
- "include_text": false
+ "query": "citation and extent",
+ "legislation_id": "ukpga/Eliz2/10-11/47",
+ "limit": 10
 }
 ```
 
-- `uksi/1981/1557`, **The Education (Scotland) Act 1981 (Commencement No. 1) Order 1981** (1981, final, extent n/a)
-- `uksi/1988/632`, **The Personal Community Charge (Students) (Scotland) Regulations 1988** (1988, final, extent n/a)
-- `asp/2003/13`, **Mental Health (Care and Treatment) (Scotland) Act 2003** (2003, revised, extent Scotland)
-- `ssi/2012/102`, **The Public Services Reform (Recovery of Expenses in respect of Inspection of Independent Further Education Colleges and English Language Schools) (Scotland) Order 2012** (2012, final, extent n/a)
-- `uksi/1989/63`, **The Personal Community Charge (Exemptions) (Scotland) Regulations 1989** (1989, final, extent n/a)
+### Citation and extent.
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/149`
+
+Section 149) **Citation and extent.**
+
+1) This Act may be cited as the Education (Scotland) Act 1962. 
+2) This Act shall extend to Scotland only. 
+3) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .  
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/2966E.`
+
+Section 29) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/102110.`
+
+Section 102) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/117135.`
+
+Section 117) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/111116`
+
+Section 111) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/67101.`
+
+Section 67) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ..
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/128.`
+
+Section 1) **. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .**
+ 
+
+### Postponement of the commencement of certain provisions
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/schedule/NINTH`
+
+NINTH SCHEDULE Postponement of the commencement of certain provisions Section 148. Serial numberProvisionDay upon which the provision shall come into operation1—17 . . .  . . . 18Section one hundred and thirty-six.Such day as the Secretary of State may by statutory instrument appoint.19—21 . . .  . . . 
+
+### Children not to be employed in factories, mines, or quarries.
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/136`
+
+Section 136) **Children not to be employed in factories, mines, or quarries.**
+No child shall be employed— 
+	a) in any factory to which the  Factories Act 1961 applies; or 
+	b) at any mine or quarry within the meaning of the  Mines and Quarries Act 1954; and those Acts respectively shall have effect as respects Scotland as if this section, so far as it relates to the subject matter thereof, were incorporated therein. 
+
+### Effect of attendance notices on computation of working hours.
+`http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/138144.`
+
+Section 138) **Effect of attendance notices on computation of working hours.**
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .  
 
 ---
 
@@ -97,12 +225,712 @@ regenerated whenever `searches.json` changes. Write the answer from this.
 
 ---
 
-## `get_legislation_text`, HTTP 404
+## `get_legislation_text`, HTTP 200
 
 ```json
 {
- "legislation_id": "ukpga/Eliz2/10-11/47"
+ "legislation_id": "uksi/1977/1261"
 }
 ```
 
+### The Independent Schools Tribunal (Scotland) Rules 1977
+`http://www.legislation.gov.uk/id/uksi/1977/1261`
 
+The Lord President of the Court of Session, in exercise of the powers conferred upon him by section 116 of the Education (Scotland) Act 1962(a) as amended by section 6(2) of and schedule 2 to the Education (Scotland) Act 1976(b) and of all other powers enabling him in that behalf, after consultation with the Council on Tribunals in accordance with section 10 of the Tribunals and Inquiries Act 1971(c) and with the concurrence of the Secretary of State, hereby makes the following Rules:-
+
+If an appellant at any time before the date fixed for the hearing gives notice in writing to the secretary of the tribunal that he desires to withdraw his appeal, the tribunal shall hear and determine the appeal in his absence.
+
+If any party to proceedings before the tribunal is dissatisfied in point of law with a decision of the tribunal, he may make application to the tribunal to state a case for the opinion of the Court of Session on any question of law arising in the proceedings and the provisions of Rules 276 to 280 of the Rules of the Court of Session(a) shall apply accordingly.
+
+The chairman of the tribunal shall fix a date, time and place for the hearing of the appeal and shall cause to be served upon the appellant, not less than twenty-eight days before the date so fixed, a notice in the form set out in the Schedule to these Rules and shall at the same time send a copy of the notice to the Secretary of State, and where the appeal is against a notice of complaint alleging that a teacher is not a proper person to be employed as a teacher in any school, to the proprietor of the school or to the teacher as the case may be.
+
+(1) An appeal to the tribunal shall be instituted by sending to the Secretary of State a written notice of appeal signed by the appellant, setting out the grounds of appeal and stating an address to which all communications regarding the appeal should be sent.
+
+(2) The notice shall be sent to the Secretary of State—
+
+(a) in the case of an appeal under section 113 of the Act against a notice of complaint, within the time limited by that notice; or
+
+(b) in the case of an appeal under section 115 of the Act against a refusal of the Secretary of State to remove a disqualification imposed by an order under Part V of the Act of 1946 or Part V of the Act, within one month after the communication of the refusal to the appellant.
+
+(3) Where the appeal is against a notice of complaint alleging that a teacher is not a proper person to be employed as a teacher in any school, the appellant shall at the same time send a copy of the notice of appeal to the proprietor of the school or to the teacher, as the case may be.
+
+(4) As soon as the tribunal has been constituted in accordance with the provisions of section 113(1) of and schedule 7 to the Act for the purpose of hearing the appeal, the Lord President shall appoint a person to act as secretary of the tribunal for the purposes of the appeal, and the Secretary of State shall send to the secretary of the tribunal three copies of the notice of appeal.
+
+(1) The decision of the tribunal on the appeal shall, in the event of disagreement, be the decision of the majority and may be given orally at the hearing or in writing as soon as may be after the hearing.
+
+(2) The secretary of the tribunal shall send a copy of the decision given by the tribunal, together with a statement of its findings and the reasons for the decision and any order made by the tribunal to the appellant and the Secretary of State.
+
+(1) An appellant may appear and be heard in person, by counsel or solicitor or by any other person allowed by the tribunal to appear on his behalf, and if a partnership, by a partner and if a company, by a duly authorised director or officer of the company.
+
+(2) The Secretary of State may appear and be heard by counsel or solicitor or by any officer of his department.
+
+The time limited by these Rules for doing any act in connection with an appeal may be extended by the tribunal or by the chairman upon such terms (if any) as may seem just notwithstanding that the time limited has expired before an application for extension is made.
+
+If an appellant or the Secretary of State fails to appear at the time and place fixed for the hearing of the appeal, the tribunal may hear and determine the appeal in his absence.
+
+(1) The Independent Schools Tribunal (Scotland) Rules 1961(b) are hereby revoked.
+
+(2) Section 38 of the Interpretation Act 1889 shall apply as if these Rules were an Act of Parliament and as if the Rules revoked by these Rules were Acts of Parliament repealed by an Act of Parliament.
+
+(1) An appellant and the Secretary of State shall have the right to address the tribunal and call witnesses, whose evidence shall be given on oath and who shall be subject to cross-examination and to re-examination.
+
+(2) The tribunal may require the attendance of further witnesses in addition to those called by or on behalf of the appellant and the Secretary of State.
+
+(3) The tribunal may permit evidence to be given by affidavit but may at any stage of the proceedings require the personal attendance of any deponent for examination and cross-examination.
+
+(4) The tribunal shall not reject any evidence on the ground only that such evidence would be inadmissible in a court of law.
+
+(5) After the evidence has been concluded, the Secretary of State and the appellant shall have the right to address the tribunal if they so desire.
+
+The hearing of an appeal shall take place in public unless the tribunal determines that there are exceptional reasons which make it desirable that the hearing or some part of it should take place in private.
+
+(1) The Interpretation Act 1889(d) shall apply for the interpretation of these Rules as it applies for the interpretation of an Act of Parliament.
+
+(2) In these Rules:—
+
+"the Act" means the Education (Scotland) Act 1962;
+
+"the Act of 1946" means the Education (Scotland) Act 1946(e);
+
+"notice of complaint" means a notice of complaint served by the Secretary of State under section 112 of the Act;
+
+"the tribunal" means an Independent Schools Tribunal constituted in accordance with the provisions of section 113(1) of and schedule 7 to the Act.
+
+These Rules may be cited as the Independent Schools Tribunal (Scotland) Rules 1977 and shall come into operation on 22nd August 1977.
+
+(1) Subject to the provisions of the Act and these Rules, the tribunal shall have power to regulate its own procedure.
+
+(2) Failure to comply with any requirements of these Rules shall invalidate any proceedings unless the tribunal so directs.
+
+G. C. Emslie,
+Lord President of the Court of Session.
+
+Edinburgh.
+15th July 1977.
+
+I concur,
+
+Bruce Millan,
+One of Her Majesty's Principal Secretaries of State.
+
+New St. Andrew's House,
+Edinburgh.
+20th July 1977.
+
+---
+
+## `get_legislation_text`, HTTP 200
+
+```json
+{
+ "legislation_id": "uksi/1962/2086"
+}
+```
+
+### The Students' Allowances (Scotland) Regulations 1962
+`http://www.legislation.gov.uk/id/uksi/1962/2086`
+
+In the exercise of the powers conferred upon me by sections 75 and 76 of the Education (Scotland) Act 1962(a) and of all other powers enabling me in that behalf, I hereby make the following Regulations:-
+
+I.—(1) These Regulations may be cited as the Students' Allowances (Scotland) Regulations 1962.
+(2) These Regulations shall come into operation on 1st October 1962.
+
+5.—(1) The allowance may be paid to the holder or to another person for his behoof, or in part to the holder and in part to the said other person, and any sum in respect of fees payable to an educational institution which is included in the amount of the allowance may be paid to the institution.
+(2) The allowance may be paid in lump sum or by instalments as the Secretary of State thinks fit: but no payment shall be made before the holder has been accepted for admission to the course of study in respect of which the allowance is awarded.
+
+Michael Noble,
+One of Her Majesty's Principal Secretaries of State.
+
+St. Andrew's House,
+Edinburgh, 1.
+19th September 1962.
+
+3.—(1) The amount of an allowance shall be determined by the Secretary of State and may include sums in respect of—
+(a) tuition and other fees payable in respect of the holder of the allowance;
+(b) travelling expenses necessarily incurred or to be incurred by the holder in attending the course of study in respect of which the allowance is awarded;
+(c) the maintenance of the holder and of any persons dependent on him during periods of whole-time study and during vacations;
+(d) other expenses incurred or to be incurred by the holder in taking advantage of educational facilities.
+(2) In determining the amount of an allowance, the Secretary of State shall take account of the sums, if any, which, in accordance with principles determined by him from time to time, the holder and his parents can reasonably be expected to contribute towards the holder's expenses.
+(3) The amount of an allowance may be revised if, having regard to any change in the circumstances of the holder or his parents, the Secretary of State thinks fit.
+
+(This Note is not part of the Regulations, but is intended to indicate their general purport.)
+
+Under section 75 of the Education (Scotland) Act 1962 the Secretary of State may, in accordance with Regulations made by him, make payment of sums by way of scholarships, bursaries and other allowances to persons attending courses of education. Under section 76, the Secretary of State may by Regulations prescribe conditions to which any payment will be subject. In accordance with these provisions of the Act, these Regulations prescribe arrangements and conditions for the award by the Secretary of State of allowances to persons attending universities, central institutions, colleges of education and other educational institutions.
+
+4. Every allowance shall be held subject to the following conditions—
+(a) the holder shall attend regularly the course of study in respect of which the allowance is awarded;
+(b) the Secretary of State shall be satisfied as to the conduct and progress of the holder; and
+(c) the holder or any person acting on his behalf shall provide the Secretary of State with such information and such documents as he may from time to time require to enable him to exercise his functions under these Regulations.
+If the holder or any person acting on his behalf does not comply with these conditions or if the Secretary of State is not satisfied as to the conduct or progress of the holder or if the holder receives from any other source any sum which in the opinion of the Secretary of State makes it unnecessary for him to be assisted by means of an allowance, the Secretary of State may suspend payment of the allowance or terminate the allowance.
+
+2.—(1) The Interpretation Act 1889(b) applies to the interpretation of these Regulations as it applies to the interpretation of an Act of Parliament.
+(2) In these Regulations, unless the context otherwise requires, "allowance" means a scholarship, bursary or other allowance paid or to be paid under section 75(4)(g) of the Education (Scotland) Act 1962.
+
+---
+
+## `get_legislation_text`, HTTP 200
+
+```json
+{
+ "legislation_id": "uksi/1967/29"
+}
+```
+
+### The Teachers (Colleges of Education) (Scotland) Regulations 1967
+`http://www.legislation.gov.uk/id/uksi/1967/29`
+
+In exercise of the powers conferred upon me by sections 75(3), 76(1), 81(2) and 144(5) of the Education (Scotland) Act 1962(a) and of all other powers enabling me in that behalf, after consultation under the provisions of section 5(1)(b) of the Teaching Council (Scotland) Act 1965(b) with the General Teaching Council and the governing bodies of the colleges of education appearing to me to be concerned regarding the functions in relation to colleges of education which I have assigned to the sa...
+
+12. Subject to the provisions of these regulations, each governing body shall make standing orders for the regulation of its proceedings and of the proceedings, and the quorum at the proceedings, of committees or sub-committees of the governing body, and for the keeping of records, the execution of documents and other such matters connected with the conduct of the governing body's business as the governing body thinks fit.
+
+13.---(1) In or in connection with the college of education under its administration and, where appropriate, in co-operation with other educational institutions and agencies, each governing body shall provide such courses of the following kinds as the Secretary of State may approve or direct to be provided:
+(a) courses leading to the teaching qualifications specified in the Training Regulations;
+(b) courses approved by the Secretary of State for registered teachers as leading to special qualification to act as--
+(i) a teacher in nursery school, which qualification shall be awarded only to women; or
+(ii) an infant teacher, which qualification shall be awarded only to women; or
+(iii) a teacher of one or more categories of pupils requiring special educational treatment; or
+(iv) a teacher of backward pupils in secondary schools or departments; or
+(v) a teacher in such other capacity as the General Teaching Council, with the approval of the Secretary of State, may determine;
+(c) courses for the further training of teachers;
+(d) courses qualifying persons to fulfil the duties of leaders in youth or community service and other courses for leaders or workers in such service;
+(e) special courses suitable for persons who have undertaken or propose to undertake duties outside the United Kingdom which may include teaching in, or the supervision of, schools or colleges.
+
+(2) For purposes of sub-paragraphs (c) and (d) above, the provision of courses may include the arrangement of conferences and the giving of assistance or advice to education authorities or other bodies providing such courses or arranging such conferences.
+
+(3) Each governing body may award diplomas and certificates to students who have successfully completed courses at or in connection with the college under their administration.
+
+8. A person who has attained the age of 70 years shall not be eligible for appointment, election or co-option to the office of governor, but a person who attains the said age while he is governor may continue to be governor until the expiry of his period of office.
+
+30. Governing bodies of colleges are hereby prescribed as bodies to which Part VI of the Local Government Act 1948(a) shall apply.
+
+26. A grant under this part of these regulations shall be of such amount or at such rate and in respect of such period as the Secretary of State may determine.
+
+34. Any person employed by an existing governing body immediately prior to the date of coming into operation of these regulations shall continue to be employed by the governing body of the same name constituted under these regulations and nothing in these regulations shall place any such person in a position worse than that in which he would have been if these regulations had not come into operation.
+
+27.---(1) The following conditions shall apply to the payment and acceptance of all grants under this part of these regulations:-
+(a) the governing body shall furnish such estimates of income and expenditure and shall give such other information to the Secretary of State as he may require; and
+(b) the accounts shall be audited to the satisfaction of the Secretary of State, and the governing body shall, if the Secretary of State intimates to them that he is not so satisfied, make such arrangements for the audit of their accounts as satisfy him.
+
+(2) The following additional conditions shall apply to the payment and acceptance of non-recurrent grants:-
+(a) the governing body shall obtain the sanction of the Secretary of State to the purchase of any land, or rights therein, and buildings proposed to be acquired, and his approval of any building and other works proposed to be undertaken, with the aid of the grant; and
+(b) where any property which was provided with the aid of the grant is no longer required by the governing body for the purpose for which it was provided, the governing body may, with the consent of the Secretary of State, sell or otherwise dispose of the said property, and shall repay to him such part as he may require of any proceeds of the sale or disposal.
+
+(3) The following additional conditions shall apply to the payment and acceptance of recurrent grant:-
+(a) the scales of tuition, examination and other fees charged to students attending the college of education shall be approved by the Secretary of State; and
+(b) the scales of charges to students resident in hostels and the scales of charges for meals provided under the administration of the governing body shall have regard to the principle that hostels and facilities for meals should, save in exceptional circumstances, be self-supporting.
+
+
+
+3.---(1) The Interpretation Act 1889(b) applies for the interpretation of these regulations as it applies for the interpretation of an Act of Parliament.
+
+(2) In these regulations unless the context otherwise requires,
+(a) references to any enactment or regulation shall be construed as references to that enactment or regulation as amended by any subsequent enactment or regulation or to any enactment or regulation substituted for that enactment or regulation, and
+(b) references to regulation or to a schedule are references to regulation of these regulations or to a schedule to these regulations as the case may be.
+
+(3) For the removal of doubt, it is declared that Dunfermline College of Physical Education, Edinburgh, is a college of education for the purposes of these regulations.
+
+(a) 1937 c. 37.
+(b) 1889 c. 63.
+
+25. Subject to the provisions of this part of these regulations, the Secretary of State may pay to the governing bodies of colleges of education:-
+
+(1) non-recurrent grants, being grants in aid of their expenditure on the acquisition of lands, or rights therein, and buildings, on the erection, enlargement and improvement of buildings, on the supply of equipment and furnishings, on the provision and laying out of premises, including playing fields and other facilities for social activities and physical recreation; and
+
+(2) recurrent grants, being grants in aid of their expenditure on the administration and maintenance of the college of education, including the employment of members of staff, and on other purposes connected with such administration and maintenance.
+
+2. In these regulations, unless the context otherwise requires, the following expressions have the meanings respectively assigned to them:-
+(1) "Act of 1962" means the Education (Scotland) Act 1962;
+(2) "Board of studies" means board of studies constituted under Regulation 23;
+(3) "Demonstration school" means school providing either primary or secondary education or school providing both primary and secondary education;
+(4) "Eastern area" means the County of the City of Dundee, the counties of Angus, Clackmannan and Fife and the combined county of Perth and Kinross and the burghs in the said counties and combined county;
+(5) "Existing governing body" means governing body constituted under the Teachers (Training Authorities) (Scotland) Regulations 1958(a);
+(6) "Education committee" means the education committee of county council, of joint county council, or of town council of a county of a city;
+(7) "Further education centre" has the meaning ascribed to it in the Further Education (Scotland) Regulations 1959(b);
+(8) "Further education establishments" means central institutions and further education centres;
+(9) "Governing body" means governing body constituted under Regulation 4;
+(10) "Governor" means member of governing body;
+(11) "Northern area" means the County of the City of Aberdeen, the counties of Aberdeen, Banff, Caithness, Inverness, Kincardine, Orkney, Ross and Cromarty, Sutherland and Zetland, and the combined county of Moray and Nairn and the burghs in the said counties and combined county;
+(12) "Registered teacher" means teacher registered by the General Teaching Council for Scotland under section 6 of the Teaching Council (Scotland) Act 1965 and, until 31st March 1968, shall be deemed to include certificated teacher;
+(13) "Regulations of 1958" means the Teachers (Training Authorities) (Scotland) Regulations 1958;
+(14) "Schools" means public schools, grant-aided schools, demonstration schools, independent schools and approved schools within the meaning of section 110(1) of the Children and Young Persons (Scotland) Act 1937(a);
+(15) "Senate" in relation to university means the Senatus Academicus of that university;
+(16) "South-eastern area" means the County of the City of Edinburgh and the counties of Berwick, East Lothian, Midlothian, Peebles, Roxburgh, Selkirk, Stirling and West Lothian and the burghs in the said counties;
+(17) "South-western area" means the County of the City of Glasgow and the counties of Argyll, Ayr, Bute, Dumfries, Dunbarton, Kirkcudbright, Lanark, Renfrew and Wigtown and the burghs in the said counties;
+(18) "Training Regulations" means regulations made under section 7 of the Teaching Council (Scotland) Act 1965; and
+(19) "Vice-principal" means the senior vice-principal in college where there is more than one vice-principal.
+
+(a) S.I. 1958/1634 (1958 I, p. 1025).
+(b) S.I. 1959/477 (1959 I, p. 1068).
+
+35.---(1) The responsibilities of an existing governing body, including responsibility for payment of pensions and superannuation benefits to retired members of staff, shall be transferred to the governing body of the same name constituted under these regulations.
+
+(2) The responsibilities of the Scottish Council for the Training of Teachers for the payment of pension and superannuation benefits both to retired members of staff and to serving members other than those entering the employment of another governing body shall be transferred to the governing body of Moray House College of Education.
+
+William Ross,
+One of Her Majesty's Principal Secretaries of State.
+St. Andrew's House, Edinburgh, 10th January 1967.
+
+11.---(1) Each governing body shall hold at least 3 ordinary meetings a year and the first ordinary meeting in the first year of the period of office of the governors shall be held within 1 month of the date on which the period of office begins.
+
+(2) The quorum at a meeting of a governing body shall be not less than one third of the membership.
+
+(3) Each governing body shall elect a chairman from such of its members as are not members of the staff of the college of education.
+
+(4) The principal of the college of education shall be vice-chairman of the governing body, ex officio.
+
+(5) Each governing body may appoint such committees (consisting either wholly of members of the governing body or partly of such members and partly of other persons) as the governing body thinks fit; and any committee so appointed may appoint such sub-committees as the committee thinks fit.
+
+
+
+9. The functions of a governing body, and any committee thereof, may be exercised notwithstanding any vacancy in the membership thereof; and the proceedings of the governing body or any such committee shall not be invalidated by reason only of any defect in the appointment, election or co-option of a member.
+
+20.---(1) For the purpose of exercising its functions under Part III each governing body shall appoint a principal and such other whole-time and part-time staff as it may require provided that:-
+(a) in any college other than Craiglockhart College of Education or Notre Dame College of Education, for the purpose of filling any vacancy in the post of principal lecturer or sole lecturer in religious education a committee shall be appointed by the governing body to make recommendations to it as to the filling of the post and at least one member of the said committee shall be a person appointed to the governing body by the General Assembly of the Church of Scotland;
+(b) in filling any vacancy in the post of Principal of Craiglockhart College of Education the governing body of the said college shall appoint a member of the Society of the Sacred Heart who possesses teaching qualifications and experience satisfactory to the governing body;
+(c) in filling any vacancy in the post of Principal of Notre Dame College of Education the governing body of the said college shall appoint a member of the Congregation of Notre Dame who possesses teaching qualifications and experience satisfactory to the governing body;
+(d) in filling any vacancy in the post of Headmistress of the Demonstration School attached to Craiglockhart College of Education and known as the School of the Convent of the Sacred Heart the governing body of the said college shall appoint a member of the Society of the Sacred Heart who possesses teaching qualifications and experience satisfactory to the governing body;
+(e) no person shall be appointed by the governing body of either Craiglockhart College of Education or Notre Dame College of Education to the teaching staff of the college unless she or he is approved as regards religious belief and character by the Scottish Hierarchy of the Roman Catholic Church.
+
+(2) Each governing body may require any person employed by it whose responsibility includes intromission with its funds to find such caution as it may determine for his duly accounting for his intromissions.
+
+(3) Each governing body may, with the approval of the Secretary of State, pay pensions and other superannuation benefits to persons who have been employed by them or by the Scottish Council for the Training of Teachers constituted under the Teachers (Training Authorities) (Scotland) Regulations 1958.
+
+6.---(1) The period of office of the governors first appointed or elected under these regulations shall, subject to the provisions of Regulation 7, end on the second Tuesday of May 1971, and the period of office of the governors appointed or elected to succeed these governors shall, subject also to the said provisions, end on the second Tuesday of May 1975 and so on at intervals of 4 years.
+
+(2) Each governing body shall, on or about 1st February in each year in which periods of office expire under the last foregoing paragraph, intimate the impending vacancies to the appointing bodies concerned or to the Secretary of State as the case may be, and the said bodies or the Secretary of State as the case may be shall make appointments to fill the vacancies in accordance with the relevant provisions of Schedule 1 before or as soon as possible after the second Tuesday of May.
+
+(3) The elections of teachers to be governors shall be conducted in accordance with the procedure prescribed in Schedule 2.
+
+10.---(1) Each governing body shall provide for the safe custody of its common seal.
+
+(2) The common seal shall not be fixed to any deed except in accordance with a resolution of the governing body and in the presence of a member of the governing body and of an official of the governing body who has been empowered to sign deeds, and the member of the governing body and the official shall sign the deed to which the seal was affixed in their presence.
+
+(3) Any deed of the governing body shall be recognised as validly executed if it is sealed with the common seal of the governing body and signed by a member of the governing body and by an official of the governing body who has been empowered by the governing body to sign deeds.
+
+4.---(1) With the general object of ensuring that teachers are adequately prepared for service in the educational establishments of Scotland, and for the particular purpose of carrying these regulations and any other regulations relating to the education and training of teachers in Scotland into effect, the governing bodies specified in the next following paragraph shall, subject to the provisions of paragraph (5), provide administer and conduct the college of education of which they are constituted as governors.
+
+(2) The governing bodies shall be and are hereby constituted under the following names, that is to say:-
+"The Governors of Aberdeen College of Education", "The Governors of Callendar Park College of Education", "The Governors of Craigie College of Education", "The Governors of Craiglockhart College of Education",
+"The Governors of Dundee College of Education",
+"The Governors of Dunfermline College of Physical Education, Edinburgh", "The Governors of Hamilton College of Education", "The Governors of Jordanhill College of Education", "The Governors of Moray House College of Education", and "The Governors of Notre Dame College of Education".
+
+(3) Each of the said governing bodies shall be body corporate having perpetual succession and common seal, with full power by and in such name--
+(a) to sue and be sued;
+(b) to enter into contracts or agreements for the purposes of its functions under these regulations;
+(c) to accept, hold and dispose of money or other moveable property for the said purposes;
+(d) to accept any endowments, whether subject to special conditions or not, for the furtherance of the said purposes; and
+(e) to invest any moneys and funds held by it which are not immediately required to be expended for the said purposes on or upon any investments for the time being authorised by law for the investment of trust funds, and to vary or transpose any investments held or made by it into investments of a nature so authorised; and, subject to the provisions of these regulations, with all other rights, powers and privileges of body corporate.
+
+(4) Notwithstanding the provisions of the last foregoing paragraph the governing bodies shall not have power to borrow money other than power to borrow not exceeding 6 months on overdraft from their bankers.
+
+(5) The religious instruction and religious training of the students attending Craiglockhart College of Education and Notre Dame College of Education shall be the sole responsibility of the Scottish Hierarchy of the Roman Catholic Church.
+
+
+
+15.---(1) Each governing body, if the Secretary of State so requires, shall undertake the selection of candidates for assistance under any scheme devised by him for recruitment to the teaching profession, and for this purpose shall appoint selection boards which shall act in accordance with such guidance as the Secretary of State may give after consultation with governing bodies.
+
+(2) Any candidate who is aggrieved by any decision of a selection board may, within 1 month of the date on which the decision is intimated to him, appeal to the governing body, whose decision shall be final.
+
+24. Each governing body shall, in consultation with representatives of students attending the college of education under their administration, make a scheme for the constitution and functions of students' representative council in the college; and the said scheme shall also prescribe rules under which the said council shall be entitled to make representations to the governing body.
+
+
+
+7.---(1) A governor shall be deemed to have vacated his office as governor, and the governing body shall declare his place vacant, in the following circumstances--
+(a) where he intimates in writing his resignation as a governor,
+(b) where he ceases to hold an office in respect of which he was qualified for appointment or election to the governing body, provided that he shall be deemed not to have ceased to hold the said office if he is at the first opportunity re-appointed or re-elected to the said office,
+(c) where he becomes bankrupt,
+(d) where he becomes incapacitated to hold office as governor,
+(e) where he fails without leave of the governing body to attend any meeting of the governing body or of committee or sub-committee of the governing body for a period of 6 months.
+
+(2) Where the place of a governor who has been appointed to the office of governor has been declared vacant under the last foregoing paragraph or where an appointed governor has died, the governing body shall intimate the vacancy to the appointing body concerned or to the Secretary of State, as the case may be, and that body or the Secretary of State, as the case may be, may appoint a governor to fill the vacancy.
+
+(3) Where the place of a governor who has been elected to the office of governor has been declared vacant, or where an elected governor has died, or where in one of the elections held under Regulation 6(3) and Schedule 2 no person is declared to have been duly elected or the number of persons declared to have been duly elected is less than the number prescribed in the relevant provision of Schedule 1, the elected members of the governing body may co-opt a person who is, or, as the case may be, persons who are, eligible to be elected to the vacant place or places.
+
+(4) A governor appointed or co-opted under this regulation shall, subject to the provisions of paragraph (1) of this regulation, hold office for the remainder of the current period of office of the governors.
+
+32. The following regulations are hereby revoked:-
+
+(1) The Teachers (Training Authorities) (Scotland) Regulations 1958, provided that:-
+(a) the Scottish Council for the Training of Teachers shall remain in being and shall exercise the functions (other than functions specified in Regulation 43) assigned to them under Parts IV and V thereof and under the Teachers (Education, Training and Certification) (Scotland) Regulations 1965(b) until 31st March 1967; and
+(b) each governing body constituted thereunder being a governing body whose period of office ends on the second Tuesday of May 1967 shall, until the end of the said period, be deemed to be the governing body of the same name constituted under Regulation 4 of these regulations and shall, until 31st March 1967, be empowered to provide courses leading to certificates awarded under the Teachers (Education, Training and Certification) (Scotland) Regulations 1965; and
+
+(2) The Teachers (Special Recruitment) (Scotland) Regulations 1952(c).
+
+(a) 1948 c. 26.
+(b) S.I. 1965/55 (1965 I, p. 72).
+(c) S.I. 1952/660 (1952 I, p. 860).
+
+29. The Secretary of State may reduce or withhold a grant if any condition imposed by this part of these regulations is not fulfilled.
+
+31. Each governing body shall make such reports and returns and give such information to the Secretary of State as he may require.
+
+
+
+19. For the purpose of the foregoing regulation and subject to the provisions of Regulation 27, each governing body:-
+
+(1) may acquire, dispose of, and otherwise intromit with, rights in land and buildings; and
+
+(2) shall erect, enlarge, improve, equip, furnish and generally maintain in good order such buildings as may be required: provided that in relation to the Governors of Craiglockhart College of Education and the Governors of Notre Dame College of Education the arrangements specified in Schedule 3 shall apply.
+
+21.---(1) Each governing body shall pay to the staff employed by them salaries in accordance with scales or rates approved by the Secretary of State provided that the Teachers' Salaries (Scotland) Regulations 1966(a) shall apply to the salaries of teaching staff employed in demonstration schools as they apply to the salaries of teachers employed by education authorities.
+
+(2) In approving salary scales or rates under the foregoing paragraph, the Secretary of State shall have regard to any recommendations made to him by any body constituted with his approval by agreement between the governing bodies on the one hand and the staffs, or any association representative of the staffs, employed by them on the other.
+
+(a) S.I. 1966/831 (1966 II, p. 1919).
+
+28. A grant under this part of these regulations may be paid in a lump sum or by instalments for such amount as the Secretary of State may determine.
+
+23.---(1) A board of studies shall be constituted in each college of education.
+
+(2) The board shall be composed in the manner prescribed in Part I of Schedule 4 and the procedure of the board shall be regulated in the manner prescribed in Part II of the said Schedule.
+
+(3) The functions of the board shall be:-
+(a) to advise upon, and assist the principal in relation to, the co-ordination of studies, including teaching method and practice, the maintenance of standards, the discipline of the students and, generally, questions falling within the ambit of the responsibilities of the teaching staff; and
+(b) to appoint members of the teaching staff to serve on the governing body in accordance with the relevant provisions of Schedule 1.
+
+
+
+14. Each governing body may, either by itself or in co-operation with other bodies, promote research into educational problems and assist members of its staff to undertake research work.
+
+1. These regulations may be cited as the Teachers (Colleges of Education) (Scotland) Regulations 1967 and shall come into operation on 21st January 1967.
+
+33. The heritable properties vested in an existing governing body shall continue to be vested in the governing body of the same name constituted under these regulations.
+
+18.---(1) Each governing body shall provide in the college under its administration such facilities as are required for the exercise of its functions under Part III of these regulations and such provision may include demonstration school, residential accommodation and facilities for meals both for staff and students and for the staff and pupils of demonstration school.
+
+(2) The provisions of the Schools (Scotland) Code 1956(a) shall apply to a demonstration school.
+
+(a) S.I. 1956/894 (1956 I, p. 735).
+
+5.---(1) The governing bodies shall be composed in the manner prescribed in Schedule 1.
+
+(2) The Secretary of State may appoint not more than 2 persons to be assessors to each governing body; and each such assessor (or in his absence such other person as may be nominated by him) shall be entitled to attend and speak at the meetings of the governing body and of any committee thereof; but no assessor shall be entitled to vote at any such meeting.
+
+17.---(1) In order to facilitate the exercise of their functions and the process of consultation on matters of common interest, governing bodies are empowered jointly to appoint a committee on such basis as they agree to be appropriate and may give the committee power to appoint such sub-committees as the committee thinks fit (consisting either wholly of members of the committee or partly of such members and partly of other persons).
+
+(2) Expenditure incurred in connection with the work of the foregoing committee and of its sub-committees (if any) shall be shared by agreement among the governing bodies concerned.
+
+22.---(1) The principal shall have under his direct control, and shall be responsible to the governing body for, the whole organisation and discipline of the college.
+
+(2) The principal may suspend any member of the teaching staff who is, in his opinion, guilty of serious misconduct, provided that he shall report the suspension to the chairman or, if he is not available, to another member of the governing body within 2 days, provided also that suspension shall not affect the rights of the person suspended to the salary or other emoluments of his post.
+
+(3)(a) The principal may suspend from attendance at the college any student who is, in his opinion, guilty of serious misconduct;
+(b) At the time of such suspension or as soon as practicable thereafter the principal shall inform the student in writing of the grounds on which he has been suspended; shall give him an opportunity to reply; and shall thereupon decide whether the student should be reinstated, should continue to be suspended or should be expelled;
+(c) Where the principal decides that the student should continue to be suspended, or should be expelled, he shall inform the student in writing and the student may, within 14 days of the principal's decision being so intimated to him, appeal to the governing body;
+(d) Where the student so desires, the governing body shall afford him the opportunity of appearing before them and of being heard in relation to the appeal, in person or through a representative and in the consideration of any such appeal no governor who has been concerned with the suspension of the student under sub-paragraph (a) shall act as a member of the governing body;
+(e) The decision of the governing body shall be final.
+
+(4) Where in the opinion of the board of studies a student is failing to make satisfactory progress, the principal shall warn the student, or shall cause warning to be given to him, that if his progress continues to be unsatisfactory he may be required to leave the college, and if after a reasonable period the board of studies are still of the opinion that the student's progress is unsatisfactory, the principal may require the student to leave the college, and the student shall leave forthwith.
+
+(5) In the absence of the principal, his powers and duties as set out in the foregoing paragraphs shall be exercisable by the vice-principal.
+
+16. A governing body shall, if the Secretary of State so requires, undertake the planning and construction of an additional college of education and for this purpose and until the Secretary of State by regulations constitutes a governing body for the said college shall be deemed to be and shall act as the governing body for the said college in all respects as if it had been so constituted under Regulation 4.
+
+---
+
+## `get_legislation_text`, HTTP 200
+
+```json
+{
+ "legislation_id": "uksi/1972/59"
+}
+```
+
+### The Raising of the School Leaving Age (Scotland) Regulations 1972
+`http://www.legislation.gov.uk/id/uksi/1972/59`
+
+In exercise of the powers conferred upon me by section 32(2) of the Education (Scotland) Act 1962(a), and of all other powers enabling me in that behalf, and after being satisfied that it is practicable to raise the upper limit of the school age to sixteen years, I hereby make the following regulations:-
+
+Subsection (1) of section 32 of the Education (Scotland) Act 1962 shall have effect with the substitution of references to the age of sixteen years for references to the age of fifteen years.
+
+These regulations may be cited as the Raising of the School Leaving Age (Scotland) Regulations 1972 and shall come into operation on 1st September 1972.
+
+---
+
+## `get_legislation_text`, HTTP 200
+
+```json
+{
+ "legislation_id": "uksi/1971/1537"
+}
+```
+
+### The Milk and Meals (Education) (Scotland) Regulations 1971
+`http://www.legislation.gov.uk/id/uksi/1971/1537`
+
+In exercise of the powers conferred on me by section 53(3) of the Education (Scotland) Act 1962(a), as read with section 2(3) of the Education (Milk) Act 1971(b), and by section 144(5) of the said Act of 1962, and of all other powers enabling me in that behalf, I hereby make the following regulations:-
+
+8.—(1) The Meals Service (Scotland) Regulations 1953(a) and regulation 11 of the Abolition of the Education (Scotland) Fund (Consequential Provisions) Regulations 1959(b) are hereby revoked.
+
+(2) Section 38 of the Interpretation Act 1889 shall apply as if these regulations were an Act of Parliament and as if the regulations revoked by these regulations were Acts of Parliament repealed by an Act of Parliament.
+
+(a) S.I. 1953/65 (1953 I, p. 642). (b) S.I. 1959/476 (1959 I, p. 1095).
+
+3.—(1) Where an education authority in implement of their duty under section 53 of the Act provide milk for pupils, the authority, in relation to each day on which they do so, shall provide—
+(a) one-third of a pint of milk for each pupil receiving primary education until the 1st August first occurring after the date on which he attains the age of seven;
+(b) one-third of a pint of milk for each other pupil receiving primary education in respect of whom there is for the time being in force a certificate given by a medical officer of the education authority stating that the pupil's health requires that he should be provided with milk at school;
+(c) not less than one-third and not more than two-thirds of a pint of milk for each pupil receiving special education.
+
+(2) An education authority acting in implement of their said duty, or in exercise of their powers under section 2(2) of the Act of 1971, to provide milk, shall provide pasteurised, sterilised or ultra heat treated milk:
+
+Provided that on any occasion when the authority are satisfied that such milk is not obtainable, the authority shall in lieu thereof provide—
+(a) milk from such sources and of such quality as are approved for this purpose by the medical officer of health for the area of the authority; or
+(b) dried full cream milk prepared for drinking.
+
+(3) In paragraph (2) above the expressions "pasteurised", "sterilised", and "ultra heat treated", in relation to milk, mean milk in respect of which the special designations "Pasteurised", "Sterilised" and "Ultra Heat Treated" respectively are lawfully used by virtue of the Milk (Special Designations) (Scotland) Order 1965(a) as amended (b), and the expression "dried full cream milk" means milk so described which may be lawfully sold as so described by virtue of the Dried Milk (Scotland) Regulations 1965(c).
+
+(a) S.I. 1965/253 (1965 I, p. 617). (b) S.I. 1966/1573 (1966 II, p. 4850). (c) S.I. 1965/1007 (1965 I, p. 2464).
+
+5. An education authority shall secure that milk, midday meals and other meals and refreshments provided by them under section 53 of the Act or under section 2(2) of the Act of 1971, as the case may be, shall be served, or prepared and served, as the case may be, under hygienic conditions.
+
+7.—(1) Subject to the provisions of this regulation and of section 2(2) of the Act of 1971, the expense incurred by an education authority in providing milk, meals and other refreshments under section 53 of the Act shall be defrayed by the authority.
+
+(2) The education authority shall in respect of every midday meal provided by them under section 53 of the Act for any pupil or child—
+(a) where a pupil is receiving school education (other than special education), or, where a child, having attained the age of five years, is awaiting admission to school, make arrangements for the payment by the parent of a charge of 12p;
+(b) where a pupil is receiving special education, make arrangements for the payment by the parent of such charge (if any) as they consider appropriate, not exceeding 6p;
+(c) in any other case make arrangements for the payment by the parent or the pupil, whichever appears to the authority to be the more appropriate, of such charge as they consider reasonable having regard to the cost of providing the food for and of preparing and serving the meal.
+
+(3) The education authority shall in respect of every meal (other than midday meal) or other refreshment provided by them under section 53 of the Act for any child or pupil make arrangements for the payment by the parent of such child or pupil or by the pupil, whichever appears to the authority to be the more appropriate, of such charge as they consider reasonable having regard to the cost of providing the food or drink for the said meal or refreshment, as the case may be, and of preparing and serving it.
+
+(4) Arrangements made by an education authority under sub-paragraphs (a) and (b) of paragraph (2) of this regulation shall include provision for the remission of any charge mentioned in the sub-paragraphs in the case of any parent who satisfies them that he is unable to pay it without financial hardship:
+
+Provided that for the purposes of this paragraph a parent who is in receipt of a supplementary allowance or a supplementary pension under section 4 of the Ministry of Social Security Act 1966(a) or a family income supplement under section 1 of the Family Income Supplements Act 1970(b) shall be deemed to be unable to pay any charge under the said sub-paragraphs (a) and (b) without financial hardship and in the case of a parent not in receipt of any such benefit the question whether he is unable to pay such charge without financial hardship shall be determined in accordance with the Schedule to these regulations.
+
+(a) 1966 c. 20. (b) 1970 c. 55.
+
+6.—(1) An education authority shall provide such premises, equipment and transport and such other incidental and ancillary facilities and services as the authority consider adequate for the purposes of the discharge of their duties or the exercise of their powers, as the case may be, under section 53 of the Act, section 2(1) and (2) of the Act of 1971 and these regulations or, if the Secretary of State is not satisfied as to the adequacy of such provision, as he may at any time require.
+
+(2) All the facilities (including premises and equipment) provided by an education authority for the aforesaid purposes shall be open to inspection by any person authorised in that behalf by the Secretary of State.
+
+These Regulations may be cited as the Milk and Meals (Education) (Scotland) Regulations 1971 and shall come into operation on 28th September 1971.
+
+4. Where an education authority provide midday meals under section 53 of the Act, the authority shall secure that the meals so provided shall be—
+(a) suitable and adequate in all respects as the main meal of the day for the recipients thereof; and
+(b) so planned as to secure variety and nutritious and balanced dietary appropriate to the age of such recipients.
+
+2.—(1) In these regulations, unless the context otherwise requires—
+"the Act" means the Education (Scotland) Act 1962, as read with the Act of 1971;
+"the Act of 1971" means the Education (Milk) Act 1971, in its application to Scotland;
+"medical officer of health" has the same meaning as in section 79(1) and 87(1) of the Local Government (Scotland) Act 1947(c); and
+"provide", in relation to milk or midday meals, includes the making of arrangements for the provision of milk or midday meals.
+
+(2) Any reference in these regulations to any enactment, order or other regulations shall, unless the context otherwise requires, be construed as reference to such enactment, order or regulations as amended, re-enacted or replaced by any subsequent enactment, order or regulations.
+
+(3) The Interpretation Act 1889(d) shall apply for the interpretation of these regulations as it applies for the interpretation of an Act of Parliament.
+
+(a) 1962 c. 47. (b) 1971 c. 74. (c) 1947 c. 43. (d) 1889 c. 63.
+
+---
+
+## `get_legislation_text`, HTTP 200
+
+```json
+{
+ "legislation_id": "uksi/1975/1135"
+}
+```
+
+### The Schools General (Scotland) Regulations 1975
+`http://www.legislation.gov.uk/uksi/1975/1135/made`
+
+These Regulations prescribe certain standards and general requirements to which every education authority shall conform in discharging their functions under Section 1 of the Education (Scotland) Act 1962. They require an education authority to open schools for a minimum number of school days except where prevented by circumstances outwith their control; to close a school temporarily or to take other measures when advised by a designated medical officer of a health board; to determine the maximum number of pupils to be accommodated in each room used for instruction; to keep registers recording admission, withdrawal and attendance of pupils; to maintain for each pupil a pupil’s progress record containing prescribed information; and to permit an Inspector to visit a school at any time and to inspect any documents kept in the school. The Regulations also deal with admission to and exclusion from public schools and the formation of good habits in pupils; empower an education authority to authorise classes to be held outwith school premises; and contain provisions applicable to special schools.
+
+Section 1) **Citation and commencement**
+These regulations, which may be cited as the Schools General (Scotland) Regulations 1975, shall come into operation on 9th August 1975. 
+
+Section 2) **Interpretation**
+
+1) The Interpretation Act 1889  shall apply for the interpretation of these regulations as it applies for the interpretation of an Act of Parliament. 
+2) In these regulations, unless the context otherwise requires, references to any enactment shall be construed as references to that enactment as amended, re-enacted or substituted (whether before or after the coming into operation of these regulations) by any other enactment. 
+
+Section 3) **Definitions**
+In these regulations, unless the context otherwise requires, the following expressions have the meanings respectively assigned to them:— 
+	- “Act of 1962” means the Education  (Scotland) Act 1962;
+	- “boarding school” means a residential school other than a residential outdoor school;
+	- “designated medical officer” shall have the same meaning as in section 63(1) of the  National Health Service (Scotland) Act 1972  ;
+	- “class” means a group of pupils for the time  being under the immediate charge of a teacher;
+	- “day school” means a school which has no  residential pupils;
+	- “health board” shall have the same meaning as in section 63(1) of the National Health Service (Scotland) Act
+ 1972
+	- “Inspector” means one of Her Majesty’s Inspectors and includes any other person appointed by the Secretary of State
+ under section 67 of the Act of 1962 to inspect educational establishments
+	- “residential outdoor school” means a residential centre to which pupils in attendance at school are sent for short periods of education or for periods of recuperation and education
+	- “school day”, in relation to a school, means a day on which the school is open for the purpose of providing school education
+	- “school year” means a period of 12 months commencing on 1st August of any year;and, unless the context otherwise requires, other expressions used in these regulations which are also used in the Act of 1962 shall have the same meaning in these regulations as they have in that Act. 
+
+Section 4) **Admission to and exclusion from schools**
+In discharging their functions under section 1 of the Act of 1962, an education authority shall not refuse a pupil, who is ordinarily resident in their area, admission to a school under their management or exclude a pupil from such a school to which he has been admitted, unless they consider that, having regard to the provisions of section 29 of that Act, 
+	a) the admission of the pupil to the school or the continued attendance of the pupil at the school would be inconsistent with any scheme prepared by them under section 7 or 30 of the Act of 1962 and approved by the Secretary of State under section 70 of that Act; or 
+	b) the parent of the pupil refuses or fails to comply, or to allow the pupil to comply, with the rules, regulations or disciplinary requirements of the school;
+or 
+	c) for reasons other than those mentioned in (a) or (b) above, they cannot otherwise ensure the provision of adequate and efficient school education. 
+
+Section 5) **Minimum number of school days**
+An education authority shall, except where prevented by circumstances outwith their control, secure that every school under their management shall be open for at least 200 school days (excluding Saturdays and Sundays) in each school year. 
+
+Section 6) **Closure of schools on advice of medical officer**
+Where a designated medical officer of a health board advises an education authority that, in order to prevent the spread of disease or other danger to health, a school under their management should be closed temporarily or that certain pupils should be excluded from that school for a specified time or, where that school is a boarding school, that the pupils should be confined to the school premises for a
+specified time, the education authority shall forthwith close that school or exclude or confine the said pupils, as the case may be, accordingly. 
+
+Section 7) **Classes outwith school premises**
+Classes in any school under the management of an education authority shall normally meet in the school premises, but any class may be held outwith the school premises if arrangements for this are authorised by that education authority. 
+
+Section 8) **Number of pupils in rooms**
+
+1) An education authority shall determine from time to time the maximum number of pupils who may be suitably accommodated in every room to which this regulation applies in any school under their management and, in discharging their duty under this regulation, the authority shall have regard to the dimensions of the room and the type of equipment provided, or to be provided, the safety and health of the pupils to be accommodated and the type of instruction to be given, in the room; and any determination under this regulation may provide for different maximum numbers in relation to different
+types of instruction. 
+2) The education authority shall cause a record to be kept in every school under their management showing, for every room to which this regulation applies in that school, the dimensions of the room and their determination under this regulation in respect of the room. 
+3) This regulation applies to every room where the room is or may be used for any form of instruction, and in this regulation “room” in relation to an open plan school includes any open plan teaching area. 
+
+Section 9) **Registers**
+An education authority shall cause registers to be kept and preserved in respect of every school under their management in accordance with the provisions of Schedule 1 to these regulations. 
+
+Section 10) **Pupils' progress records**
+
+1) An education authority shall cause a record, to be known as a pupil’s progress record, to be kept for every pupil in attendance at a school under their management and such record shall, in relation to the pupil, contain information, which shall be checked or adjusted as necessary at least once a year and on transfer of the pupil to another school, about the following matters, that is to say— 
+	a) the pupil’s full name and address, date of birth, position in his family and his parent’s name and address, occupation and, where appropriate, place of work; 
+	b) the name and address of any person other than the parent who may be notified in the case of any emergency affecting the pupil; 
+	c) the schools (whether public, grant-aided or independent) attended by the pupil, with the dates of admission and leaving and the designation of the class from which he left; 
+	d) the results, with dates, of any objective or diagnostic tests administered to the pupil; 
+	e) a note of any factors adversely affecting the pupil’s educational capacity or attainment; 
+	f) the pupil’s health record; 
+	g) where appropriate, information about the pupil’s emotional and social development; 
+	h) the pupil’s educational progress during each annual stage of school education; and 
+	i) where the pupil is in attendance at a secondary school, information about any positions of responsibility held by him in the school or where appropriate in any organisation. 
+2) Each pupil’s progress record shall remain in the custody of the education authority providing the pupil’s education and shall be preserved by that authority for a period of five years following that pupil’s final attendance at school; provided that, where a pupil transfers to another school, which is not under the management of that education authority and which is a public or grant-aided school, they shall, when requested to do so by the person or body of persons responsible for the management of that other school, transmit that record to that person or body of persons. 
+3) The information contained in a pupil’s progress record shall be used only for the purpose of supervising that pupil’s educational development and of giving adequate advice and assistance to, or in relation to, that pupil. The contents of the record or any part thereof shall only be disclosed to persons authorised in that behalf by the Secretary of State or the education authority for the time being having custody of the record. 
+
+Section 11) **Formation of good habits in pupils**
+In the day to day conduct of every school under their management, an education authority shall ensure that care is taken to develop, in pupils in attendance at that school, reasonable and responsible social attitudes and relationships, to cultivate in such pupils consideration for others, and to encourage in such pupils the practice of good manners, good attitudes to work, initiative and self-reliance and habits of personal hygiene and cleanliness. 
+
+Section 12) **Special schools**
+
+1) An education authority shall secure that no pupil shall be admitted to a special school (other than a child guidance clinic) under their management, unless they or an education authority in whose area the child is or was resident have decided under section 65 of the Act of 1962 that the pupil requires special education and that decision has not been revoked. 
+2) In the application of these regulations to a special school which is a child guidance clinic under the management of an education authority, regulations 4, 5, 9, and 10 of and Schedule 1 to these regulations shall not apply. 
+3) An education authority shall secure that no pupil in a special school under their management shall be compelled to take part in religious observance or to receive religious instruction contrary to the wishes of his parent and in discharging their duty under this paragraph the education authority shall give the parent of every such pupil an opportunity of expressing his wishes on the matter. 
+
+Section 13) **Visits by Inspectors**
+An education authority shall permit an Inspector acting under section 67 of the Act of 1962 to visit any school under their management at any time without notice and to see any documents which are kept in that school. 
+
+Section 14) **Amendments**
+The regulations mentioned in Schedule 2 to these regulations shall have effect subject to the amendments specified in relation to them in that Schedule. 
+
+Section 15) **Revocations and savings**
+
+1) The regulations mentioned in Column (1) of Schedule 3 to these regulations are hereby revoked to the extent specified in Column (2) of that Schedule. 
+2) Section 38(2) of the Interpretation Act 1889 shall apply as if these regulations were an Act of Parliament and as if the regulations revoked by these regulations were Acts of Parliament repealed by an Act of Parliament. 
+16) Insofar as anything done under or for the purposes of a regulation revoked by these regulations and in force at the coming into operation of these regulations could have been done under or for the purposes of a provision of these regulations, it shall continue in force and be deemed to have been done under or for the purposes of that provision. 
+17) Any reference in any enactment to any provision of a regulation revoked by these regulations shall, insofar as it has been re-enacted, with or without modifications, by a provision of these regulations, be construed, unless the context otherwise requires, as a reference to the provision so re-enacted. 
+
+Section 15) **Revocations and savings**
+
+1) The regulations mentioned in Column (1) of Schedule 3 to these regulations are hereby revoked to the extent specified in Column (2) of that Schedule. 
+2) Section 38(2) of the Interpretation Act 1889 shall apply as if these regulations were an Act of Parliament and as if the regulations revoked by these regulations were Acts of Parliament repealed by an Act of Parliament. 
+16) Insofar as anything done under or for the purposes of a regulation revoked by these regulations and in force at the coming into operation of these regulations could have been done under or for the purposes of a provision of these regulations, it shall continue in force and be deemed to have been done under or for the purposes of that provision. 
+17) Any reference in any enactment to any provision of a regulation revoked by these regulations shall, insofar as it has been re-enacted, with or without modifications, by a provision of these regulations, be construed, unless the context otherwise requires, as a reference to the provision so re-enacted. 
+
+Section 15) **Revocations and savings**
+
+1) The regulations mentioned in Column (1) of Schedule 3 to these regulations are hereby revoked to the extent specified in Column (2) of that Schedule. 
+2) Section 38(2) of the Interpretation Act 1889 shall apply as if these regulations were an Act of Parliament and as if the regulations revoked by these regulations were Acts of Parliament repealed by an Act of Parliament. 
+16) Insofar as anything done under or for the purposes of a regulation revoked by these regulations and in force at the coming into operation of these regulations could have been done under or for the purposes of a provision of these regulations, it shall continue in force and be deemed to have been done under or for the purposes of that provision. 
+17) Any reference in any enactment to any provision of a regulation revoked by these regulations shall, insofar as it has been re-enacted, with or without modifications, by a provision of these regulations, be construed, unless the context otherwise requires, as a reference to the provision so re-enacted. 
+
+13. An education authority shall permit an Inspector acting under section 67 of the Act of 1962 to visit any school under their management at any time without notice and to see any documents which are kept in that school.
+
+3. In these regulations, unless the context otherwise requires, the following expressions have the meanings respectively assigned to them:-
+
+"Act of 1962" means the Education (Scotland) Act 1962;
+
+"boarding school" means a residential school other than a residential outdoor school;
+
+"designated medical officer" shall have the same meaning as in section 63(1) of the National Health Service (Scotland) Act 1972(d);
+
+"class" means a group of pupils for the time being under the immediate charge of a teacher;
+
+"day school" means a school which has no residential pupils;
+
+"health board" shall have the same meaning as in section 63(1) of the National Health Service (Scotland) Act 1972;
+
+"Inspector" means one of Her Majesty's Inspectors and includes any other person appointed by the Secretary of State under section 67 of the Act of 1962 to inspect educational establishments;
+
+"residential outdoor school" means a residential centre to which pupils in attendance at school are sent for short periods of education or for periods of recuperation and education;
+
+"school day", in relation to a school, means a day on which the school is open for the purpose of providing school education;
+
+"school year" means a period of 12 months commencing on 1st August of any year;
+
+and, unless the context otherwise requires, other expressions used in these regulations which are also used in the Act of 1962 shall have the same meaning in these regulations as they have in that Act.
+
+(a) 1962 c. 47.    (b) 1969 c. 49.
+(c) 1889 c. 63.    (d) 1972 c. 58.
+
+2.—(1) The Interpretation Act 1889(c) shall apply for the interpretation of these regulations as it applies for the interpretation of an Act of Parliament.
+
+(2) In these regulations, unless the context otherwise requires, references to any enactment shall be construed as references to that enactment as amended, re-enacted or substituted (whether before or after the coming into operation of these regulations) by any other enactment.
+
+9. An education authority shall cause registers to be kept and preserved in respect of every school under their management in accordance with the provisions of Schedule 1 to these regulations.
+
+12.—(1) An education authority shall secure that no pupil shall be admitted to a special school (other than a child guidance clinic) under their management, unless they or an education authority in whose area the child is or was resident have decided under section 65 of the Act of 1962 that the pupil requires special education and that decision has not been revoked.
+
+(2) In the application of these regulations to a special school which is a child guidance clinic under the management of an education authority, regulations 4, 5, 9, and 10 of and Schedule 1 to these regulations shall not apply.
+
+(3) An education authority shall secure that no pupil in a special school under their management shall be compelled to take part in religious observance or to receive religious instruction contrary to the wishes of his parent and in discharging their duty under this paragraph the education authority shall give the parent of every such pupil an opportunity of expressing his wishes on the matter.
+
+15.—(1) The regulations mentioned in Column (1) of Schedule 3 to these regulations are hereby revoked to the extent specified in Column (2) of that Schedule.
+
+(2) Section 38(2) of the Interpretation Act 1889 shall apply as if these regulations were an Act of Parliament and as if the regulations revoked by these regulations were Acts of Parliament repealed by an Act of Parliament.
+
+8.—(1) An education authority shall determine from time to time the maximum number of pupils who may be suitably accommodated in every room to which this regulation applies in any school under their management and, in discharging their duty under this regulation, the authority shall have regard to the dimensions of the room and the type of equipment provided, or to be provided, the safety and health of the pupils to be accommodated and the type of instruction to be given, in the room; and any determination under this regulation may provide for different maximum numbers in relation to different types of instruction.
+
+(2) The education authority shall cause a record to be kept in every school under their management showing, for every room to which this regulation applies in that school, the dimensions of the room and their determination under this regulation in respect of the room.
+
+(3) This regulation applies to every room where the room is or may be used for any form of instruction, and in this regulation "room" in relation to an open plan school includes any open plan teaching area.
+
+7. Classes in any school under the management of an education authority shall normally meet in the school premises, but any class may be held outwith the school premises if arrangements for this are authorised by that education authority.
+
+5. An education authority shall, except where prevented by circumstances outwith their control, secure that every school under their management shall be open for at least 200 school days (excluding Saturdays and Sundays) in each school year.
+
+16. Insofar as anything done under or for the purposes of a regulation revoked by these regulations and in force at the coming into operation of these regulations could have been done under or for the purposes of a provision of these regulations, it shall continue in force and be deemed to have been done under or for the purposes of that provision.
+
+10.—(1) An education authority shall cause a record, to be known as a pupil's progress record, to be kept for every pupil in attendance at a school under their management and such record shall, in relation to the pupil, contain information, which shall be checked or adjusted as necessary at least once a year and on transfer of the pupil to another school, about the following matters, that is to say—
+
+(a) the pupil's full name and address, date of birth, position in his family and his parent's name and address, occupation and, where appropriate, place of work;
+
+(b) the name and address of any person other than the parent who may be notified in the case of any emergency affecting the pupil;
+
+(c) the schools (whether public, grant-aided or independent) attended by the pupil, with the dates of admission and leaving and the designation of the class from which he left;
+
+(d) the results, with dates, of any objective or diagnostic tests administered to the pupil;
+
+(e) a note of any factors adversely affecting the pupil's educational capacity or attainment;
+
+(f) the pupil's health record;
+
+(g) where appropriate, information about the pupil's emotional and social development;
+
+(h) the pupil's educational progress during each annual stage of school education; and
+
+(i) where the pupil is in attendance at a secondary school, information about any positions of responsibility held by him in the school or where appropriate in any organisation.
+
+(2) Each pupil's progress record shall remain in the custody of the education authority providing the pupil's education and shall be preserved by that authority for a period of five years following that pupil's final attendance at school; provided that, where a pupil transfers to another school, which is not under the management of that education authority and which is a public or grant-aided school, they shall, when requested to do so by the person or body of persons responsible for the management of that other school, transmit that record to that person or body of persons.
+
+(3) The information contained in a pupil's progress record shall be used only for the purpose of supervising that pupil's educational development and of giving adequate advice and assistance to, or in relation to, that pupil. The contents of the record or any part thereof shall only be disclosed to persons authorised in that behalf by the Secretary of State or the education authority for the time being having custody of the record.
+
+4. In discharging their functions under section 1 of the Act of 1962, an education authority shall not refuse a pupil, who is ordinarily resident in their area, admission to a school under their management or exclude a pupil from such a school to which he has been admitted, unless they consider that, having regard to the provisions of section 29 of that Act,
+
+(a) the admission of the pupil to the school or the continued attendance of the pupil at the school would be inconsistent with any scheme prepared by them under section 7 or 30 of the Act of 1962 and approved by the Secretary of State under section 70 of that Act; or
+
+(b) the parent of the pupil refuses or fails to comply, or to allow the pupil to comply, with the rules, regulations or disciplinary requirements of the school; or
+
+(c) for reasons other than those mentioned in (a) or (b) above, they cannot otherwise ensure the provision of adequate and efficient school education.
+
+14. The regulations mentioned in Schedule 2 to these regulations shall have effect subject to the amendments specified in relation to them in that Schedule.
+
+17. Any reference in any enactment to any provision of a regulation revoked by these regulations shall, insofar as it has been re-enacted, with or without modifications, by a provision of these regulations, be construed, unless the context otherwise requires, as a reference to the provision so re-enacted.
+
+1. These regulations, which may be cited as the Schools General (Scotland) Regulations 1975, shall come into operation on 9th August 1975.
+
+6. Where a designated medical officer of a health board advises an education authority that, in order to prevent the spread of disease or other danger to health, a school under their management should be closed temporarily or that certain pupils should be excluded from that school for a specified time or, where that school is a boarding school, that the pupils should be confined to the school premises for a specified time, the education authority shall forthwith close that school or exclude or confine the said pupils, as the case may be, accordingly.
+
+11. In the day to day conduct of every school under their management, an education authority shall ensure that care is taken to develop, in pupils in attendance at that school, reasonable and responsible social attitudes and relationships, to cultivate in such pupils consideration for others, and to encourage in such pupils the practice of good manners, good attitudes to work, initiative and self-reliance and habits of personal hygiene and cleanliness.

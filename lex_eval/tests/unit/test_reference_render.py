@@ -121,6 +121,96 @@ def test_citation_schedule_lists_the_links_the_metric_expects():
     assert "Lawfulness of processing" in markdown
 
 
+def test_a_lettered_section_keeps_its_capital_in_the_schedule_link():
+    """s.33A must link to `33A`, not to the lowercase id the metric matches on.
+
+    legislation.gov.uk is case-sensitive, so a link built from the lowercased
+    id 404s. A reviewer hit exactly that and could not check the citation.
+    """
+    answer = "See [s.33A](https://www.legislation.gov.uk/ukpga/1987/26/section/33A)."
+    markdown = render_markdown(
+        _record(
+            final_answer=answer,
+            sources_retrieved=[
+                {
+                    "uri": "http://www.legislation.gov.uk/ukpga/1987/26/section/33A",
+                    "title": "Power to modify section 33",
+                    "legislation_id": "ukpga/1987/26",
+                    "extent": ["Scotland"],
+                }
+            ],
+        )
+    )
+
+    assert "(https://www.legislation.gov.uk/ukpga/1987/26/section/33A)" in markdown
+    assert "legislation.gov.uk/ukpga/1987/26/section/33a)" not in markdown
+
+
+def test_a_provision_whose_id_ends_in_a_dot_keeps_it_in_the_schedule_link():
+    """`.../section/117135.` is a real identifier, dot included.
+
+    The citation parser strips a trailing dot so a citation at the end of a
+    sentence still matches. The reviewer's link must keep it, or it 404s.
+    """
+    uri = "http://www.legislation.gov.uk/ukpga/Eliz2/10-11/47/section/117135."
+    markdown = render_markdown(
+        _record(
+            final_answer=f"Repealed: [s.117]({uri}).",
+            sources_retrieved=[
+                {
+                    "uri": uri,
+                    "title": "Sections 117 to 135, repealed",
+                    "legislation_id": "ukpga/Eliz2/10-11/47",
+                    "extent": ["Scotland"],
+                }
+            ],
+        )
+    )
+
+    assert (
+        "(https://www.legislation.gov.uk/ukpga/Eliz2/10-11/47/section/117135.)"
+        in markdown
+    )
+
+
+def test_a_full_act_retrieval_shows_the_instrument_title_in_the_schedule():
+    """A row with a blank title is one a reviewer cannot mark up.
+
+    LEX nests an instrument's title under "legislation", so the title has to be
+    read from there when the whole instrument was retrieved rather than a
+    section of it.
+    """
+    from lex_eval.reference.lex_client import ApiCall, LexTools
+
+    tools = LexTools.__new__(LexTools)
+    tools.api_calls = [
+        ApiCall(
+            tool="get_legislation_text",
+            url="https://lex.example/legislation/text",
+            payload={"legislation_id": "uksi/1977/1261"},
+            status=200,
+            elapsed_ms=1,
+            response={
+                "legislation": {
+                    "title": "The Independent Schools Tribunal (Scotland) Rules 1977",
+                    "extent": [],
+                },
+                "full_text": "...",
+            },
+        )
+    ]
+
+    assert tools.sources_retrieved() == [
+        {
+            "uri": "http://www.legislation.gov.uk/id/uksi/1977/1261",
+            "title": "The Independent Schools Tribunal (Scotland) Rules 1977",
+            "legislation_id": "uksi/1977/1261",
+            "provision_type": "full_text",
+            "extent": [],
+        }
+    ]
+
+
 def test_an_answer_with_no_links_says_so_rather_than_showing_an_empty_table():
     markdown = render_markdown(_record(final_answer="No links at all."))
 
