@@ -72,17 +72,17 @@ An unexercised enabling power is unremarkable. Acts routinely carry powers that 
 
 ### 4. References
 
-Provisions of the Education (Scotland) Act 1962, retrieved at section level:
+A correct answer has to cite one thing: the Education (Scotland) Act 1962 itself.
 
-- Section 117 (repealed, no text held), [ukpga/Eliz2/10-11/47/section/117135.](http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/117135.)
-- Section 149, citation and extent, [ukpga/Eliz2/10-11/47/section/149](http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/149)
-- Sections 111 to 116 (repealed), [ukpga/Eliz2/10-11/47/section/111116](http://www.legislation.gov.uk/id/ukpga/Eliz2/10-11/47/section/111116)
+- [Education (Scotland) Act 1962](https://www.legislation.gov.uk/ukpga/Eliz2/10-11/47), `ukpga/Eliz2/10-11/47`
+- [Section 149, citation and extent](https://www.legislation.gov.uk/ukpga/Eliz2/10-11/47/section/149)
 
-Instruments whose enabling words were read, none of them made under section 117:
+Section 117 is deliberately not cited as a provision. It carries no text, so there
+is nothing at it to cite, and the repealed block it sits in is held under the
+composite identifier `ukpga/Eliz2/10-11/47/section/117135.`, which is not the form
+an answer would cite section 117 by.
 
-- [The Independent Schools Tribunal (Scotland) Rules 1977](http://www.legislation.gov.uk/id/uksi/1977/1261), made under section 116
-- [The Students' Allowances (Scotland) Regulations 1962](http://www.legislation.gov.uk/id/uksi/1962/2086), made under sections 75 and 76
-- [The Teachers (Colleges of Education) (Scotland) Regulations 1967](http://www.legislation.gov.uk/id/uksi/1967/29), made under sections 75(3), 76(1), 81(2) and 144(5)
-- [The Raising of the School Leaving Age (Scotland) Regulations 1972](http://www.legislation.gov.uk/id/uksi/1972/59), made under section 32(2)
-- [The Milk and Meals (Education) (Scotland) Regulations 1971](http://www.legislation.gov.uk/id/uksi/1971/1537), made under section 53(3) and section 144(5)
-- [The Schools General (Scotland) Regulations 1975](http://www.legislation.gov.uk/id/uksi/1975/1135), enabling words not held
+The six instruments checked and ruled out are named in section 2.3 with their
+identifiers, and the full retrieval is in the appendix. They are not cited here on
+purpose: a citation in this section is something a correct answer is expected to
+cite, and these are the instruments a correct answer must not list.
