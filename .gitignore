@@ -251,3 +251,10 @@ lexchat/
 # Written to be frozen, not maintained, so they are kept locally rather than
 # committed. Permanent docs live directly in lex_eval/docs/ and in decisions/.
 lex_eval/docs/findings/
+
+# Word review documents returned by lawyers. They carry reviewers' names and
+# are binary; the decision is transcribed into .authored/q{id}/review.json,
+# which is what is committed.
+lex_eval/data/reference_answers/reviews/
+*.docx
+*.docx.bak

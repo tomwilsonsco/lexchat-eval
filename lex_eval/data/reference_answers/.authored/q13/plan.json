@@ -1,21 +1,21 @@
 {
-  "scope_note": "Covers whether any secondary legislation was made under the enabling power in section 117 of the Education (Scotland) Act 1962, and whether that Act can be retrieved at all. Limited to legislation. Does not cover section 117 of the later Education (Scotland) Act 1980.",
+  "scope_note": "Covers whether any secondary legislation was made under the enabling power in section 117 of the Education (Scotland) Act 1962. Limited to legislation. Does not cover section 117 of the later Education (Scotland) Act 1980, which is a different statute.",
   "steps": [
     {
       "title": "Retrieve the Education (Scotland) Act 1962",
-      "detail": "Attempt to retrieve the Act by both its modern and regnal-year identifiers, and by search, and record whether it is available at all."
+      "detail": "The Act is held under its regnal-year identifier `ukpga/Eliz2/10-11/47` and is reachable by section search, not by title search or by the modern-form identifier `ukpga/1962/47`. Retrieve it and record which route works."
     },
     {
-      "title": "Read section 117 and its enabling power",
-      "detail": "If the Act is retrievable, read section 117 and establish what power it confers and on whom."
+      "title": "Read section 117 as it now stands",
+      "detail": "Read section 117 in the retrieved Act and record whether any text of it survives, so that nothing is asserted about the terms of the power itself."
     },
     {
-      "title": "Search for instruments made under the power",
-      "detail": "Search for secondary legislation made under section 117, and for each candidate establish whether the retrieved material actually records section 117 as its enabling provision."
+      "title": "Read the enabling preamble of each candidate instrument",
+      "detail": "For every Scottish education instrument that a search surfaces as a plausible candidate, retrieve its full text and read the preamble, which names the sections it was made under. That preamble, not the instrument's subject matter, is the evidence of the enabling power."
     },
     {
-      "title": "Decide between an empty list and an unanswerable question",
-      "detail": "Distinguish instruments that merely relate to Scottish education from instruments shown to be made under section 117, and report an empty list rather than a list of unconnected instruments."
+      "title": "List only instruments whose preamble names section 117",
+      "detail": "Report the instruments whose retrieved preamble names section 117 of the 1962 Act. If none does, report an empty list and say which sections the near-miss instruments were made under instead."
     }
   ]
 }

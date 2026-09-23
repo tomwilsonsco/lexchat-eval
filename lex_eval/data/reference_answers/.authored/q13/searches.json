@@ -1,8 +1,13 @@
 [
   {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1962"}},
-  {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1962 section 117 regulations"}},
-  {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1962 consolidation"}},
-  {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1980 section 117"}},
+  {"tool": "search_legislation", "args": {"query": "Education (Scotland) Act 1962 regulations made under section 117"}},
+  {"tool": "search_legislation_sections", "args": {"legislation_id": "ukpga/Eliz2/10-11/47", "query": "section 117 power to make regulations"}},
+  {"tool": "search_legislation_sections", "args": {"legislation_id": "ukpga/Eliz2/10-11/47", "query": "citation and extent"}},
   {"tool": "get_legislation_text", "args": {"legislation_id": "ukpga/1962/47"}},
-  {"tool": "get_legislation_text", "args": {"legislation_id": "ukpga/Eliz2/10-11/47"}}
+  {"tool": "get_legislation_text", "args": {"legislation_id": "uksi/1977/1261"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "uksi/1962/2086"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "uksi/1967/29"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "uksi/1972/59"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "uksi/1971/1537"}},
+  {"tool": "get_legislation_text", "args": {"legislation_id": "uksi/1975/1135"}}
 ]

@@ -524,11 +524,29 @@ def _fmt_citations(record: Dict[str, Any]) -> str:
             mark = "Background"
         else:
             mark = ""
+        # `pid` is lowercased so that s.33A and s.33a match each other, but
+        # legislation.gov.uk is case-sensitive and 404s on the lowercase form,
+        # which is what a reviewer clicking this table would have hit. Take the
+        # capitals back from the URL the research read.
+        path = _cased_path(source.get("uri") or "", pid)
         lines.append(
-            f"| [{pid}](https://www.legislation.gov.uk/{pid}) | {title} "
+            f"| [{pid}](https://www.legislation.gov.uk/{path}) | {title} "
             f"| {'yes' if read else 'no'} | {mark} |"
         )
     return "\n".join(lines)
+
+
+def _cased_path(uri: str, pid: str) -> str:
+    """`pid` with the punctuation and capitals it had in *uri*, e.g. `.../section/33A`.
+
+    Returns `pid` unchanged when there is no URL to take them from, or when
+    the two are not the same provision. A trailing dot is compared loosely
+    because `pid` has lost one: the metric strips it so a citation at the end
+    of a sentence still matches, but a few provisions really do end in one
+    (`.../section/117135.`) and the link 404s without it.
+    """
+    path = re.sub(r"^https?://[^/]+/(id/)?", "", uri.strip()).rstrip("/")
+    return path if path.lower().rstrip(".,;:") == pid.rstrip(".,;:") else pid
 
 
 def _fmt_retrieved(sources: List[Dict[str, Any]]) -> str:

@@ -1,11 +1,28 @@
 {
-  "verified": false,
-  "verified_by": null,
-  "verified_at": null,
-  "verdict": null,
-  "citations_reviewed": false,
-  "required_citations": [],
-  "corrections": "",
-  "notes": "",
-  "signed_reference_sha256": null
+  "verified": true,
+  "verified_by": "Corsino San Miguel/Steve Dewar",
+  "verified_at": "2026-09-18",
+  "verdict": "Approve",
+  "citations_reviewed": true,
+  "required_citations": [
+    "ssi/2014/243",
+    "ssi/2014/243/article/4",
+    "ssi/2014/243/article/5",
+    "ssi/2014/243/article/7a",
+    "ssi/2022/356",
+    "ssi/2022/356/article/1",
+    "ssi/2022/356/article/2",
+    "ukpga/1987/26/section/29",
+    "ukpga/1987/26/section/31",
+    "ukpga/1987/26/section/32",
+    "ukpga/1987/26/section/32a",
+    "ukpga/1987/26/section/32b",
+    "ukpga/1987/26/section/33",
+    "ukpga/1987/26/section/33a",
+    "ukpga/1987/26/section/33b",
+    "ukpga/1987/26/section/34"
+  ],
+  "corrections": "Further sections of the Housing (Scotland) Act 1987 should have been included; sections 29, 37.",
+  "notes": "In section 3 above, Key statements used by evaluation, there should have been questions on the 1987 Act, s32(6) and s32B(6) both allow for regulation to \u201cmake different provision for different purposes and different areas\u201d. This should allow local authority specific regulations to be made. This can be used to address questions of resources which falls into the part about tangential and related measures. Section 37 of the 1987 act regarding guidance would have also been a useful tangential points. All major and substantial points were addressed, yet the question explicitly asked about these tangential elements.",
+  "signed_reference_sha256": "187913bda441500f"
 }

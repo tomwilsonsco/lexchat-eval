@@ -370,8 +370,11 @@ authoring:
 ```
 
 Leave `signed_reference_sha256` as `null` when recording a fresh approval: `--render-only` stamps it
-with the version the lawyer saw, and any later change to the answer, statements, required citations
-or retrieved material makes the sign-off stale until they confirm the new version.
+with the record's current version, and any later change to the answer, statements, required citations
+or retrieved material makes the sign-off stale until they confirm the new version. Returned Word
+review documents go in `lex_eval/data/reference_answers/reviews/` (gitignored). How to transcribe one
+into `review.json` is set out in
+[`lex_eval/docs/reference-answers.md`](lex_eval/docs/reference-answers.md#transcribing-a-returned-review).
 
 ### Output
 

@@ -643,16 +643,17 @@ class LexTools:
                 lid = call.payload.get("legislation_id", "")
                 uri = f"http://www.legislation.gov.uk/id/{lid}"
                 if uri not in seen:
+                    # LEX nests the title under "legislation", so reading it off
+                    # the top level left every full-Act row in the reviewer's
+                    # citation schedule with a blank title.
+                    body = call.response if isinstance(call.response, dict) else {}
+                    leg = body.get("legislation") or {}
                     seen[uri] = {
                         "uri": uri,
-                        "title": (
-                            call.response.get("title", "")
-                            if isinstance(call.response, dict)
-                            else ""
-                        ),
+                        "title": leg.get("title") or body.get("title", ""),
                         "legislation_id": lid,
                         "provision_type": "full_text",
-                        "extent": [],
+                        "extent": leg.get("extent") or [],
                     }
         return list(seen.values())
 
