@@ -52,7 +52,9 @@ This records what the research searched and what it could not establish, and
 includes the system's instructions to the model. A caveat or limitation in the
 response that matches it, for example that in-force status could not be
 verified, that the index is incomplete, or that a search was cut short by a
-limit, is grounded. It is not a source for any legal fact or conclusion.
+limit, is grounded. It is not a source for any legal fact or conclusion. Do
+not fail the response for leaving out anything in this record or for not
+following its instructions: use it only to check caveats the response includes.
 """
 
 

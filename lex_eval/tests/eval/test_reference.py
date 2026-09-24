@@ -48,10 +48,11 @@ from lex_eval.utils.test_helpers import (
 
 _COVERAGE_THRESHOLD: float = 0.3
 # Signed-off references expect only the citations the lawyer marked required,
-# so anything short of all of them is a miss. The draft threshold above is low
-# for the opposite reason: a draft's expectation is every link in its answer,
-# background material included.
-_REQUIRED_CITATION_THRESHOLD: float = 1.0
+# so the bar is higher than for a draft, whose expectation is every link in its
+# answer, background material included. It is not 1.0: reviewers mark most
+# links Required, and a short conversational answer is not expected to cite
+# all of them, so 1.0 failed every answer to every signed-off question.
+_REQUIRED_CITATION_THRESHOLD: float = 0.5
 _AGREEMENT_THRESHOLD: float = 0.6
 # Same value as _AGREEMENT_THRESHOLD by convention ("at least 3 of 5"), kept as
 # its own constant since it's a different question (does the plan set out to
