@@ -27,6 +27,12 @@ responses
     max_turns_halted  INTEGER     (research steps the server cut short at its ReAct turn cap;
                                    >0 means at least one step returned no report)
     react_turns_max   INTEGER     (highest ReAct turn count any step reached in this run)
+    delegation_halts  JSON        (list of {step, reason, limit, steps, written_up} for each
+                                   delegation the server stopped at the turn cap; NULL when none did.
+                                   max_turns_halted counts them, this says which and whether the
+                                   step wrote its partial findings up before stopping)
+    empty_completions INTEGER     (provider completions that returned no content and no tool calls,
+                                   whether or not LexChat's retry recovered; 0 on a healthy run)
     research_plan     JSON        (deep_research only: the plan from POST /api/research/plan, NULL otherwise)
     needs_clarification    BOOLEAN (True when POST /api/research/plan asked a clarifying question instead
                                     of proposing a plan; a valid outcome, distinct from is_error)
@@ -100,6 +106,8 @@ CREATE TABLE IF NOT EXISTS responses (
     total_ms          INTEGER,
     max_turns_halted  INTEGER,
     react_turns_max   INTEGER,
+    delegation_halts  JSON,
+    empty_completions INTEGER  NOT NULL DEFAULT 0,
     reformatted       BOOLEAN  NOT NULL DEFAULT FALSE,
     local_cache_hits  INTEGER  NOT NULL DEFAULT 0,
     memo_hits         INTEGER  NOT NULL DEFAULT 0,
@@ -147,6 +155,10 @@ _MIGRATE_RESPONSES = [
     # --- research steps cut short at the server's ReAct turn cap ---
     "ALTER TABLE responses ADD COLUMN max_turns_halted INTEGER",
     "ALTER TABLE responses ADD COLUMN react_turns_max INTEGER",
+    # --- which delegations halted, and provider completions that came back empty
+    # (LexChat audit schema v2/v3/v4) ---
+    "ALTER TABLE responses ADD COLUMN delegation_halts JSON",
+    "ALTER TABLE responses ADD COLUMN empty_completions INTEGER",
     # --- deep_research clarification path (distinct outcome, not an error) ---
     "ALTER TABLE responses ADD COLUMN needs_clarification BOOLEAN",
     "ALTER TABLE responses ADD COLUMN clarification_question TEXT",
@@ -161,10 +173,10 @@ INSERT INTO responses (
     research_mode, case_law_context, tool_sequence, fallback_used,
     summarisation_output, summarisation_used, summarisation_llm,
     chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
-    react_turns_max, reformatted,
+    react_turns_max, delegation_halts, empty_completions, reformatted,
     local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
     needs_clarification, clarification_question, attempts
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 # Same columns as _INSERT_RESPONSE plus an explicit id, for copying rows
@@ -177,10 +189,10 @@ INSERT INTO responses (
     research_mode, case_law_context, tool_sequence, fallback_used,
     summarisation_output, summarisation_used, summarisation_llm,
     chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
-    react_turns_max, reformatted,
+    react_turns_max, delegation_halts, empty_completions, reformatted,
     local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan,
     needs_clarification, clarification_question, attempts
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -284,6 +296,12 @@ def insert_response(conn: duckdb.DuckDBPyConnection, record: Dict[str, Any]) -> 
             # collapsing it to NULL the way the cost/timing fields do.
             record.get("max_turns_halted"),
             record.get("react_turns_max"),
+            (
+                json.dumps(record["delegation_halts"])
+                if record.get("delegation_halts")
+                else None
+            ),
+            record.get("empty_completions", 0),
             record.get("reformatted", False),
             record.get("local_cache_hits", 0),
             record.get("memo_hits", 0),
@@ -339,7 +357,8 @@ def load_records(
                    research_mode, case_law_context, tool_sequence, fallback_used,
                    summarisation_output, summarisation_used, summarisation_llm,
                    chat_mode, provider, total_cost_usd, total_ms,
-                   max_turns_halted, react_turns_max, reformatted,
+                   max_turns_halted, react_turns_max, delegation_halts,
+                   empty_completions, reformatted,
                    local_cache_hits, memo_hits, audit_schema_version, audit_json,
                    research_plan, needs_clarification, clarification_question,
                    attempts, is_error, error_message
@@ -377,6 +396,8 @@ def load_records(
         total_ms,
         max_turns_halted,
         react_turns_max,
+        delegation_halts_json,
+        empty_completions,
         reformatted,
         local_cache_hits,
         memo_hits,
@@ -401,6 +422,9 @@ def load_records(
             json.loads(summarisation_output_json) if summarisation_output_json else []
         )
         research_plan = json.loads(research_plan_json) if research_plan_json else None
+        delegation_halts = (
+            json.loads(delegation_halts_json) if delegation_halts_json else []
+        )
         records.append(
             {
                 "response_id": response_id,
@@ -430,6 +454,8 @@ def load_records(
                 "total_ms": total_ms,
                 "max_turns_halted": max_turns_halted,
                 "react_turns_max": react_turns_max,
+                "delegation_halts": delegation_halts,
+                "empty_completions": empty_completions or 0,
                 "reformatted": bool(reformatted),
                 "local_cache_hits": local_cache_hits or 0,
                 "memo_hits": memo_hits or 0,
@@ -1439,7 +1465,8 @@ def make_deploy_db(
             "research_mode, case_law_context, tool_sequence, fallback_used, "
             "summarisation_output, summarisation_used, summarisation_llm, "
             "chat_mode, provider, total_cost_usd, total_ms, "
-            "max_turns_halted, react_turns_max, reformatted, "
+            "max_turns_halted, react_turns_max, delegation_halts, "
+            "empty_completions, reformatted, "
             "local_cache_hits, memo_hits, audit_schema_version, audit_json, research_plan, "
             "needs_clarification, clarification_question, attempts "
             "FROM responses ORDER BY id"
@@ -1474,6 +1501,8 @@ def make_deploy_db(
                 total_ms,
                 max_turns_halted,
                 react_turns_max,
+                delegation_halts_json,
+                empty_completions,
                 reformatted,
                 local_cache_hits,
                 memo_hits,
@@ -1525,6 +1554,8 @@ def make_deploy_db(
                     total_ms,
                     max_turns_halted,
                     react_turns_max,
+                    delegation_halts_json,
+                    empty_completions or 0,
                     bool(reformatted),
                     local_cache_hits or 0,
                     memo_hits or 0,

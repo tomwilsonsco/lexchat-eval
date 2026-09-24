@@ -16,8 +16,9 @@ Produces a dict with these keys:
     research_mode, case_law_context, tool_sequence, fallback_used,
     summarisation_output, summarisation_used, is_error, error_message,
     chat_mode, provider, total_cost_usd, total_ms, max_turns_halted,
-    react_turns_max, local_cache_hits, memo_hits, reformatted,
-    audit_schema_version, audit_json
+    react_turns_max, delegation_halts, empty_completions,
+    local_cache_hits, memo_hits, reformatted, audit_schema_version,
+    audit_json
 """
 
 from __future__ import annotations
@@ -36,6 +37,15 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 VERBOSE_TRUNCATE_CHARS = 500
+
+# The audit event shapes this module understands. LexChat bumps its
+# AUDIT_SCHEMA_VERSION on any change to the event. Versions 2 to 5 were all
+# additive, each adding a key without moving one we already read: v2
+# delegations[].halted, v3 empty_completions, v4 halted.written_up, v5
+# mode_change. So accept that range and keep failing above it, because an
+# unknown version may have changed a field we depend on rather than added one.
+MIN_AUDIT_SCHEMA_VERSION = 1
+MAX_AUDIT_SCHEMA_VERSION = 5
 
 
 def _trunc(s: str, n: int = VERBOSE_TRUNCATE_CHARS) -> str:
@@ -377,17 +387,23 @@ def audit_capture(
         )
 
     if _audit_event is not None:
-        if _audit_event.get("schema_version", 0) != 1:
+        _schema_version = _audit_event.get("schema_version", 0)
+        # isinstance first: a non-integer version must still raise the clear
+        # error below rather than a TypeError from the comparison.
+        if not isinstance(_schema_version, int) or not (
+            MIN_AUDIT_SCHEMA_VERSION <= _schema_version <= MAX_AUDIT_SCHEMA_VERSION
+        ):
             _vlog(
                 _vf,
                 f"ERROR: Unsupported audit schema_version "
-                f"{_audit_event.get('schema_version')!r}, expected 1.",
+                f"{_schema_version!r}, expected "
+                f"{MIN_AUDIT_SCHEMA_VERSION} to {MAX_AUDIT_SCHEMA_VERSION}.",
             )
             if _vf:
                 _vf.close()
             raise RuntimeError(
-                f"Unsupported audit schema_version "
-                f"{_audit_event.get('schema_version')!r}, expected 1. "
+                f"Unsupported audit schema_version {_schema_version!r}, expected "
+                f"{MIN_AUDIT_SCHEMA_VERSION} to {MAX_AUDIT_SCHEMA_VERSION}. "
                 "Update lex_eval to match the new LexChat schema."
             )
 
@@ -494,6 +510,20 @@ def audit_capture(
     # research_output, which the models phrase inconsistently.
     max_turns_halted = timings.get("max_turns_halted")
     react_turns_max = timings.get("react_turns_max")
+    # Which delegations stopped at the turn cap, rather than how many (that is
+    # max_turns_halted). Audit schema v2 added delegations[].halted and v4 added
+    # written_up inside it. "step" is the delegation's 1-based position, the same
+    # numbering metrics/structure.py::_group_tools_by_delegation uses, so a
+    # metric can tell a step that halted from one that lost its own research.
+    delegation_halts = [
+        {"step": _i, **(d.get("halted") or {})}
+        for _i, d in enumerate(audit.get("delegations", []), 1)
+        if d.get("halted")
+    ] or None  # None = SQL NULL when nothing halted
+    # Provider completions that came back with no content and no tool calls,
+    # whether or not LexChat's retry then recovered (audit schema v3). A count,
+    # because the records themselves are in audit_json if anyone needs them.
+    empty_completions = len(audit.get("empty_completions") or [])
     local_cache_hits = sum(
         1
         for d in audit.get("delegations", [])
@@ -550,6 +580,8 @@ def audit_capture(
     _vlog(_vf, f"total_ms:               {total_ms}")
     _vlog(_vf, f"max_turns_halted:       {max_turns_halted}")
     _vlog(_vf, f"react_turns_max:        {react_turns_max}")
+    _vlog(_vf, f"delegation_halts:       {delegation_halts}")
+    _vlog(_vf, f"empty_completions:      {empty_completions}")
     _vlog(_vf, f"local_cache_hits:       {local_cache_hits}")
     _vlog(_vf, f"memo_hits:              {memo_hits}")
     _vlog(_vf, f"reformatted:            {reformatted}")
@@ -587,6 +619,8 @@ def audit_capture(
         "total_ms": total_ms,
         "max_turns_halted": max_turns_halted,
         "react_turns_max": react_turns_max,
+        "delegation_halts": delegation_halts,
+        "empty_completions": empty_completions,
         "local_cache_hits": local_cache_hits,
         "memo_hits": memo_hits,
         "reformatted": reformatted,

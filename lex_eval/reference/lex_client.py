@@ -96,34 +96,102 @@ def slim_search_results(resp_json: dict) -> dict:
     return {"results": slimmed, "total": resp_json.get("total", len(slimmed))}
 
 
-def matches_jurisdiction(extent: List[str], jurisdiction: str) -> bool:
+# LexChat's jurisdiction filter, mirrored. The words the LEX API sends in a
+# result's `extent`, mapped to territory codes. "United Kingdom" and "Great
+# Britain" are retained by a single-nation filter, because the question the
+# filter answers is "does this apply here", not "was this made for here".
+_TERRITORY_ALIASES = {
+    "england": "E",
+    "wales": "W",
+    "scotland": "S",
+    "northern ireland": "NI",
+    "united kingdom": "UK",
+    "great britain": "GB",
+}
+
+_JURISDICTION_ACCEPTS = {
+    "england_and_wales": {"E", "W", "UK", "GB"},
+    "scotland": {"S", "UK", "GB"},
+    "northern_ireland": {"NI", "UK"},
+    "wales": {"W", "UK", "GB"},
+    "uk_wide": {"UK"},
+}
+
+# Where an instrument's own id says which territory it belongs to, used only
+# when the API sent no usable extent, which is common.
+_ID_PREFIX_JURISDICTION = {
+    "asp": "scotland",
+    "ssi": "scotland",
+    "nia": "northern_ireland",
+    "nisr": "northern_ireland",
+    "nisro": "northern_ireland",
+    "nisi": "northern_ireland",
+    "apni": "northern_ireland",
+    "asc": "wales",
+    "anaw": "wales",
+    "wsi": "wales",
+    "mwa": "wales",
+}
+
+
+def _extent_tokens(extent: List[str]) -> set:
+    """Normalise an `extent` list to territory codes, dropping blanks."""
+    tokens = set()
+    for e in extent or []:
+        for part in str(e).split("+"):
+            part = part.strip()
+            if not part:
+                continue
+            tokens.add(_TERRITORY_ALIASES.get(part.lower(), part.upper()))
+    return tokens
+
+
+def matches_jurisdiction(
+    extent: List[str], jurisdiction: str, legislation_id: str = ""
+) -> bool:
     """Would LexChat's jurisdiction filter keep a result with this `extent`?
 
     Ported from `LexChat/server_py/src/agent/tools/lex.py::_matches_jurisdiction`.
     The filter is applied by LexChat to search results after the API returns them,
     not by the API, so anything checking it has to apply the same rule here.
 
-    Nothing in the eval calls this. It is here as the executable reproduction of
-    TOM_TO_DO.md finding 41: LexChat expects extents like "E+W+S+NI", but the LEX
-    API sends words ("Scotland", "United Kingdom", ""), so with a jurisdiction
-    filter set every result is dropped. Do not "correct" it to match what the API
-    sends, reproducing the mismatch faithfully is the whole point.
+    Nothing in the eval calls this. It is here as the executable mirror of the
+    deployed rule. It used to reproduce TOM_TO_DO.md finding 41, a filter that
+    split extents on "+" looking for a single letter while the API sent words,
+    so a Scotland filter dropped almost every Scottish result. LexChat fixed
+    that (FIX_PLAN P1.1, in `main` at c77e779). Track the deployed rule here
+    rather than correcting it toward what the API sends.
 
         >>> matches_jurisdiction(["Scotland"], "scotland")
-        False
+        True
+
+    One divergence from the deployed rule is worth knowing: an extent whose
+    words are none of the recognised six is dropped, not treated as unknown.
+    The API sends no such value today, so this is a forward-looking risk
+    rather than a live defect.
     """
-    if not extent:
-        return True
-    tokens = {t.strip() for e in extent for t in e.split("+")}
+    accepts = _JURISDICTION_ACCEPTS.get(jurisdiction)
+    if accepts is None:
+        return True  # unknown filter value: never silently narrow
+
+    tokens = _extent_tokens(extent)
+    if tokens:
+        return bool(tokens & accepts)
+
+    # Extent unknown from here on.
     if jurisdiction == "uk_wide":
-        return tokens >= {"E", "W", "S", "NI"}
-    single = {
-        "england_and_wales": "E",
-        "scotland": "S",
-        "northern_ireland": "NI",
-        "wales": "W",
-    }.get(jurisdiction)
-    return single in tokens if single else True
+        return False
+
+    owner = _ID_PREFIX_JURISDICTION.get(
+        (legislation_id or "").split("/")[0].strip().lower()
+    )
+    if owner is None:
+        return True  # UK-level or unrecognised: could apply anywhere
+    if owner == jurisdiction:
+        return True
+    # England & Wales and Wales overlap: a Welsh instrument is in scope for an
+    # England & Wales search, but an English one is not exclusively Welsh.
+    return owner == "wales" and jurisdiction == "england_and_wales"
 
 
 # ---------------------------------------------------------------------------

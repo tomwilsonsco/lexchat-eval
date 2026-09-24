@@ -13,9 +13,11 @@ Tests focus on error handling:
 
 import copy
 import json
+import re
 from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
 
+import httpx
 import pytest
 
 from lex_eval.gather_responses import process_question
@@ -46,12 +48,18 @@ class _MockResponse:
 class _MockClient:
     """Simulates an httpx.Client with a .stream() context manager."""
 
-    def __init__(self, lines, plan_response=None):
+    def __init__(self, lines, plan_response=None, plan_statuses=None):
         self._lines = lines
         self._plan_response = plan_response or {
             "needs_clarification": False,
             "plan": {},
         }
+        # HTTP statuses the planner returns, one per call. A real planner
+        # response always carries a status_code, and gather_responses now reads
+        # it to decide whether a 5xx is worth retrying, so the mock has to
+        # supply one. Pass a list to simulate a transient failure.
+        self._plan_statuses = list(plan_statuses or [200])
+        self.plan_calls = 0
 
     @contextmanager
     def stream(self, method, url, **kwargs):
@@ -62,9 +70,23 @@ class _MockClient:
 
     def post(self, url, **kwargs):
         # Return a mock response for deep research plan requests
+        status = self._plan_statuses[min(self.plan_calls, len(self._plan_statuses) - 1)]
+        self.plan_calls += 1
         mock_resp = MagicMock()
-        mock_resp.raise_for_status = MagicMock()
+        mock_resp.status_code = status
         mock_resp.json = MagicMock(return_value=self._plan_response)
+        # A real response raises on 4xx/5xx, and gather_responses relies on
+        # that to turn a dead planner into an error row.
+        if status >= 400:
+            mock_resp.raise_for_status = MagicMock(
+                side_effect=httpx.HTTPStatusError(
+                    f"Server error '{status}'",
+                    request=httpx.Request("POST", url),
+                    response=httpx.Response(status),
+                )
+            )
+        else:
+            mock_resp.raise_for_status = MagicMock()
         return mock_resp
 
 
@@ -434,3 +456,122 @@ class TestTurnCapHaltReachesTheRecord:
 
         assert result["max_turns_halted"] == 0
         assert result["react_turns_max"] == 7
+
+
+class TestCaptureKeysReachTheRecord:
+    """Every field the capture layer derives must survive the gather seam.
+
+    `gather_responses` rebuilds the stored record with an explicit key list
+    rather than passing the capture result through, so a field added to
+    `audit_capture` is silently dropped unless it is added here too. That
+    happened to `delegation_halts` and `empty_completions`: both were derived
+    correctly and stored as NULL for every response, and NULL is
+    indistinguishable from "nothing halted", so nothing looked wrong until a
+    run halted and the column still said nothing.
+    """
+
+    # Keys audit_capture returns that the record deliberately does not carry,
+    # each for a stated reason.
+    NOT_CARRIED = {
+        # gather_responses stores the configured summarisation model instead,
+        # since the capture cannot see which model was configured.
+        "summarisation_llm",
+    }
+
+    def _record_keys(self, source: str) -> set:
+        """The keys assigned in gather_responses' success-path result dict."""
+        import re
+
+        start = source.index("if actual_output and not failure_phrase:")
+        end = source.index('"attempts": attempt,', start)
+        return set(re.findall(r'"([a-z_]+)":', source[start:end]))
+
+    def test_no_capture_field_is_dropped(self):
+        import inspect
+
+        from lex_eval import gather_responses
+        from lex_eval.utils.audit_capture import audit_capture as capture_fn
+
+        returned = set(
+            re.findall(
+                r'^\s+"([a-z_]+)":',
+                inspect.getsource(capture_fn).split("return {")[-1],
+                re.M,
+            )
+        )
+        carried = self._record_keys(inspect.getsource(gather_responses))
+        missing = returned - carried - self.NOT_CARRIED
+        assert not missing, (
+            f"audit_capture returns {sorted(missing)}, which gather_responses "
+            "never writes to the record, so they are stored as NULL"
+        )
+
+    def test_the_two_halt_fields_are_carried(self):
+        """Named explicitly, because this is the pair that was lost."""
+        import inspect
+
+        from lex_eval import gather_responses
+
+        carried = self._record_keys(inspect.getsource(gather_responses))
+        assert "delegation_halts" in carried
+        assert "empty_completions" in carried
+
+
+class TestPlannerIsRetried:
+    """A transient planner 5xx must not discard the question.
+
+    The planner is a single HTTP call taken before the chat stream, and it used
+    to get one attempt regardless of --retries, so a one-off 502 lost the whole
+    deep-research run. LexChat reports a provider rate limit here as a bare 502
+    with no diagnosis, so from the outside a retryable condition is
+    indistinguishable from a permanent one and retrying is the only way to tell.
+    Measured 23 September 2026: 5 of 8 deep-research gather failures were a
+    planner 502 that then succeeded on a later attempt.
+    """
+
+    def _run(self, mock_client, retries=3):
+        with (
+            patch(
+                "lex_eval.gather_responses.get_authenticated_client",
+                return_value=mock_client,
+            ),
+            patch("lex_eval.gather_responses.time.sleep"),
+        ):
+            return process_question(
+                question_id=1,
+                question="q",
+                model_name="m",
+                research_mode="legislation_only",
+                summarisation_llm="m",
+                max_retries=retries,
+                chat_mode="deep_research",
+            )
+
+    def test_a_transient_502_is_retried_and_succeeds(self):
+        lines = _sse_lines(AUDIT_SUCCESS)
+        client = _MockClient(lines, plan_statuses=[502, 502, 200])
+        result = self._run(client)
+        assert client.plan_calls == 3
+        assert not result.get("is_error"), result.get("error_message")
+
+    def test_a_persistent_502_still_fails_after_the_retries(self):
+        """It raises to the caller, which is what records the error row."""
+        lines = _sse_lines(AUDIT_SUCCESS)
+        client = _MockClient(lines, plan_statuses=[502])
+        with pytest.raises(httpx.HTTPStatusError):
+            self._run(client)
+        assert client.plan_calls == 3
+
+    def test_a_4xx_is_not_retried(self):
+        """A client error is not transient; retrying only wastes time."""
+        lines = _sse_lines(AUDIT_SUCCESS)
+        client = _MockClient(lines, plan_statuses=[400])
+        with pytest.raises(httpx.HTTPStatusError):
+            self._run(client)
+        assert client.plan_calls == 1
+
+    def test_success_first_time_makes_one_call(self):
+        lines = _sse_lines(AUDIT_SUCCESS)
+        client = _MockClient(lines, plan_statuses=[200])
+        self._run(client)
+        assert client.plan_calls == 1

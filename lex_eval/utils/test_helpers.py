@@ -148,3 +148,23 @@ def record_id(record: Dict[str, Any]) -> str:
     return (
         f"Q{record['question_id']}_{record['llm_name']}_response{record['response_id']}"
     )
+
+
+def halted_steps(record: Dict[str, Any]) -> set:
+    """Which of a run's delegations stopped at LexChat's tool-call step limit.
+
+    Returns 1-based delegation positions, the same numbering
+    ``metrics/structure.py::_group_tools_by_delegation`` gives its groups.
+    Both walk the audit event's delegations in order, so position N here is
+    group N there.
+
+    A halted delegation hands back a notice saying the step was cut short
+    instead of a research report, so any check that reads a report has
+    nothing of the model's to score and should skip it. Empty when the run
+    completed, and for rows gathered before ``delegation_halts`` existed.
+    """
+    return {
+        h["step"]
+        for h in record.get("delegation_halts") or []
+        if isinstance(h, dict) and isinstance(h.get("step"), int)
+    }

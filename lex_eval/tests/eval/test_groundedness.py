@@ -25,6 +25,7 @@ from lex_eval.metrics import (
     ClaimSupportMetric,
     ResponseGroundednessMetric,
 )
+from lex_eval.metrics.structure import _model_words
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
@@ -135,11 +136,13 @@ def _gate_research_output(
 ):
     """Fail fast if no research output was captured.
 
-    "No research output" covers both an empty field and one holding only
-    LexChat's halted-research sentinel: neither gives the judge anything to
-    score, and asking it to find claims in the sentinel makes it invent them.
+    "No research output" covers an empty field, one holding only LexChat's
+    halted-research sentinel, and one holding only its appended instruction
+    blocks: none gives the judge anything to score, and asking it to find
+    claims in LexChat's own instructions to the model makes it invent them.
     """
-    if not _HALTED_RESEARCH_RE.sub("", record.get("research_output") or "").strip():
+    own_words = _model_words(record.get("research_output") or "")
+    if not _HALTED_RESEARCH_RE.sub("", own_words).strip():
         reason = f"No research output captured; {metric_name} scored 0"
         attach_metric(
             request,
@@ -171,6 +174,17 @@ def test_response_groundedness(request, record):
       - research_output must be non-empty.
     """
     test_case = record_to_test_case(record)
+    # LexChat emits its search-scope disclosure TWICE, in two renderings that
+    # do not agree in detail: an agent-facing [SEARCH SCOPE] block in the
+    # report, and a reader-facing italic footer on the answer. That confounds
+    # this check, which compares the two texts. Stripping neither is worst,
+    # because the judge then compares LexChat's two renderings and reports
+    # their disagreements as the model misrepresenting its research. Stripping
+    # both sides is used here as the least wrong, and it is still wrong on a
+    # model that weaves the disclosure into the answer body rather than
+    # confining it to the footer, which Gemini does. Removing body prose would
+    # need a prose detector, so it is not attempted, and this metric should not
+    # be read as a model verdict on a build that emits the disclosure.
 
     ok, reason = _gate_output_length(
         request, record, test_case, "response_groundedness", "Response Groundedness"
@@ -184,8 +198,10 @@ def test_response_groundedness(request, record):
     if not ok:
         pytest.skip(reason)
 
+    test_case.actual_output = _model_words(test_case.actual_output)
+
     metric = ResponseGroundednessMetric(
-        research_output=record["research_output"],
+        research_output=_model_words(record["research_output"]),
         model=_judge,
         threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
         scope_note=(record.get("research_plan") or {}).get("scope_note"),
@@ -259,7 +275,7 @@ def test_claim_support(request, record):
         pytest.skip(reason)
 
     metric = ClaimSupportMetric(
-        research_output=record["research_output"],
+        research_output=_model_words(record["research_output"]),
         model=_judge,
         threshold=_CLAIM_SUPPORT_THRESHOLD,
     )

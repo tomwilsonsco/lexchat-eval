@@ -330,6 +330,7 @@ COMPARISON_OUTCOME_COLUMNS: dict[str, str] = {
     **OUTCOME_COLUMNS,
 }
 
+
 def _column_help(tooltips: dict[str, str], widths: dict | None = None) -> dict:
     """Turn a column name to description mapping into Streamlit column config.
 

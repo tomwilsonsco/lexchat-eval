@@ -593,3 +593,397 @@ class TestMalformedLinksAreNotFabricatedCitations:
         metric.measure(self._case("asp/2021/3", "ukpga/1988"))
         assert metric.score == 1.0, metric.reason
         assert "Diagnostic, not scored" in metric.reason
+
+
+# ---------------------------------------------------------------------------
+# A step stopped at LexChat's tool-call limit
+# ---------------------------------------------------------------------------
+
+_HALT_REPORT = """[Research Incomplete - step limit reached]
+This research step was stopped by a fixed limit of 20 tool-call rounds before
+it produced any findings.
+"""
+
+
+class TestHaltedStepsAreSkipped:
+    """A halted step has no report of the model's to score.
+
+    LexChat used to send a halt notice through its reformat retry, which
+    dressed it up in the required headings and made a step that retrieved
+    nothing indistinguishable from a complete one. That reformat is now
+    skipped deliberately, so the notice arrives unheaded. Scoring it as a
+    missing-heading failure would mark the fix as a regression.
+    """
+
+    def test_halted_step_does_not_fail_the_run(self):
+        metric = MandatoryStructureMetric(halted_steps={2})
+        metric.measure(_test_case(_VALID_REPORT, _HALT_REPORT))
+        assert metric.score == 1.0
+        assert metric.is_successful()
+        assert "1 halted step(s) skipped" in metric.reason
+
+    def test_unhalted_step_still_fails(self):
+        """Skipping a halt must not excuse a sibling's missing headings."""
+        metric = MandatoryStructureMetric(halted_steps={2})
+        metric.measure(_test_case("No headings at all.", _HALT_REPORT))
+        assert metric.score == 0.0
+        assert not metric.is_successful()
+        assert "step 1" in metric.reason
+
+    def test_every_step_halted_is_not_measured(self):
+        metric = MandatoryStructureMetric(halted_steps={1, 2})
+        metric.measure(_test_case(_HALT_REPORT, _HALT_REPORT))
+        assert metric.reason.startswith("Not measured:")
+        assert not metric.is_successful()
+
+    def test_no_halts_behaves_as_before(self):
+        metric = MandatoryStructureMetric()
+        metric.measure(_test_case(_VALID_REPORT))
+        assert metric.score == 1.0
+        assert "skipped" not in metric.reason
+
+
+class TestGenuineGapAcceptsTheCurrentWording:
+    """The prompt's mandated sentence is not the wording LexChat asks for.
+
+    LexChat measured that sentence appearing in 0 of 179 pre-pilot answers.
+    Its tool results now carry a rule telling the Worker to report a miss as
+    not found and say what was searched for, so that phrasing is the required
+    behaviour and not a paraphrase of it.
+    """
+
+    _EMPTY = [
+        ToolCall(
+            name="Worker: search_legislation_sections",
+            input_parameters={"legislation_id": "asp/2021/3"},
+            output="",
+        )
+    ]
+
+    def _measure(self, report, chat_mode="research"):
+        case = LLMTestCase(
+            input="q",
+            actual_output="final",
+            tools_called=[
+                ToolCall(name="delegate_research", input_parameters={}, output=report),
+                *self._EMPTY,
+            ],
+        )
+        metric = GenuineGapMetric(chat_mode=chat_mode)
+        metric.measure(case)
+        return metric
+
+    def test_not_found_scores_full_in_research_mode(self):
+        m = self._measure("The searches for commencement orders returned not found.")
+        assert m.score == 1.0
+        assert m.is_successful()
+
+    def test_not_held_scores_full_in_research_mode(self):
+        m = self._measure("This index has no record under that id: not held.")
+        assert m.score == 1.0
+
+    def test_a_paraphrase_still_only_scores_half_in_research_mode(self):
+        m = self._measure("There is no relevant material on this.")
+        assert m.score == 0.5
+        assert not m.is_successful()
+
+    def test_an_undisclosed_gap_still_scores_zero(self):
+        m = self._measure("Section 4 plainly requires consultation.")
+        assert m.score == 0.0
+
+
+class TestLexChatsOwnBlocksAreNotReadAsTheModelsWords:
+    """LexChat appends instruction blocks to a Worker report, in code.
+
+    On a measured conversational report they were 55% of it. The search-scope
+    block tells the model that anything it reports as not found was "not found
+    in this index", so a gap-disclosure check matching that phrase would pass
+    every report ever written, whether or not the model disclosed anything.
+    Scoring the model's writing means removing them first.
+    """
+
+    # Shortened from a real capture, markers and wording verbatim.
+    _BLOCK = (
+        "[SEARCH SCOPE - what this research step actually did]\n"
+        "NONE of this can establish that something does not exist. If any part "
+        "of the answer you write reports something as not found, it MUST quote "
+        "the search terms above. Absence from the index is therefore NOT "
+        "evidence of absence in law.\n"
+        "[/SEARCH SCOPE]"
+    )
+    _EMPTY = [
+        ToolCall(
+            name="Worker: search_legislation_sections",
+            input_parameters={"legislation_id": "asp/2021/3"},
+            output="",
+        )
+    ]
+
+    def _gap(self, model_text):
+        case = LLMTestCase(
+            input="q",
+            actual_output="final",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output=f"{model_text}\n{self._BLOCK}",
+                ),
+                *self._EMPTY,
+            ],
+        )
+        metric = GenuineGapMetric()
+        metric.measure(case)
+        return metric
+
+    def test_the_block_alone_does_not_count_as_disclosure(self):
+        """The whole point: an undisclosed gap must still score 0.0."""
+        assert self._gap("Section 4 plainly requires consultation.").score == 0.0
+
+    def test_the_models_own_disclosure_still_counts(self):
+        assert self._gap("The instrument was not found in the index.").score == 1.0
+
+    def test_headings_inside_a_block_do_not_satisfy_the_structure_check(self):
+        metric = MandatoryStructureMetric()
+        metric.measure(_test_case(f"{self._BLOCK}\n### References\n- a"))
+        assert metric.score == 0.0
+
+    def test_stripping_leaves_citation_urls_alone(self):
+        """Citation checks read the raw report; the blocks carry no URLs."""
+        from lex_eval.metrics.structure import _cited_legislation_ids, _model_words
+
+        report = (
+            "See [Act](http://www.legislation.gov.uk/id/ssi/2008/216).\n"
+            f"{self._BLOCK}"
+        )
+        assert _cited_legislation_ids(report) == _cited_legislation_ids(
+            _model_words(report)
+        )
+
+
+class TestModelWordsBlockRemoval:
+    """Three of LexChat's six block markers are paired, three self-contained.
+
+    Verified by grepping LexChat/server_py/src/utils/ for closing forms:
+    SEARCH SCOPE, SECTION OUTLINE and PINPOINTS TO KEEP close; ENABLING POWER,
+    CHANGE RECORD and CURRENCY do not. Treating them all as paired takes the
+    rest of the report away with a self-contained marker.
+    """
+
+    def test_paired_block_and_its_contents_go(self):
+        from lex_eval.metrics.structure import _model_words
+
+        out = _model_words("A.\n[SEARCH SCOPE - x]\nnot found\n[/SEARCH SCOPE]\nB.")
+        assert "not found" not in out
+        assert "A." in out and "B." in out
+
+    def test_unclosed_paired_block_is_dropped_to_the_end(self):
+        """A truncated report must not leak LexChat's words as the model's."""
+        from lex_eval.metrics.structure import _model_words
+
+        out = _model_words("A.\n[SEARCH SCOPE - x]\nnot found blah")
+        assert out == "A."
+
+    def test_self_contained_marker_keeps_the_text_after_it(self):
+        from lex_eval.metrics.structure import _model_words
+
+        out = _model_words("Findings [ENABLING POWER - record states X] more.")
+        assert "more." in out
+        assert "ENABLING POWER" not in out
+
+    def test_a_report_with_no_blocks_is_unchanged(self):
+        from lex_eval.metrics.structure import _model_words
+
+        assert _model_words("Just the model writing.") == "Just the model writing."
+
+
+class TestAnswerScopeFooterRemoval:
+    """LexChat's disclosure reaches the answer and the report in different forms.
+
+    The report gets a bracketed `[SEARCH SCOPE ...]` block; the answer gets an
+    italic `*Search scope: ...*` footer carrying index-coverage percentages and
+    a sampling date. Strip the report alone and a groundedness check sees an
+    answer asserting statistics with no support behind it, and calls the model
+    unfounded for text the model never wrote. Measured: this accounted for 4 of
+    5 conversational groundedness failures before the footer was stripped too.
+    """
+
+    _FOOTER = (
+        "\n\n*Search scope: the legislation index was searched for "
+        '"vitamin margarine"; no jurisdiction filter narrowed it. Roughly 85% '
+        "of 2025 Scottish SIs are held (sampled Sep 2026).*"
+    )
+
+    def test_footer_is_removed_from_an_answer(self):
+        from lex_eval.metrics.structure import _model_words
+
+        out = _model_words(f"Regulation 4 sets the vitamin levels.{self._FOOTER}")
+        assert out == "Regulation 4 sets the vitamin levels."
+
+    def test_index_statistics_do_not_survive(self):
+        from lex_eval.metrics.structure import _model_words
+
+        out = _model_words(f"An answer.{self._FOOTER}").lower()
+        assert "85%" not in out and "sampled sep 2026" not in out
+
+    def test_an_answer_with_no_footer_is_unchanged(self):
+        from lex_eval.metrics.structure import _model_words
+
+        assert _model_words("Just the answer.") == "Just the answer."
+
+    def test_a_mid_answer_mention_of_search_scope_is_kept(self):
+        """Only the trailing footer goes, not the words wherever they appear."""
+        from lex_eval.metrics.structure import _model_words
+
+        text = "The search scope: was narrow.\n\nBut the answer continues."
+        assert _model_words(text) == text
+
+
+class TestChangeRecordCountsAsRetrieval:
+    """An instrument named in a change record was retrieved, not invented.
+
+    `get_legislation_changes` returns legislation.gov.uk's own record of what
+    amends or commences an instrument. LexChat's Worker prompt now requires it
+    for any in-force, commencement or amendment question, so it is a main
+    retrieval route, not a curiosity. Before it was counted, Citation Grounding
+    reported fabrication for correctly sourced citations: measured on two
+    deep-research responses, all 14 accused ids came from a change record and
+    appeared in no other tool output.
+    """
+
+    def _changes_call(self, target, related):
+        return ToolCall(
+            name="Worker: get_legislation_changes",
+            input_parameters={"legislation_id": target, "direction": "to"},
+            output=json.dumps(
+                {
+                    "legislation_id": target,
+                    "direction": "to",
+                    "related": [
+                        {"legislation_id": r, "type_of_effect": "inserted"}
+                        for r in related
+                    ],
+                }
+            ),
+        )
+
+    def test_related_instruments_count_as_retrieved(self):
+        from lex_eval.metrics.structure import _retrieved_legislation_ids
+
+        got = _retrieved_legislation_ids(
+            [self._changes_call("asp/2000/1", ["asp/2010/8", "uksi/2014/631"])]
+        )
+        assert {"asp/2000/1", "asp/2010/8", "uksi/2014/631"} <= got
+
+    def test_a_citation_from_a_change_record_is_not_fabrication(self):
+        case = LLMTestCase(
+            input="q",
+            actual_output="final",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output=(
+                        "Amended by [asp 2010/8]"
+                        "(http://www.legislation.gov.uk/id/asp/2010/8)."
+                    ),
+                ),
+                self._changes_call("asp/2000/1", ["asp/2010/8"]),
+            ],
+        )
+        metric = CitationGroundingMetric()
+        metric.measure(case)
+        assert metric.score == 1.0, metric.reason
+
+    def test_a_genuinely_unretrieved_citation_still_fails(self):
+        """The fabrication check must still work."""
+        case = LLMTestCase(
+            input="q",
+            actual_output="final",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output=(
+                        "See [an Act]" "(http://www.legislation.gov.uk/id/asp/1999/99)."
+                    ),
+                ),
+                self._changes_call("asp/2000/1", ["asp/2010/8"]),
+            ],
+        )
+        metric = CitationGroundingMetric()
+        metric.measure(case)
+        assert metric.score == 0.0
+        assert "asp/1999/99" in metric.reason
+
+    def test_malformed_change_record_output_is_ignored(self):
+        from lex_eval.metrics.structure import _retrieved_legislation_ids
+
+        bad = ToolCall(
+            name="Worker: get_legislation_changes",
+            input_parameters={"legislation_id": "asp/2000/1"},
+            output="not json at all",
+        )
+        assert _retrieved_legislation_ids([bad]) == {"asp/2000/1"}
+
+
+class TestCitationReadNamesTheRoute:
+    """The verdict stays; the explanation stops misdescribing what happened.
+
+    An Act known only from a change record was retrieved, so it is not
+    fabrication, but its text was not pulled, so it is not read. Saying it was
+    "cited on the strength of a search result title" is simply untrue, and it
+    was untrue of 41 of 44 unread citations across twelve measured responses.
+    """
+
+    def _case(self, cited_id, *tools):
+        return LLMTestCase(
+            input="q",
+            actual_output="final",
+            tools_called=[
+                ToolCall(
+                    name="delegate_research",
+                    input_parameters={},
+                    output=(
+                        f"See [an Act]"
+                        f"(http://www.legislation.gov.uk/id/{cited_id})."
+                    ),
+                ),
+                *tools,
+            ],
+        )
+
+    def test_a_change_record_citation_is_named_as_such(self):
+        changes = ToolCall(
+            name="Worker: get_legislation_changes",
+            input_parameters={"legislation_id": "asp/2000/1"},
+            output=json.dumps({"related": [{"legislation_id": "asp/2010/8"}]}),
+        )
+        metric = CitationReadMetric()
+        metric.measure(self._case("asp/2010/8", changes))
+        assert "known from a change record" in metric.reason
+        assert "search result title" not in metric.reason
+        assert metric.score == 0.0  # the verdict is unchanged
+
+    def test_a_search_title_citation_is_still_named_as_such(self):
+        search = ToolCall(
+            name="Worker: search_legislation",
+            input_parameters={},
+            output=json.dumps(
+                {"results": [{"legislation_id": "asp/2010/8", "title": "An Act"}]}
+            ),
+        )
+        metric = CitationReadMetric()
+        metric.measure(self._case("asp/2010/8", search))
+        assert "search result title" in metric.reason
+        assert "known from a change record" not in metric.reason
+
+    def test_a_read_citation_still_passes(self):
+        read = ToolCall(
+            name="Worker: get_legislation_text",
+            input_parameters={"legislation_id": "asp/2010/8"},
+            output="The full text of the Act.",
+        )
+        metric = CitationReadMetric()
+        metric.measure(self._case("asp/2010/8", read))
+        assert metric.score == 1.0

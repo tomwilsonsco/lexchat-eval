@@ -20,6 +20,7 @@ from .structure import (
     _DELEGATE_TOOL_NAME,
     _cited_legislation_ids,
     _group_tools_by_delegation,
+    _model_words,
     _retrieved_legislation_ids,
     _retrieved_usable_content,
 )
@@ -119,7 +120,7 @@ class ReportIntegrationMetric(BaseMetric):
             return self.score
 
         in_scope = {
-            i: g["report"]
+            i: _model_words(g["report"])
             for i, g in enumerate(groups, 1)
             if _retrieved_usable_content(g["tools"])
             and (

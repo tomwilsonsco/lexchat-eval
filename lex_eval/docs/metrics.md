@@ -55,6 +55,19 @@ lookup are worth half each. An empty search is still a research attempt; this
 check does not establish successful retrieval. Mixed-mode Tool Usage retains the
 legislation check and is labelled as covering legislation only.
 
+**A run stopped at the tool-call limit is not scored for a tool it never
+reached.** When LexChat halts a step at its limit, a required tool can be
+missing because the Worker ran out of rounds, which is not a choice the model
+made. The row is written as not measured instead. This applies only when a
+required tool is genuinely absent: if the other steps called everything anyway,
+the halt says nothing about tool usage and the run is scored as normal.
+
+**`get_legislation_changes` is deliberately not required.** LexChat's Worker
+prompt makes it mandatory for a question about whether a provision is in force,
+commenced or amended, but nothing in the question set marks which questions
+those are, so requiring it here would fail every other question. It is ignored
+by the order check, so a run that calls it is scored on the rest of its chain.
+
 ## Research Output Structure
 
 **Aim.** Checks that the Worker agent's report to the Manager uses the four Markdown headings its
@@ -70,6 +83,14 @@ the word appearing mid-sentence. Scores 1.0 if every required heading is present
 **Not measured in conversational mode.** That mode's Worker prompt tells the agent not to use these
 headings at all, so a score would be measuring obedience to an instruction LexChat never gave. The
 row is still written, carrying a reason that keeps it out of the dashboard mean.
+
+**A step stopped at the tool-call limit is skipped.** It hands back a notice
+saying it was cut short instead of a report. LexChat used to send that notice
+through its reformat retry, which dressed it in the required headings and made a
+step that retrieved nothing look complete; it now skips that reformat on
+purpose, so the notice arrives unheaded. Scoring it as a missing-heading failure
+would mark the fix as a regression. A sibling step's missing headings still
+fail, and a run where every step halted is written as not measured.
 
 ## Reference Links
 
@@ -95,6 +116,16 @@ Act missing from the retrieved set scores 0.0, with no partial credit: unlike Re
 "some links survived" is meaningfully better than "none did", one fabricated citation is a full failure
 regardless of how many others were genuine.
 
+**A change record counts as retrieval.** `get_legislation_changes` returns
+legislation.gov.uk's own record of what amends or commences an instrument, so
+an Act it names was retrieved by this run just as surely as a search hit was,
+and LexChat's Worker prompt requires that tool for any question about in-force
+status, commencement or amendment. Before it was counted, this metric reported
+fabrication for correctly sourced citations: measured on two deep-research
+responses, all 14 accused ids came from a change record and appeared in no
+other tool output. That is the worst failure this metric can have, because the
+output accuses the model of inventing a source.
+
 **Only legislation.gov.uk URLs are read as Act ids.** A judgment link such as
 `caselaw.nationalarchives.gov.uk/uksc/2025/13` would otherwise become Act id `uksc/2025`, which no
 legislation tool call can ever have retrieved, so every case law citation was reported as fabricated.
@@ -118,6 +149,17 @@ set of Acts whose text was retrieved (the `legislation_id` argument of a `search
 or `get_legislation_text` call that returned usable output, not an error). Score is the fraction of
 cited Acts that were read; threshold is 1.0, so a single unread cited Act fails. Case law citations
 are ignored, since there is no legislation retrieval to check them against.
+
+**An Act known only from a change record is not read, and the reason says so.**
+`get_legislation_changes` returns the precise amendment relation, which
+provisions were inserted or amended and by which, but not the instrument's
+text. That is a different position from having seen only a search-result title,
+and a reviewer has to be able to tell them apart: measured over twelve
+responses, 41 of 44 unread citations came from a change record and only 3 from
+a title alone. So the score is unchanged, since the text really was not pulled,
+and the reason splits the unread ids by which route each came by. Deciding to
+report rather than rescore follows the same rule as Step Completion's halted
+steps: keep the verdict, name the cause.
 
 **Why.** Citation Grounding accepts an Act that merely turned up in a search results list, so an
 answer can invent a relationship ("made under", "inserted by", "commenced by") for a source nobody
@@ -171,12 +213,30 @@ honestly can't be credited to a sibling step that didn't.
 Worker prompt. The conversational one asks only that the agent "say so plainly", so there is no
 wording to copy and a paraphrase is the required behaviour, not a partial one.
 
+**"Not found" and "not held" score in full in every mode.** The mandated
+sentence is still in the research Worker prompt, but LexChat measured it
+appearing in none of its pre-pilot answers, because it was never added to the
+conversational prompt. What the Worker is told now travels on its tool results:
+report a miss as not found, say what was searched for, and attribute it to the
+search or the index rather than to the user. So that phrasing is the required
+behaviour and not a paraphrase of a sentence nobody writes. Looser wordings
+still take the 0.5 research-mode penalty.
+
 ## Step Completion
 
 **Aim.** Deep research only. Checks that every step of the approved research plan carries its own
 retrieved legal text into its own report. Catches a step whose tool calls returned legal text and then
 reported nothing, most commonly because it hit a tool-call budget limit mid-step, while its sibling
 steps report normally and nothing else in the harness would notice.
+
+**A step stopped at the tool-call limit still fails, and the reason says so.**
+Its retrieval was still lost from its report, so the verdict does not change,
+but "the step threw its research away" and "the step was cut short" call for
+different responses and only the second is LexChat's limit rather than the
+model. LexChat now gives a halted step one tool-free round to write up what it
+had retrieved, so a halted step that passes here is that write-up working and
+one that fails is it not working. Read this alongside the dashboard's research
+limit column rather than on its own.
 
 **How.** Deterministic. For each step, if its own tool calls returned usable
 `search_legislation_sections`/`get_legislation_text` content but its own report cites none of the Acts

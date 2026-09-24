@@ -27,6 +27,7 @@ deep-research result:
 
 import json
 import re
+from typing import Optional
 from urllib.parse import urlparse
 
 from .base import BaseMetric
@@ -127,6 +128,70 @@ _TEXT_TOOLS = (
 )
 
 
+# LexChat appends its own instruction blocks to a Worker report, in code
+# rather than through the model: [SEARCH SCOPE ...] ... [/SEARCH SCOPE] and the
+# ENABLING POWER, CHANGE RECORD, CURRENCY, PINPOINTS TO KEEP and SECTION
+# OUTLINE markers beside it. They are LexChat telling the model what it must
+# do, not the Worker's findings, and they are not small: the search-scope
+# block alone can be a large share of a report.
+#
+# Anything reading the report for the model's own words has to remove them
+# first. The search-scope block contains the phrase "not found", so a
+# gap-disclosure check looking for that phrase would otherwise pass every
+# report ever written. Matching LexChat's markers by name is brittle, but the
+# blocks arrive inside report text and there is nothing structured to read
+# instead; the names mirror `strip_scope_blocks` in
+# LexChat/server_py/src/utils/search_scope.py.
+# Three of the six wrap their content in a closing marker and three are
+# self-contained, which decides how each is removed. Verified by grepping
+# LexChat/server_py/src/utils/ for the closing forms.
+_PAIRED_BLOCK_NAMES = ("SEARCH SCOPE", "SECTION OUTLINE", "PINPOINTS TO KEEP")
+_TOOL_BLOCK_NAMES = _PAIRED_BLOCK_NAMES + (
+    "ENABLING POWER",
+    "CHANGE RECORD",
+    "CURRENCY",
+)
+_PAIRED_ALT = "|".join(_PAIRED_BLOCK_NAMES)
+_ALL_ALT = "|".join(_TOOL_BLOCK_NAMES)
+
+_PAIRED_TOOL_BLOCK = re.compile(rf"\[({_PAIRED_ALT})[^\]]*\][\s\S]*?\[/\1\]", re.I)
+# A paired block opened and never closed, which a truncated report would leave.
+# Dropping to the end is the safe direction: leaving the text in place would let
+# LexChat's own words satisfy a check on the model's. Only the paired names get
+# this, or a self-contained marker would take the rest of the report with it.
+_UNCLOSED_TOOL_BLOCK = re.compile(rf"\[(?:{_PAIRED_ALT})[^\]]*\][\s\S]*$", re.I)
+_TOOL_BLOCK_HEADER = re.compile(rf"\[/?(?:{_ALL_ALT})[^\[\]]*\]", re.I)
+
+# The reader-facing counterpart, which LexChat appends to the *answer* rather
+# than the report: one or more italic "*Search scope: ...*" lines at the very
+# end. Same shape as LexChat's own `_ECHOED_FOOTER` in search_scope.py.
+#
+# It has to come off whenever a check compares the answer with the report,
+# because the two carry LexChat's disclosure in different forms: the block in
+# the report, this footer in the answer. Removing one and not the other makes
+# the answer look like it asserts index-coverage statistics out of nowhere,
+# which is not the model's claim at all.
+_ANSWER_SCOPE_FOOTER = re.compile(r"(?:\n*^\*Search scope:[^\n]*\*[ \t]*)+\s*\Z", re.M)
+
+
+def _model_words(text: str) -> str:
+    """*text* with LexChat's own code-emitted additions removed.
+
+    Works on a Worker report (the bracketed blocks) and on a final answer (the
+    italic search-scope footer). Use it wherever a check reads either as the
+    model's writing, and on **both** sides wherever it compares them.
+
+    Leave the raw text alone where only citation URLs matter: neither the
+    blocks nor the footer carries one, so stripping would make no difference.
+    """
+    if not text:
+        return ""
+    out = _PAIRED_TOOL_BLOCK.sub("", text)
+    out = _UNCLOSED_TOOL_BLOCK.sub("", out)
+    out = _TOOL_BLOCK_HEADER.sub("", out)
+    return _ANSWER_SCOPE_FOOTER.sub("", out).strip()
+
+
 def _usable_output(output) -> bool:
     """True if a tool call's *output* is real content rather than a failure.
 
@@ -162,16 +227,25 @@ class MandatoryStructureMetric(BaseMetric):
     Matching is case-insensitive and ignores surrounding bold markers /
     numbering so minor formatting variations don't cause false failures.
 
+    A step LexChat stopped at its tool-call limit is skipped, because it hands
+    back a notice saying so instead of a report, and LexChat deliberately no
+    longer reformats that notice into a headed shell. Marking it a structure
+    failure would score an honest halt as a formatting defect.
+
     Score:
         1.0: all mandatory headings present (pass)
         0.0: one or more headings missing, or no delegate_research call found
     """
 
     def __init__(
-        self, threshold: float = 1.0, research_mode: str = "legislation_only"
+        self,
+        threshold: float = 1.0,
+        research_mode: str = "legislation_only",
+        halted_steps: Optional[set] = None,
     ) -> None:
         self.threshold = threshold
         self.research_mode = research_mode
+        self.halted_steps = halted_steps or set()
         self.score = 0.0
         self.success = False
         self.reason = ""
@@ -201,9 +275,29 @@ class MandatoryStructureMetric(BaseMetric):
                 for v in variants
             )
 
+        checked = [
+            (i, out)
+            for i, out in enumerate(dr_outputs, 1)
+            if i not in self.halted_steps
+        ]
+        if not checked:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                "Not measured: every captured step stopped at the tool-call "
+                "limit, so no Worker report was written to check."
+            )
+            return self.score
+
+        skipped = (
+            f" {len(dr_outputs) - len(checked)} halted step(s) skipped."
+            if len(checked) < len(dr_outputs)
+            else ""
+        )
+
         step_failures = []
-        for i, dr_output in enumerate(dr_outputs, 1):
-            lowered = dr_output.lower()
+        for i, dr_output in checked:
+            lowered = _model_words(dr_output).lower()
             missing = [h for h in headings if not _heading_present(h, lowered)]
             if missing:
                 display = [h[0] if isinstance(h, list) else h for h in missing]
@@ -213,16 +307,18 @@ class MandatoryStructureMetric(BaseMetric):
         if step_failures:
             self.score = 0.0
             self.success = False
-            self.reason = f"Missing mandatory headings: {'; '.join(step_failures)}"
+            self.reason = (
+                f"Missing mandatory headings: {'; '.join(step_failures)}.{skipped}"
+            )
         else:
             self.score = 1.0
             self.success = True
             self.reason = (
                 "All mandatory Markdown headings present in Worker output."
-                if len(dr_outputs) == 1
+                if len(checked) == 1
                 else f"All mandatory Markdown headings present in all "
-                f"{len(dr_outputs)} Worker report(s)."
-            )
+                f"{len(checked)} Worker report(s)."
+            ) + skipped
 
         return self.score
 
@@ -470,8 +566,16 @@ def _leading_json(raw: str) -> dict:
 def _retrieved_legislation_ids(tools: list) -> set:
     """
     Return the set of legislation_ids that *tools* actually retrieved:
-    results returned by ``search_legislation``, plus the legislation_id
-    argument passed to ``search_legislation_sections`` / ``get_legislation_text``.
+    results returned by ``search_legislation``, the legislation_id argument
+    passed to ``search_legislation_sections`` / ``get_legislation_text``, and
+    the instruments named in a ``get_legislation_changes`` change record.
+
+    The change record has to count. It is legislation.gov.uk's own record of
+    what amends or commences an instrument, so an Act it names was retrieved by
+    this run just as surely as a search hit was, and LexChat's Worker prompt
+    now requires that tool for any question about in-force status, commencement
+    or amendment. Leaving it out made Citation Grounding report fabrication for
+    correctly sourced citations that came from a change record alone.
 
     Ids are lowercased, because that is how they arrive from a citation URL.
     The API sends them cased (``ukpga/Edw7/4/31``) and roughly one id in
@@ -494,6 +598,20 @@ def _retrieved_legislation_ids(tools: list) -> set:
                     lid = r.get("legislation_id")
                     if lid:
                         ids.add(lid.lower())
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                continue
+        elif tool.name == "Worker: get_legislation_changes":
+            params = tool.input_parameters or {}
+            lid = params.get("legislation_id")
+            if lid:
+                ids.add(lid.lower())
+            raw = tool.output
+            try:
+                data = _leading_json(raw) if isinstance(raw, str) else raw
+                for r in (data or {}).get("related", []):
+                    rel = r.get("legislation_id") if isinstance(r, dict) else None
+                    if rel:
+                        ids.add(rel.lower())
             except (json.JSONDecodeError, AttributeError, TypeError):
                 continue
         elif tool.name in (
@@ -586,6 +704,37 @@ def _read_legislation_ids(tools: list) -> set:
             lid = (tool.input_parameters or {}).get("legislation_id")
             if lid:
                 ids.add(lid.lower())
+    return ids
+
+
+def _change_record_ids(tools: list) -> set:
+    """Ids a ``get_legislation_changes`` change record named, target included.
+
+    Used only to explain a Citation Read failure, never to score one. An Act
+    known from a change record was genuinely retrieved, so it is not
+    fabrication, but its *text* was not pulled, so it is not read either. The
+    two are different positions and a reviewer has to be able to tell them
+    apart.
+    """
+    ids: set = set()
+    for tool in tools or []:
+        if tool.name != "Worker: get_legislation_changes":
+            continue
+        lid = (tool.input_parameters or {}).get("legislation_id")
+        if lid:
+            ids.add(lid.lower())
+        try:
+            data = (
+                _leading_json(tool.output)
+                if isinstance(tool.output, str)
+                else tool.output
+            )
+            for r in (data or {}).get("related", []):
+                rel = r.get("legislation_id") if isinstance(r, dict) else None
+                if rel:
+                    ids.add(rel.lower())
+        except (json.JSONDecodeError, AttributeError, TypeError):
+            continue
     return ids
 
 
@@ -742,11 +891,27 @@ class CitationReadMetric(BaseMetric):
         self.success = self.score >= self.threshold
 
         if unread:
+            # Say which route each unread citation came by. A change record
+            # gives the precise amendment relation without the instrument's
+            # text, which is a different position from having seen only a
+            # title, and the two call for different responses from a reviewer.
+            from_changes = sorted(unread & _change_record_ids(test_case.tools_called))
+            from_titles = sorted(unread - set(from_changes))
+            parts = []
+            if from_titles:
+                parts.append(
+                    f"cited on the strength of a search result title, or never "
+                    f"looked up at all: {from_titles}"
+                )
+            if from_changes:
+                parts.append(
+                    f"known from a change record, so the amendment relation was "
+                    f"retrieved but the text was not: {from_changes}"
+                )
             self.reason = (
                 f"Cited without reading: {sorted(unread)}. "
                 f"{len(cited_ids) - len(unread)} of {len(cited_ids)} cited Act(s) "
-                "had their text retrieved; the rest were cited on the strength of "
-                "a search result title, or were never looked up at all."
+                f"had their text retrieved. Of the rest, " + "; ".join(parts) + "."
             )
         else:
             self.reason = (
@@ -882,6 +1047,22 @@ _GENUINE_GAP_KEYWORDS = (
     "switch to research mode",
 )
 
+# The wording LexChat now asks for, so it earns full marks in every mode
+# rather than the paraphrase penalty.
+#
+# The mandated sentence above is still in WORKER_SYSTEM_PROMPT, but LexChat
+# found it absent from its pre-pilot answers, because it was never added to
+# the conversational variant. What the Worker is actually told now is
+# a rule its tool results carry (LexChat/server_py/src/utils/search_scope.py,
+# _REPORTING_RULE): report a miss as not found, say what was searched for, and
+# attribute it to the search or the index rather than to the user. That steers
+# the report to "not found" and "not held", neither of which is a paraphrase of
+# a sentence nobody writes any more.
+_GENUINE_GAP_REQUIRED_WORDINGS = (
+    "not found",
+    "not held",
+)
+
 
 class GenuineGapMetric(BaseMetric):
     """
@@ -959,8 +1140,10 @@ class GenuineGapMetric(BaseMetric):
                 step_scores.append(1.0)
                 n_retrieved += 1
                 continue
-            lowered = (g["report"] or "").lower()
-            if _GENUINE_GAP_PHRASE.lower() in lowered:
+            lowered = _model_words(g["report"]).lower()
+            if _GENUINE_GAP_PHRASE.lower() in lowered or any(
+                w in lowered for w in _GENUINE_GAP_REQUIRED_WORDINGS
+            ):
                 step_scores.append(1.0)
             elif any(kw in lowered for kw in _GENUINE_GAP_KEYWORDS):
                 step_scores.append(paraphrase_score)
@@ -1037,10 +1220,19 @@ class StepCompletionMetric(BaseMetric):
 
     Only steps that retrieved usable legislation are scored. Empty retrieval
     is GenuineGapMetric's question; no eligible steps means not measured.
+
+    A step stopped at LexChat's tool-call limit is still scored, because its
+    retrieval was still lost from the report, but the reason says the limit
+    was the cause. LexChat now gives a halted step one tool-free round to
+    write up what it had retrieved, so a halted step that passes is that
+    write-up working and one that fails is it not working.
     """
 
-    def __init__(self, threshold: float = 1.0) -> None:
+    def __init__(
+        self, threshold: float = 1.0, halted_steps: Optional[set] = None
+    ) -> None:
         self.threshold = threshold
+        self.halted_steps = halted_steps or set()
         self.score = 0.0
         self.success = False
         self.reason = ""
@@ -1082,9 +1274,16 @@ class StepCompletionMetric(BaseMetric):
 
         if failed:
             steps = ", ".join(str(i) for i in failed)
+            halted = sorted(set(failed) & self.halted_steps)
+            cause = (
+                f" Step(s) {', '.join(str(i) for i in halted)} stopped at the "
+                "tool-call limit, so the limit is the cause."
+                if halted
+                else ""
+            )
             self.reason = (
                 f"Step(s) {steps} retrieved legislation text but "
-                "their own report cites none of it."
+                f"their own report cites none of it.{cause}"
             )
         else:
             self.reason = (

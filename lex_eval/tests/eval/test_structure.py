@@ -31,6 +31,7 @@ from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.applicability import exclusion
 from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
+    halted_steps,
     load_records,
     record_id,
     record_to_test_case,
@@ -104,7 +105,11 @@ def test_mandatory_structure(request, record):
 
     test_case = record_to_test_case(record)
     research_mode = record.get("research_mode", "legislation_only")
-    metric = MandatoryStructureMetric(threshold=1.0, research_mode=research_mode)
+    metric = MandatoryStructureMetric(
+        threshold=1.0,
+        research_mode=research_mode,
+        halted_steps=halted_steps(record),
+    )
     metric.measure(test_case)
 
     attach_metric(
@@ -336,7 +341,7 @@ def test_step_completion(request, record):
 
     _gate_scope(request, record, "step_completion")
     test_case = record_to_test_case(record)
-    metric = StepCompletionMetric(threshold=1.0)
+    metric = StepCompletionMetric(threshold=1.0, halted_steps=halted_steps(record))
     metric.measure(test_case)
 
     attach_metric(
