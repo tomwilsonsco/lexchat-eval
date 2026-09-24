@@ -797,6 +797,32 @@ class TestModelWordsBlockRemoval:
         assert _model_words("Just the model writing.") == "Just the model writing."
 
 
+class TestSearchScopeText:
+    """The [SEARCH SCOPE] text that `_model_words` removes, kept for the judge."""
+
+    def test_returns_the_block_contents_without_the_report(self):
+        from lex_eval.metrics.structure import _search_scope_text
+
+        out = _search_scope_text(
+            "Findings.\n[SEARCH SCOPE - x]\nIn-force: not established.\n"
+            "[/SEARCH SCOPE]\nMore findings."
+        )
+        assert out == "In-force: not established."
+
+    def test_joins_one_block_per_step(self):
+        from lex_eval.metrics.structure import _search_scope_text
+
+        out = _search_scope_text(
+            "[SEARCH SCOPE - a]\none\n[/SEARCH SCOPE] x [SEARCH SCOPE - b]\ntwo"
+        )
+        assert out == "one\n\ntwo"
+
+    def test_a_report_with_no_block_gives_nothing(self):
+        from lex_eval.metrics.structure import _search_scope_text
+
+        assert _search_scope_text("Just the model writing.") == ""
+
+
 class TestAnswerScopeFooterRemoval:
     """LexChat's disclosure reaches the answer and the report in different forms.
 

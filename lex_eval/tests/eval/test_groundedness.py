@@ -25,7 +25,7 @@ from lex_eval.metrics import (
     ClaimSupportMetric,
     ResponseGroundednessMetric,
 )
-from lex_eval.metrics.structure import _model_words
+from lex_eval.metrics.structure import _model_words, _search_scope_text
 from lex_eval.utils.collector import attach_metric
 from lex_eval.utils.judge import _judge
 from lex_eval.utils.test_helpers import (
@@ -176,15 +176,12 @@ def test_response_groundedness(request, record):
     test_case = record_to_test_case(record)
     # LexChat emits its search-scope disclosure TWICE, in two renderings that
     # do not agree in detail: an agent-facing [SEARCH SCOPE] block in the
-    # report, and a reader-facing italic footer on the answer. That confounds
-    # this check, which compares the two texts. Stripping neither is worst,
-    # because the judge then compares LexChat's two renderings and reports
-    # their disagreements as the model misrepresenting its research. Stripping
-    # both sides is used here as the least wrong, and it is still wrong on a
-    # model that weaves the disclosure into the answer body rather than
-    # confining it to the footer, which Gemini does. Removing body prose would
-    # need a prose detector, so it is not attempted, and this metric should not
-    # be read as a model verdict on a build that emits the disclosure.
+    # report, and a reader-facing italic footer on the answer. Both come off
+    # before comparing, or the judge reports the disagreements between
+    # LexChat's two renderings as the model misrepresenting its research. The
+    # model also repeats the block's caveats in the answer body, so the block's
+    # text is handed to the judge separately as a record of the search, which
+    # keeps a correctly repeated caveat from reading as unsupported.
 
     ok, reason = _gate_output_length(
         request, record, test_case, "response_groundedness", "Response Groundedness"
@@ -206,6 +203,7 @@ def test_response_groundedness(request, record):
         threshold=_RESPONSE_GROUNDEDNESS_THRESHOLD,
         scope_note=(record.get("research_plan") or {}).get("scope_note"),
         research_mode=record.get("research_mode"),
+        search_scope=_search_scope_text(record["research_output"]),
     )
     # Reset here, not just inside generate(): a near-verbatim response passes
     # without calling the judge at all, so without this the row would wrongly

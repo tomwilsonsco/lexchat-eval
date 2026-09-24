@@ -38,6 +38,24 @@ even though it does not appear in the research output.
 """
 
 
+# Wrapper for LexChat's own record of the search, the [SEARCH SCOPE] blocks it
+# appends to the research output in code. They are removed from the research
+# output itself, because they are LexChat's words rather than the Worker's, but
+# LexChat also tells the model to repeat their caveats in its answer. Without
+# them the judge reads a caveat such as "in-force status could not be verified"
+# as unsupported, when it came from here.
+_SEARCH_SCOPE_TEMPLATE = """
+Search Record (written by the system, not the research agent):
+{search_scope}
+
+This records what the research searched and what it could not establish, and
+includes the system's instructions to the model. A caveat or limitation in the
+response that matches it, for example that in-force status could not be
+verified, that the index is incomplete, or that a search was cut short by a
+limit, is grounded. It is not a source for any legal fact or conclusion.
+"""
+
+
 class _GroundednessJudgement(BaseModel):
     analysis: str
     verdict: Literal["pass", "fail"]
@@ -48,7 +66,7 @@ _PROMPT_TEMPLATE = """You are an expert legal evaluator. Your task is to decide 
 
 Research Output:
 {research_output}
-{scope_block}
+{scope_block}{search_scope_block}
 Final Response:
 {actual_output}
 
@@ -100,6 +118,9 @@ class ResponseGroundednessMetric(BaseMetric):
                          a plan. Given to the judge so that a response
                          describing its own scope is not read as unsupported.
         research_mode:   The question's research mode, labelling the scope note.
+        search_scope:    LexChat's [SEARCH SCOPE] text, removed from
+                         research_output. Given to the judge so that a response
+                         repeating one of its caveats is not read as unsupported.
     """
 
     def __init__(
@@ -109,12 +130,14 @@ class ResponseGroundednessMetric(BaseMetric):
         threshold: float = 1.0,
         scope_note: str | None = None,
         research_mode: str | None = None,
+        search_scope: str | None = None,
     ) -> None:
         self.research_output = research_output
         self.model = model
         self.threshold = threshold
         self.scope_note = scope_note
         self.research_mode = research_mode
+        self.search_scope = search_scope
         self.score = 0.0
         self.reason = ""
         self.success = False
@@ -141,9 +164,15 @@ class ResponseGroundednessMetric(BaseMetric):
             if self.scope_note and self.scope_note.strip()
             else ""
         )
+        search_scope_block = (
+            _SEARCH_SCOPE_TEMPLATE.format(search_scope=self.search_scope.strip())
+            if self.search_scope and self.search_scope.strip()
+            else ""
+        )
         prompt = _PROMPT_TEMPLATE.format(
             research_output=self.research_output,
             scope_block=scope_block,
+            search_scope_block=search_scope_block,
             actual_output=actual_output,
         )
         try:

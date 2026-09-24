@@ -455,6 +455,14 @@ something like "case law was excluded under the approved research plan", which i
 nowhere in the research output, so without the scope note the judge read it as an unsupported claim and
 failed the whole answer. Runs without a plan pass no scope note and the prompt is unchanged.
 
+LexChat's own search record is handled the same way. LexChat appends a `[SEARCH SCOPE]` block to the
+research output and a matching italic footer to the answer. Both are removed before comparing, because
+they are LexChat's words, not the model's, and the two versions differ in detail. The model often repeats
+the block's caveats in the answer itself, for example "in-force status could not be verified". So the
+judge is given the block's text as a record of the search: a caveat that matches it counts as grounded,
+but the record is not a source for any legal point. Before this, correctly repeated caveats were failed as
+unsupported.
+
 **The `<suggestions>` block never reaches this metric.** In conversational mode the Manager is told to
 end every reply with a `<suggestions>` block of follow-up questions. LexChat strips it from the answer
 before sending, so it is absent from `actual_output` and no metric sees it. Worth knowing before

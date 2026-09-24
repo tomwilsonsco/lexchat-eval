@@ -192,6 +192,23 @@ def _model_words(text: str) -> str:
     return _ANSWER_SCOPE_FOOTER.sub("", out).strip()
 
 
+_SEARCH_SCOPE_BODY = re.compile(
+    r"\[SEARCH SCOPE[^\]]*\]([\s\S]*?)(?:\[/SEARCH SCOPE\]|\Z)", re.I
+)
+
+
+def _search_scope_text(report: str) -> str:
+    """The contents of every [SEARCH SCOPE] block in a Worker report, joined.
+
+    This is the part of the report that `_model_words` removes, kept for a
+    check that must still know what LexChat recorded about the search, e.g.
+    that in-force status was not established.
+    """
+    return "\n\n".join(
+        m.group(1).strip() for m in _SEARCH_SCOPE_BODY.finditer(report or "")
+    ).strip()
+
+
 def _usable_output(output) -> bool:
     """True if a tool call's *output* is real content rather than a failure.
 
