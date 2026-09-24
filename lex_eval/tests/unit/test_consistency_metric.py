@@ -96,6 +96,26 @@ def test_preprocess_strips_link_target_but_keeps_link_text():
     assert "equality act 2010 - s.149" in processed
 
 
+def test_lexchat_footer_does_not_count_as_agreement():
+    """Two different answers sharing LexChat's footer must not look alike."""
+    footer = (
+        "\n\n*Search scope: the legislation index was searched for x; "
+        + ("this index is known to be incomplete and records no in-force status. " * 20)
+        + "*"
+    )
+    with_footer = ConsistencyMetric(
+        reference_outputs=["Section 38 lets Ministers set bus fares." + footer]
+    )
+    without = ConsistencyMetric(
+        reference_outputs=["Section 38 lets Ministers set bus fares."]
+    )
+    answer = "No provision caps fares nationally."
+    with_footer.measure(LLMTestCase(input="q", actual_output=answer + footer))
+    without.measure(LLMTestCase(input="q", actual_output=answer))
+
+    assert with_footer.score == without.score
+
+
 def test_citation_check_skipped_when_no_citations_present():
     """The Worker prompt allows bold-text citation as a fallback, so a
     response with no section URLs should be judged on cosine alone."""

@@ -14,6 +14,7 @@ number buried among hundreds of otherwise-identical tokens.
 """
 
 from .base import BaseMetric
+from .structure import _model_words
 from ..testcase import LLMTestCase
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -28,7 +29,11 @@ _SECTION_CITATION_RE = re.compile(
 
 
 def _preprocess(text: str) -> str:
-    """Strip markdown formatting and normalise whitespace."""
+    """Strip LexChat's search-scope footer and markdown, normalise whitespace."""
+    # LexChat appends a long, near-identical "*Search scope: ...*" footer to
+    # every answer. It is LexChat's code, not the model's answer, and left in
+    # it makes two runs look more alike than their answers are.
+    text = _model_words(text)
     # Drop markdown link targets (keeping the visible link text): every
     # citation shares the same legislation.gov.uk URL prefix, which would
     # otherwise inflate similarity with content-free boilerplate.
