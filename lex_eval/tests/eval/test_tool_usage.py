@@ -25,6 +25,7 @@ import pytest
 
 from lex_eval.metrics.tool_usage import ToolUsageMetric
 from lex_eval.utils.test_helpers import (
+    halted_steps,
     load_records,
     record_to_test_case,
     record_id,
@@ -67,6 +68,7 @@ def test_tool_usage(request, record):
         research_mode=research_mode,
         tool_sequence=tool_sequence,
         chat_mode=chat_mode,
+        halted_steps=halted_steps(record),
     )
     metric.measure(test_case)
 
@@ -82,4 +84,6 @@ def test_tool_usage(request, record):
         tools_used=_tools_list(test_case),
     )
 
+    if metric.reason.startswith("Not measured:"):
+        pytest.skip(metric.reason)
     assert metric.is_successful(), metric.reason

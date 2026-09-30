@@ -17,6 +17,7 @@ from lex_eval.utils.versioning import (
     start_scoring,
     compatible_ids,
     metric_version,
+    _code_only,
 )
 from lex_eval.reports.data import read_database
 
@@ -177,3 +178,18 @@ def test_gather_entrypoint_records_and_rejoins_experiment(tmp_path, monkeypatch)
         == 2
     )
     conn.close()
+
+
+def test_comment_and_docstring_edits_keep_the_scoring_version():
+    code = 'def f(x):\n    """Old doc."""\n    return x + 1  # note\n'
+    reworded = 'def f(x):\n    """New doc."""\n    # moved note\n    return x + 1\n'
+    changed = 'def f(x):\n    """Old doc."""\n    return x + 2  # note\n'
+    assert _code_only(code) == _code_only(reworded)
+    assert _code_only(code) != _code_only(changed)
+
+
+def test_consistency_version_does_not_depend_on_which_responses_were_scored():
+    base = {"source_version": "v1", "judge": {}}
+    assert metric_version(
+        {**base, "response_ids": [1, 2]}, "consistency"
+    ) == metric_version({**base, "response_ids": [3, 4]}, "consistency")

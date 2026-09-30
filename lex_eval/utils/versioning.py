@@ -1,5 +1,6 @@
 """Append-only experiment and scoring history beside the existing results."""
 
+import ast
 import hashlib
 import json
 import subprocess
@@ -37,15 +38,37 @@ def revision():
 SCORING_UTILS = ("applicability.py", "collector.py", "judge.py", "test_helpers.py")
 
 
+def _code_only(source):
+    """*source* with comments, docstrings and formatting removed.
+
+    A comment or docstring edit cannot change a score, so it must not make
+    stored scores incompatible and force a paid judge rescore.
+    """
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if (
+            isinstance(body, list)
+            and body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            node.body = body[1:] or [ast.Pass()]
+    return ast.dump(tree)
+
+
 def source_version():
-    """Fingerprint scoring code, including uncommitted changes."""
+    """Fingerprint scoring code, including uncommitted changes, ignoring comments."""
     paths = [ROOT / "lex_eval/testcase.py", ROOT / "lex_eval/reference/store.py"]
     paths.extend(ROOT / "lex_eval/utils" / name for name in SCORING_UTILS)
     for folder in ("metrics", "tests/eval"):
         paths.extend(sorted((ROOT / "lex_eval" / folder).glob("*.py")))
     return fingerprint(
         {
-            str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
+            str(p.relative_to(ROOT)): hashlib.sha256(
+                _code_only(p.read_text()).encode()
+            ).hexdigest()
             for p in paths
         }
     )
@@ -178,8 +201,6 @@ def metric_version(config, metric):
         "metric": metric,
         "judge": config["judge"],
     }
-    if metric == "consistency":
-        data["response_ids"] = config.get("response_ids", [])
     return fingerprint(data)
 
 

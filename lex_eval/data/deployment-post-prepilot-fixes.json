@@ -1,0 +1,39 @@
+{
+  "recorded_by": "eval team, 23 September 2026",
+  "what_this_is": "A hand-written snapshot of the LexChat build this gather ran against. The harness does not inspect the server's build, so this file is the only record of it, and it is a claim by whoever wrote it rather than something measured.",
+  "lexchat_commit": "c77e77912eb07669ad9a4b092764e293f99c650b",
+  "lexchat_commit_short": "c77e779",
+  "lexchat_commit_subject": "Merge fix/prepilot-defects into main: second cut of the pre-pilot defect fixes (Session 22, 30 of 48 rows, 8 of 14 buckets)",
+  "lexchat_commit_date": "2026-09-23T10:50:05+01:00",
+  "fix_programme": {
+    "name": "pre-pilot defect fixes",
+    "branch": "fix/prepilot-defects",
+    "first_cut_merged": "2026-09-22",
+    "second_cut_merged": "2026-09-23",
+    "rows_fixed": "30 of 48, 8 of 14 buckets",
+    "rollback_tags": [
+      "pre-prepilot-fixes-2026-09-22",
+      "pre-prepilot-fixes-2026-09-23"
+    ],
+    "tracker": "LexChat/docs/prepilot-fixes/summary-table.html, stamped 23 September 2026"
+  },
+  "audit_schema_version": 5,
+  "observed_at_capture": {
+    "active_model": "glm-5.2:cloud",
+    "provider": "ollama",
+    "summarisation_model": "glm-5.2:cloud",
+    "note": "Read from GET /api/models and GET /api/developer/provider-config at gather time, so these two are measured rather than asserted."
+  },
+  "verified_against_this_build": [
+    "Audit event emits schema_version 5; the harness accepts 1 to 5.",
+    "get_legislation_changes is live and called by the Worker.",
+    "search_legislation returns leading JSON with results[].legislation_id, plus the new returned/total_matched/removed_by_filters keys.",
+    "Worker reports carry an appended [SEARCH SCOPE] instruction block, about half the report by length."
+  ],
+  "unknown": [
+    "Whether the running server is built from this commit. The commit is read from the local LexChat/ clone, which is not evidence of the deployed build.",
+    "The server's RESEARCH_MODE environment override, which decides whether the parliamentary and Westminster tool sets are reachable.",
+    "Prompt or corpus changes made outside the commit history.",
+    "Everything about the build behind the baseline experiments glm-5.2-original and glm-5.2-original-deep, which carry deployment: null and cannot be filled in retrospectively."
+  ]
+}

@@ -16,32 +16,75 @@ pytestmark = pytest.mark.unit
 @pytest.mark.parametrize(
     "extent, expected",
     [
-        # What LexChat's filter is written for.
+        # The letter form the old filter was written for. Nothing in 6,215
+        # captured results sends it, so this is defensive only.
         (["E+W+S+NI"], True),
         (["S"], True),
         (["E+W"], False),
-        # What the LEX API actually sends. Every one of these is dropped, which
-        # is TOM_TO_DO.md finding 41: a Scotland filter that keeps no Scottish
-        # Act. Measured 1 Sep 2026 at 0 of 75 Scottish results surviving.
-        (["Scotland"], False),
-        (["United Kingdom"], False),
-        ([""], False),
-        # An unknown extent is kept, but only when the list is genuinely empty.
+        # The words the LEX API actually sends. Every one of these used to be
+        # dropped, which was TOM_TO_DO.md finding 41. LexChat fixed the parser
+        # (FIX_PLAN P1.1), so they are now retained.
+        (["Scotland"], True),
+        (["United Kingdom"], True),
+        (["Great Britain"], True),
+        ([""], True),
         ([], True),
+        # Explicitly other territories, still excluded.
+        (["England", "Wales"], False),
+        (["Northern Ireland"], False),
+        # A mixed extent that includes Scotland is in scope.
+        (["England", "Wales", "Scotland"], True),
     ],
 )
-def test_scotland_filter_against_real_and_expected_extents(extent, expected):
+def test_scotland_filter_against_the_extents_the_api_sends(extent, expected):
     assert matches_jurisdiction(extent, "scotland") is expected
 
 
-def test_uk_wide_needs_all_four_territories():
-    assert matches_jurisdiction(["E+W+S+NI"], "uk_wide") is True
+def test_uk_wide_needs_a_uk_extent_and_rejects_unknown():
+    assert matches_jurisdiction(["United Kingdom"], "uk_wide") is True
     assert matches_jurisdiction(["E+W"], "uk_wide") is False
+    # uk_wide is the one filter that does not include an unknown extent:
+    # "applies everywhere" cannot be assumed from missing data.
     assert matches_jurisdiction([""], "uk_wide") is False
+    assert matches_jurisdiction([], "uk_wide") is False
 
 
 def test_an_unrecognised_jurisdiction_keeps_everything():
     assert matches_jurisdiction(["Scotland"], "atlantis") is True
+
+
+@pytest.mark.parametrize(
+    "legislation_id, jurisdiction, expected",
+    [
+        # With no usable extent, the instrument's own id says whose it is.
+        ("ssi/2020/1", "scotland", True),
+        ("asp/2021/3", "scotland", True),
+        ("nisr/2020/1", "scotland", False),
+        ("wsi/2020/1", "scotland", False),
+        # A UK-level id could apply anywhere, so it is kept.
+        ("uksi/2020/1", "scotland", True),
+        # England & Wales and Wales overlap in one direction only.
+        ("wsi/2020/1", "england_and_wales", True),
+        ("ssi/2020/1", "england_and_wales", False),
+    ],
+)
+def test_unknown_extent_falls_back_to_the_id_prefix(
+    legislation_id, jurisdiction, expected
+):
+    assert matches_jurisdiction([""], jurisdiction, legislation_id) is expected
+
+
+def test_an_unrecognised_extent_word_is_dropped_not_treated_as_unknown():
+    """The one place the deployed rule diverges from what we recommended.
+
+    A territory word outside the recognised six is kept as a token, so the
+    membership test fails and the result is dropped under every filter. The
+    API sends no such value today, so this records a forward-looking risk: if
+    legislation.gov.uk renames or adds a territory, that law disappears from
+    every filtered search rather than degrading to include-by-default.
+    """
+    assert matches_jurisdiction(["Atlantis"], "scotland") is False
+    assert matches_jurisdiction(["Atlantis"], "england_and_wales") is False
 
 
 # ---------------------------------------------------------------------------

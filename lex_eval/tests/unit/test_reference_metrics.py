@@ -431,3 +431,30 @@ def test_a_short_label_list_is_a_judge_error_not_a_shrunken_denominator():
     assert not metric.is_successful()
     assert metric.reason.startswith("Judge error:")
     assert "2 label(s) for 3 statements" in metric.reason
+
+
+class TestCitationMatching:
+    """A link to a provision, or to anything inside it, cites that provision."""
+
+    _REQUIRED = {"asp/2000/1/section/21"}
+
+    def _score(self, url: str) -> float:
+        metric = CitationAgreementMetric(
+            reference_answer="", threshold=0.5, required_citations=self._REQUIRED
+        )
+        metric.measure(LLMTestCase(input="q", actual_output=f"See [s]({url})."))
+        return metric.score
+
+    def test_a_subsection_link_cites_the_section(self):
+        assert (
+            self._score("https://www.legislation.gov.uk/asp/2000/1/section/21/2") == 1.0
+        )
+
+    def test_a_dated_version_link_cites_the_section(self):
+        url = "https://www.legislation.gov.uk/asp/2000/1/section/21/2019-01-01"
+        assert self._score(url) == 1.0
+
+    def test_a_section_sharing_the_number_prefix_does_not(self):
+        assert (
+            self._score("https://www.legislation.gov.uk/asp/2000/1/section/210") == 0.0
+        )

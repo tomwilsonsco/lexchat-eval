@@ -153,3 +153,68 @@ def test_conversational_still_requires_sections_before_fallback():
         sequence, "legislation_only", chat_mode="conversational"
     )
     assert not ok, detail
+
+
+# ---------------------------------------------------------------------------
+# A run stopped at LexChat's tool-call limit
+# ---------------------------------------------------------------------------
+
+
+class _Call:
+    def __init__(self, name):
+        self.name = name
+        self.output = ""
+
+
+def _case(sequence):
+    class _Case:
+        tools_called = [_Call(t) for t in sequence]
+
+    return _Case()
+
+
+class TestHaltedRunsAreNotScoredForMissingTools:
+    """A tool the limit stopped the Worker reaching is not a model choice.
+
+    The presence check is over the whole run, so a halt only matters when a
+    required tool is genuinely absent. When the other steps called everything
+    anyway, the halt says nothing about tool usage and the run is scored as
+    normal.
+    """
+
+    def test_missing_tool_after_a_halt_is_not_measured(self):
+        sequence = [_DELEGATE, _SEARCH]
+        metric = ToolUsageMetric(
+            research_mode="legislation_only",
+            tool_sequence=sequence,
+            chat_mode="deep_research",
+            halted_steps={1},
+        )
+        metric.measure(_case(sequence))
+        assert metric.reason.startswith("Not measured:")
+        assert not metric.is_successful()
+
+    def test_missing_tool_without_a_halt_still_fails(self):
+        sequence = [_DELEGATE, _SEARCH]
+        metric = ToolUsageMetric(
+            research_mode="legislation_only",
+            tool_sequence=sequence,
+            chat_mode="deep_research",
+        )
+        metric.measure(_case(sequence))
+        assert not metric.reason.startswith("Not measured:")
+        assert not metric.is_successful()
+        assert metric.score == pytest.approx(2 / 3)
+
+    def test_halt_does_not_excuse_a_run_that_used_every_tool(self):
+        """A complete chain is scored on its merits whether it halted or not."""
+        sequence = [_DELEGATE, _SEARCH, _SECTIONS]
+        metric = ToolUsageMetric(
+            research_mode="legislation_only",
+            tool_sequence=sequence,
+            chat_mode="deep_research",
+            halted_steps={1},
+        )
+        metric.measure(_case(sequence))
+        assert metric.score == 1.0
+        assert metric.is_successful()

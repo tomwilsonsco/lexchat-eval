@@ -55,13 +55,11 @@ def expected_citations(reference: dict) -> tuple[set[str], str]:
 def _is_covered(expected: str, actual: set[str]) -> bool:
     """Whether *expected* is cited in *actual*.
 
-    An Act-level citation (``ukpga/2018/12``) is covered by a citation to any
-    provision inside that Act, since citing section 6 of an Act does cite it.
+    A citation to the provision itself or to anything inside it counts: section
+    21 is cited by a link to section 21(2), and an Act by a link to any of its
+    sections. A dated version of the provision counts too.
     """
-    if expected in actual:
-        return True
-    is_act_level = len(expected.split("/")) <= 3
-    return is_act_level and any(a.startswith(f"{expected}/") for a in actual)
+    return any(a == expected or a.startswith(f"{expected}/") for a in actual)
 
 
 def act_of(provision: str) -> str:
@@ -198,7 +196,7 @@ class CitationAgreementMetric(BaseMetric):
     The default threshold is low because a draft reference cites everything its
     author consulted, including background provisions a good response need not
     repeat. A signed-off reference expects only the citations the lawyer called
-    required, so it is scored against a much higher threshold. See
+    required, so it is scored against a higher threshold. See
     docs/metrics.md.
     """
 

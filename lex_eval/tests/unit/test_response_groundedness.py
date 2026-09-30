@@ -152,3 +152,40 @@ def test_no_scope_note_leaves_the_prompt_unchanged():
     metric.measure(_test_case(_DIVERGENT_ACTUAL_OUTPUT))
 
     assert "Approved Research Scope" not in judge.prompt
+
+
+def test_search_scope_is_given_to_the_judge():
+    """A caveat repeated from LexChat's search record must be checkable."""
+    judge = _PromptCapturingJudge()
+    metric = ResponseGroundednessMetric(
+        research_output=_DIVERGENT_RESEARCH_OUTPUT,
+        model=judge,
+        search_scope="In-force status: NOTHING in this step establishes it.",
+    )
+    metric.measure(_test_case(_DIVERGENT_ACTUAL_OUTPUT))
+
+    assert "Search Record" in judge.prompt
+    assert "In-force status: NOTHING in this step establishes it." in judge.prompt
+
+
+def test_no_search_scope_leaves_the_prompt_unchanged():
+    judge = _PromptCapturingJudge()
+    metric = ResponseGroundednessMetric(
+        research_output=_DIVERGENT_RESEARCH_OUTPUT, model=judge, search_scope="  "
+    )
+    metric.measure(_test_case(_DIVERGENT_ACTUAL_OUTPUT))
+
+    assert "Search Record" not in judge.prompt
+
+
+def test_search_record_cannot_be_used_to_fail_an_omission():
+    """The record supports caveats the answer includes; it is not a checklist."""
+    judge = _PromptCapturingJudge()
+    metric = ResponseGroundednessMetric(
+        research_output=_DIVERGENT_RESEARCH_OUTPUT,
+        model=judge,
+        search_scope="If anything is reported as not found, it MUST quote the terms.",
+    )
+    metric.measure(_test_case(_DIVERGENT_ACTUAL_OUTPUT))
+
+    assert "leaving out anything in this record" in judge.prompt

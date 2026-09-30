@@ -68,6 +68,13 @@ PER_TOOL_SCORE = round(1 / len(REQUIRED_TOOLS), 10)
 # prompt phases. `get_legislation_text` is the optional fallback (Phase 3) and
 # is NOT a required tool, but if it is called it must come after
 # `search_legislation_sections`.
+#
+# `get_legislation_changes` is deliberately absent. LexChat added it as a
+# Phase 2b tool and its prompt makes it mandatory for a question about whether
+# a provision is in force, commenced or amended, but nothing in the question
+# set marks which questions those are, so requiring it here would fail every
+# other question. Unlisted tools are ignored by the order check, so a run that
+# calls it is scored on the rest of its chain as before.
 EXPECTED_TOOL_ORDER: list[str] = [
     "Worker: search_legislation",
     "Worker: search_legislation_sections",
@@ -265,6 +272,9 @@ class ToolUsageMetric(BaseMetric):
             plan step (segmented on ``delegate_research`` boundaries) using
             first-occurrence order only, not the no-revisit rule, see
             ``_check_tool_order``.
+        halted_steps: Positions of delegations LexChat stopped at its
+            tool-call limit, from ``utils/test_helpers.py::halted_steps``.
+            A run that halted is not scored for a tool it never reached.
     """
 
     def __init__(
@@ -273,11 +283,13 @@ class ToolUsageMetric(BaseMetric):
         research_mode: str = "legislation_only",
         tool_sequence: Optional[List[str]] = None,
         chat_mode: str = "research",
+        halted_steps: Optional[Set[int]] = None,
     ):
         self.threshold = threshold
         self.research_mode = research_mode
         self.tool_sequence = tool_sequence
         self.chat_mode = chat_mode
+        self.halted_steps = halted_steps or set()
         self.score = 0.0
         self.reason = ""
         self.success = False
@@ -311,6 +323,20 @@ class ToolUsageMetric(BaseMetric):
         missing = [t for t in REQUIRED_TOOLS if t not in tools_used]
 
         all_required_present = len(present) == len(REQUIRED_TOOLS)
+
+        # A run LexChat stopped at its tool-call limit did not choose to skip
+        # the tool it is missing, so there is no model behaviour here to score.
+        # Only a missing tool is affected: when every required tool was called
+        # anyway, the halt tells us nothing and the run is scored as normal.
+        if missing and self.halted_steps:
+            self.score = 0.0
+            self.success = False
+            self.reason = (
+                f"Not measured: {len(self.halted_steps)} step(s) stopped at the "
+                f"tool-call limit, so the missing {missing} is the limit's doing, "
+                "not the model's."
+            )
+            return self.score
 
         # --- Presence score (1/3 per required tool) ---
         presence_score = len(present) / len(REQUIRED_TOOLS)

@@ -88,6 +88,28 @@ def get_summarisation_model() -> Tuple[Optional[str], Optional[str]]:
         client.close()
 
 
+def get_lexchat_build() -> str:
+    """
+    Return the LexChat build the server reports, e.g. "v2026.09.3".
+
+    Read from /api/bot-info, which gives the exact build ("v2026.09.3-2-gabc1234"
+    when the server runs past a release) and the release alone ("2026.09.3") when
+    the server has no git history. Returns "n/a" for a server that reports
+    neither, as builds before v2026.09.3 do.
+    """
+    client = get_authenticated_client()
+    try:
+        response = client.get("/api/bot-info")
+        response.raise_for_status()
+        info = response.json()
+    except Exception as exc:
+        logger.warning("Could not read LexChat build from /api/bot-info (%s)", exc)
+        return "n/a"
+    finally:
+        client.close()
+    return info.get("build") or info.get("version") or "n/a"
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     model, provider = get_active_model()
@@ -95,6 +117,8 @@ if __name__ == "__main__":
         print(f"\nActive model (manager/worker): {model}  (provider: {provider})")
     else:
         print("\nNo active model found. Set one in LexChat's admin portal.")
+
+    print(f"LexChat build:                 {get_lexchat_build()}")
 
     summ_model, summ_provider = get_summarisation_model()
     if summ_model:

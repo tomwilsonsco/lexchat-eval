@@ -1,11 +1,16 @@
 {
-  "verified": false,
-  "verified_by": null,
-  "verified_at": null,
-  "verdict": null,
-  "citations_reviewed": false,
-  "required_citations": [],
-  "corrections": "",
-  "notes": "",
-  "signed_reference_sha256": null
+  "verified": true,
+  "verified_by": "Patrick Stewart",
+  "verified_at": "2026-09-18",
+  "verdict": "Approve",
+  "citations_reviewed": true,
+  "required_citations": [
+    "asp/2000/1/section/21",
+    "asp/2000/1/section/22",
+    "asp/2002/3/section/45",
+    "asp/2002/3/section/57"
+  ],
+  "corrections": "The answer does not mention the definition of \u2018financial year\u2019. This is not needed for an answer but is useful for context. The definition is found in section 29 of the 2000 Act and section 70(1) of the 2002 Act.",
+  "notes": "the answer is accurate and correctly notes the link to the Public Finance and Accountability (Scotland) Act 2000. This is something that may not be obvious at first but is needed to awnser the question. Decision line read \"points one and two of Section 3 could maybe be combined into one statement as the first statement may make it appear as if the deadline is entirely up to the discretion of the ministers where this is not the case.\" Recorded as Approve with statements 1 and 2 combined by the maintainer, not the reviewer, stating that the ministerial timing is subject to the 6 month limit in section 21(2) of the 2000 Act.",
+  "signed_reference_sha256": "a57c37a16ed9a450"
 }

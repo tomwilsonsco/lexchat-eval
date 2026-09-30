@@ -1,11 +1,15 @@
 {
-  "verified": false,
-  "verified_by": null,
-  "verified_at": null,
-  "verdict": null,
-  "citations_reviewed": false,
-  "required_citations": [],
-  "corrections": "",
-  "notes": "",
-  "signed_reference_sha256": null
+  "verified": true,
+  "verified_by": "Heather Evans",
+  "verified_at": "2026-09-16",
+  "verdict": "Approve",
+  "citations_reviewed": true,
+  "required_citations": [
+    "asp/2009/12/section/35",
+    "asp/2009/12/section/35a",
+    "asp/2009/12/section/35za"
+  ],
+  "corrections": "N/A",
+  "notes": "none",
+  "signed_reference_sha256": "a384b2e0c6691b83"
 }

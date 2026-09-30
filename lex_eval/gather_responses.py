@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,7 +33,11 @@ from typing import Any, Dict, IO, List, Optional
 
 from lex_eval.utils.audit_capture import audit_capture
 from lex_eval.utils.db import get_connection, insert_response, init_db, clear_responses
-from lex_eval.utils.get_llm import get_active_model, get_summarisation_model
+from lex_eval.utils.get_llm import (
+    get_active_model,
+    get_lexchat_build,
+    get_summarisation_model,
+)
 from lex_eval.utils.lexchat_client import get_authenticated_client
 
 logger = logging.getLogger(__name__)
@@ -56,6 +61,11 @@ TRANSPORT_FAILURE_PHRASES = (
     "request timed out",
     "please try again later",
 )
+
+# Seconds to wait before re-asking the planner, multiplied by the attempt
+# number. A planner 5xx is usually the provider rate-limiting a burst, so
+# an immediate retry tends to hit the same limit.
+_PLAN_RETRY_BACKOFF_SECONDS = 20
 
 
 def transport_failure_phrase(text: str) -> Optional[str]:
@@ -92,16 +102,37 @@ def process_question(
         # ------------------------------------------------------------------
         deep_research_plan: Optional[dict] = None
         if chat_mode == "deep_research":
-            plan_response = client.post(
-                "/api/research/plan",
-                json={
-                    "messages": [{"role": "user", "content": question}],
-                    "model": model_name,
-                    "research_mode": research_mode,
-                },
-            )
-            plan_response.raise_for_status()
-            plan_data = plan_response.json()
+            # Retried on a 5xx, because the planner is a single HTTP call that
+            # transiently fails and, unlike the chat stream, it used to get one
+            # attempt regardless of --retries. LexChat reports a provider rate
+            # limit here as a bare 502, so a retryable condition is
+            # indistinguishable from a permanent one from the outside;
+            # retrying is the only way to tell.
+            plan_data = None
+            for plan_attempt in range(1, max_retries + 1):
+                plan_response = client.post(
+                    "/api/research/plan",
+                    json={
+                        "messages": [{"role": "user", "content": question}],
+                        "model": model_name,
+                        "research_mode": research_mode,
+                    },
+                )
+                if plan_response.status_code < 500:
+                    plan_response.raise_for_status()
+                    plan_data = plan_response.json()
+                    break
+                logger.warning(
+                    "Q%d: planner returned HTTP %d on attempt %d/%d%s",
+                    question_id,
+                    plan_response.status_code,
+                    plan_attempt,
+                    max_retries,
+                    ", retrying" if plan_attempt < max_retries else "",
+                )
+                if plan_attempt == max_retries:
+                    plan_response.raise_for_status()
+                time.sleep(_PLAN_RETRY_BACKOFF_SECONDS * plan_attempt)
 
             if plan_data.get("needs_clarification"):
                 logger.warning(
@@ -132,6 +163,8 @@ def process_question(
                     "total_ms": None,
                     "max_turns_halted": None,
                     "react_turns_max": None,
+                    "delegation_halts": None,
+                    "empty_completions": 0,
                     "local_cache_hits": 0,
                     "memo_hits": 0,
                     "reformatted": False,
@@ -218,6 +251,8 @@ def process_question(
                     "total_ms": capture_result.get("total_ms"),
                     "max_turns_halted": capture_result.get("max_turns_halted"),
                     "react_turns_max": capture_result.get("react_turns_max"),
+                    "delegation_halts": capture_result.get("delegation_halts"),
+                    "empty_completions": capture_result.get("empty_completions", 0),
                     "local_cache_hits": capture_result.get("local_cache_hits", 0),
                     "memo_hits": capture_result.get("memo_hits", 0),
                     "reformatted": capture_result.get("reformatted", False),
@@ -433,6 +468,10 @@ def main() -> None:
     else:
         logger.info("Summarisation LLM: %s", summ_model_name)
 
+    # Read once per gather: a server redeployed mid-gather is not detected.
+    lexchat_build = get_lexchat_build()
+    logger.info("LexChat build: %s", lexchat_build)
+
     # ------------------------------------------------------------------
     # Load questions
     # ------------------------------------------------------------------
@@ -480,6 +519,7 @@ def main() -> None:
             "provider": model_provider,
             "summarisation_model": summ_model_name,
             "summarisation_provider": summ_provider,
+            "lexchat_build": lexchat_build,
             "deployment": deployment,
             "capture_revision": revision(),
             "capture_version": capture_version(),
@@ -490,6 +530,7 @@ def main() -> None:
     snapshot_by_id = {q["id"]: q for q in question_snapshot}
 
     def save_response(conn, record):
+        record["lexchat_build"] = lexchat_build
         conn.execute("BEGIN TRANSACTION")
         try:
             rid = insert_response(conn, record)

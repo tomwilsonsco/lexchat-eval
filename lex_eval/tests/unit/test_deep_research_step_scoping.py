@@ -129,3 +129,46 @@ class TestReportIntegrationScopingRequiresOwnCitation:
         assert not metric.is_successful()
         assert metric.reason.startswith("Not measured:")
         assert "nothing to check" in metric.reason
+
+
+class TestStepCompletionNamesAHaltAsTheCause:
+    """The verdict does not change, the explanation does.
+
+    A step stopped at the tool-call limit really did lose its retrieval from
+    its report, so it still fails. But "the step threw its research away" and
+    "the step was cut short" call for different responses, and only the second
+    is LexChat's limit rather than the model. LexChat now gives a halted step
+    one tool-free round to write up what it retrieved, so a halted step that
+    passes here is that write-up working.
+    """
+
+    def test_halted_failure_names_the_limit(self):
+        tools = _step("No citation", _search_sections("asp/2021/3"))
+        metric = StepCompletionMetric(halted_steps={1})
+        metric.measure(
+            LLMTestCase(input="q", actual_output="final", tools_called=tools)
+        )
+        assert metric.score == 0.0
+        assert "stopped at the tool-call limit" in metric.reason
+
+    def test_unhalted_failure_does_not_blame_a_limit(self):
+        tools = _step("No citation", _search_sections("asp/2021/3"))
+        metric = StepCompletionMetric()
+        metric.measure(
+            LLMTestCase(input="q", actual_output="final", tools_called=tools)
+        )
+        assert metric.score == 0.0
+        assert "tool-call limit" not in metric.reason
+
+    def test_a_halted_step_that_wrote_its_findings_up_passes(self):
+        """P3.8's write-up reaching the report is what a pass here means."""
+        tools = _step(
+            "See http://www.legislation.gov.uk/asp/2021/3 section 4",
+            _search_sections("asp/2021/3"),
+        )
+        metric = StepCompletionMetric(halted_steps={1})
+        metric.measure(
+            LLMTestCase(input="q", actual_output="final", tools_called=tools)
+        )
+        assert metric.score == 1.0
+        assert metric.is_successful()

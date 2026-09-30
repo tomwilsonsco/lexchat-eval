@@ -330,6 +330,7 @@ COMPARISON_OUTCOME_COLUMNS: dict[str, str] = {
     **OUTCOME_COLUMNS,
 }
 
+
 def _column_help(tooltips: dict[str, str], widths: dict | None = None) -> dict:
     """Turn a column name to description mapping into Streamlit column config.
 
@@ -1789,9 +1790,14 @@ def _experiment_info(records, rows):
     group = [r for r in records if r.get("experiment_id") == chosen]
     ids = {r["response_id"] for r in group}
     stored = [row for row in rows if row["response_id"] in ids]
+    builds = sorted({r.get("lexchat_build") or "n/a" for r in group})
     st.caption(
         f"Gathered {min(r['timestamp'] for r in group)[:10]} to "
-        f"{max(r['timestamp'] for r in group)[:10]}"
+        f"{max(r['timestamp'] for r in group)[:10]} · LexChat build: "
+        f"{', '.join(builds)}",
+        help="The build the LexChat server reported when these responses were "
+        "gathered. n/a means it was not recorded, for gathers before 30 "
+        "September 2026 or a server too old to report it.",
     )
     st.dataframe(
         [_display_counts(outcome_counts(group))],

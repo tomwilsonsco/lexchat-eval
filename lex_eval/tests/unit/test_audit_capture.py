@@ -260,9 +260,11 @@ AUDIT_FAILED = {
     "error": "Worker agent timed out",
 }
 
+# Above MAX_AUDIT_SCHEMA_VERSION. Versions 2 to 5 are supported, so an
+# unsupported fixture has to sit past the top of that range.
 AUDIT_WRONG_SCHEMA = {
     "type": "audit",
-    "schema_version": 2,
+    "schema_version": 6,
     "request_id": "wrong456",
     "chat_mode": "research",
     "research_mode": "legislation_only",
@@ -515,13 +517,37 @@ class TestMissingAuditEvent:
 
 
 class TestUnknownSchemaVersion:
-    """Test that an audit event with wrong schema_version raises RuntimeError."""
+    """Test which audit schema versions are accepted and which raise.
 
-    def test_raises_runtime_error(self):
+    LexChat bumped its schema to 5 through four additive changes, so the
+    range is supported and only something past the top is refused. The
+    refusal has to stay loud: a version we have not read may have moved a
+    field rather than added one, and a silent miss would show up as a
+    metric blaming the model for empty capture.
+    """
+
+    def test_raises_runtime_error_above_supported_range(self):
         """audit_capture should raise RuntimeError naming the version."""
         lines = _sse_lines(AUDIT_WRONG_SCHEMA)
         with pytest.raises(RuntimeError, match="schema_version"):
             audit_capture(_MockClient(lines), "test question", "test-model")
+
+    @pytest.mark.parametrize("version", [0, 6, 99, "5", None, "abc"])
+    def test_unsupported_or_malformed_versions_raise(self, version):
+        """A non-integer version must raise the clear error, not a TypeError."""
+        event = {**AUDIT_WRONG_SCHEMA, "schema_version": version}
+        with pytest.raises(RuntimeError, match="schema_version"):
+            audit_capture(_MockClient(_sse_lines(event)), "test question", "test-model")
+
+    @pytest.mark.parametrize("version", [1, 2, 3, 4, 5])
+    def test_supported_versions_are_captured(self, version):
+        """Every version in the supported range should capture normally."""
+        event = {**AUDIT_WRONG_SCHEMA, "schema_version": version}
+        result = audit_capture(
+            _MockClient(_sse_lines(event)), "test question", "test-model"
+        )
+        assert result["audit_schema_version"] == version
+        assert result["actual_output"] == "Some answer"
 
 
 # ---------------------------------------------------------------------------
@@ -783,3 +809,102 @@ class TestCaseLaw:
         )
         assert result["case_law_context"] == []
         assert result["retrieval_context"] == []
+
+
+# ---------------------------------------------------------------------------
+# Tests, per-delegation halts and empty completions (audit schema v2-v4)
+# ---------------------------------------------------------------------------
+
+
+AUDIT_HALTED_STEPS = {
+    "type": "audit",
+    "schema_version": 5,
+    "request_id": "halt789",
+    "chat_mode": "deep_research",
+    "research_mode": "legislation_only",
+    "provider": "openrouter",
+    "model": "openai/gpt-4o",
+    "answer": "An incomplete answer",
+    "delegations": [
+        {"brief": "step 1", "report": "## Summary Answer", "tools": [], "halted": None},
+        {
+            "brief": "step 2",
+            "report": "[Research Incomplete - step limit reached]",
+            "tools": [],
+            "halted": {
+                "reason": "step_cap",
+                "limit": 20,
+                "steps": 20,
+                "written_up": False,
+            },
+        },
+        {
+            "brief": "step 3",
+            "report": "[Research Incomplete - step limit reached; PARTIAL findings below]",
+            "tools": [],
+            "halted": {
+                "reason": "step_cap",
+                "limit": 20,
+                "steps": 20,
+                "written_up": True,
+            },
+        },
+    ],
+    "empty_completions": [{"attempt": 1}, {"attempt": 2}],
+    "timings": {"total_ms": 1000, "max_turns_halted": 2, "react_turns_max": 20},
+    "error": None,
+}
+
+
+class TestDelegationHalts:
+    """A halt has to be attributable to the step that halted.
+
+    ``timings.max_turns_halted`` says how many steps stopped at the tool-call
+    limit; it cannot say which. Without the position, a check that reads a
+    step's report cannot tell a step that was cut short from one that threw
+    its own research away, which is the distinction the whole halt-reporting
+    fix turns on.
+    """
+
+    def test_halted_steps_carry_their_position(self):
+        """Steps are numbered from 1, matching the delegation order."""
+        lines = _sse_lines(AUDIT_HALTED_STEPS)
+        result = audit_capture(_MockClient(lines), "test question", "test-model")
+        assert [h["step"] for h in result["delegation_halts"]] == [2, 3]
+
+    def test_halt_detail_is_preserved(self):
+        """written_up distinguishes a bare halt from one with partial findings."""
+        lines = _sse_lines(AUDIT_HALTED_STEPS)
+        result = audit_capture(_MockClient(lines), "test question", "test-model")
+        by_step = {h["step"]: h for h in result["delegation_halts"]}
+        assert by_step[2]["written_up"] is False
+        assert by_step[3]["written_up"] is True
+        assert by_step[2]["reason"] == "step_cap"
+        assert by_step[2]["limit"] == 20
+
+    def test_empty_completions_counted(self):
+        """The count is enough; the records stay in audit_json."""
+        lines = _sse_lines(AUDIT_HALTED_STEPS)
+        result = audit_capture(_MockClient(lines), "test question", "test-model")
+        assert result["empty_completions"] == 2
+
+    def test_clean_run_reports_no_halts(self):
+        """A run where nothing halted stores NULL, not an empty list."""
+        event = {
+            **AUDIT_HALTED_STEPS,
+            "delegations": [AUDIT_HALTED_STEPS["delegations"][0]],
+            "empty_completions": [],
+            "timings": {"total_ms": 1000, "max_turns_halted": 0},
+        }
+        result = audit_capture(
+            _MockClient(_sse_lines(event)), "test question", "test-model"
+        )
+        assert result["delegation_halts"] is None
+        assert result["empty_completions"] == 0
+
+    def test_older_schema_without_halt_key(self):
+        """A v1 event has no halted key at all and must not error."""
+        lines = _sse_lines(AUDIT_WRONG_SCHEMA | {"schema_version": 1})
+        result = audit_capture(_MockClient(lines), "test question", "test-model")
+        assert result["delegation_halts"] is None
+        assert result["empty_completions"] == 0
