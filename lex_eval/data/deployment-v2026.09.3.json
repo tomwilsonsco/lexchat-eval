@@ -1,0 +1,28 @@
+{
+  "recorded_by": "eval team, 30 September 2026",
+  "what_this_is": "A snapshot of the LexChat build this gather ran against. Unlike earlier snapshots, the release and build are read from the server itself (GET /api/bot-info), not asserted from the local clone.",
+  "server_reported": {
+    "version": "2026.09.3",
+    "build": "v2026.09.3",
+    "research_mode": "",
+    "source": "GET /api/bot-info at gather time"
+  },
+  "lexchat_commit": "a6b4a76",
+  "lexchat_commit_subject": "release: v2026.09.3",
+  "lexchat_commit_date": "2026-09-29T17:34:12+01:00",
+  "fix_programme": {
+    "name": "pre-pilot defect fixes",
+    "third_cut_merged": "2026-09-29",
+    "rows_fixed": "41 of 59, 8 of 14 buckets",
+    "previous_tested_build": "c77e779 (23 September gather)"
+  },
+  "audit_schema_version": 6,
+  "observed_at_capture": {
+    "active_model": "glm-5.2:cloud",
+    "provider": "ollama"
+  },
+  "unknown": [
+    "The server's RESEARCH_MODE environment override beyond the empty value /api/bot-info reports.",
+    "Prompt or corpus changes made outside the commit history."
+  ]
+}
