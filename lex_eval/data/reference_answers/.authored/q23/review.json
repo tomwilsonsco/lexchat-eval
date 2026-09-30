@@ -1,11 +1,15 @@
 {
-  "verified": false,
-  "verified_by": null,
-  "verified_at": null,
-  "verdict": null,
-  "citations_reviewed": false,
-  "required_citations": [],
-  "corrections": "",
-  "notes": "",
-  "signed_reference_sha256": null
+  "verified": true,
+  "verified_by": "Cambeul Walker",
+  "verified_at": "2026-09-28",
+  "verdict": "Approve",
+  "citations_reviewed": true,
+  "required_citations": [
+    "asp/2025/2/section/26",
+    "asp/2025/2/section/27",
+    "ssi/2025/377"
+  ],
+  "corrections": "Nothing in answer \u2013 some in detail as in comments.",
+  "notes": "See above. Decision line read \"See comments above\"; recorded as Approve because the reviewer found nothing wrong in the answer and accepted every key statement. Two margin comments applied by the maintainer without further review: the sentence on what the question exists to catch now says it was designed to test commencement for the consultation purpose only, and that not finding the Act was an unexpected failure; the sentence saying \"Is the Act in force?\" has no yes or no answer now names the two cases where it would (before Royal Assent, or every provision commenced for all purposes).",
+  "signed_reference_sha256": "779140213065be68"
 }

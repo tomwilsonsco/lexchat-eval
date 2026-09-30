@@ -1,6 +1,6 @@
 ### 1. Summary Answer (BLUF)
 
-**There is no single statutory definition of "occupier" to borrow.** The term takes its meaning from the enactment it appears in, read with that Act's purpose and its other provisions. Where a notice-giving power leaves it undefined, the common law test of **control** is the usual starting point rather than an automatic answer.
+**Statute and case law offer several formulations of "occupier" to synthesise from, but no single definition that applies across enactments.** The term takes its meaning from the enactment it appears in, read with that Act's purpose and its other provisions. Where a notice-giving power leaves it undefined, the common law test of **control** is the usual starting point rather than an automatic answer.
 
 The three points that matter for choosing a recipient:
 
@@ -22,7 +22,7 @@ For a notice, the practical consequence is that **"the occupier" is unlikely to 
 
 ([ukpga/Eliz2/5-6/31, s.1](http://www.legislation.gov.uk/id/ukpga/Eliz2/5-6/31/section/1))
 
-This is the single most useful provision for the question asked. It is an express statement that Parliament codified **the content of the duty** and left **the identity of the duty holder** to the common law. Section 2 then imposes the common duty of care on "an occupier of premises" without saying who that is ([s.2](http://www.legislation.gov.uk/id/ukpga/Eliz2/5-6/31/section/2)).
+This explains why the England and Wales statutes offer no definition of their own. It is an express statement that Parliament codified **the content of the duty** and left **the identity of the duty holder** to the common law. Section 2 then imposes the common duty of care on "an occupier of premises" without saying who that is ([s.2](http://www.legislation.gov.uk/id/ukpga/Eliz2/5-6/31/section/2)).
 
 The nearest the Act comes to a formulation is section 5(1), which speaks of "a person occupying or having control of the premises" ([s.5](http://www.legislation.gov.uk/id/ukpga/Eliz2/5-6/31/section/5)).
 
@@ -42,7 +42,7 @@ So the 1984 Act's occupier is the 1957 Act's occupier, and the 1957 Act's occupi
 
 ([ukpga/Eliz2/8-9/30, s.1](http://www.legislation.gov.uk/id/ukpga/Eliz2/8-9/30/section/1))
 
-This is a usable synthesised definition: **occupying or having control of** land or other premises. The Act extends to Scotland only (s.5(1), [ukpga/Eliz2/8-9/30, s.5](http://www.legislation.gov.uk/id/ukpga/Eliz2/8-9/30/section/5)).
+This is the most useful statutory definition for the question asked: **occupying or having control of** land or other premises. The Act extends to Scotland only (s.5(1), [ukpga/Eliz2/8-9/30, s.5](http://www.legislation.gov.uk/id/ukpga/Eliz2/8-9/30/section/5)).
 
 Section 3 is worth noting alongside it. Where premises are occupied under a tenancy and the landlord is responsible for maintenance or repair, the landlord owes the same care in respect of dangers arising from a failure to carry out that responsibility ([s.3](http://www.legislation.gov.uk/id/ukpga/Eliz2/8-9/30/section/3)). That is a duty imposed on someone who is not the occupier, which is a caution against reading "occupier" as a synonym for "the person responsible for the premises".
 

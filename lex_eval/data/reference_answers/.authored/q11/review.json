@@ -1,11 +1,18 @@
 {
-  "verified": false,
-  "verified_by": null,
-  "verified_at": null,
-  "verdict": null,
-  "citations_reviewed": false,
-  "required_citations": [],
-  "corrections": "",
-  "notes": "",
-  "signed_reference_sha256": null
+  "verified": true,
+  "verified_by": "Cambeul Walker",
+  "verified_at": "2026-09-28",
+  "verdict": "Approve",
+  "citations_reviewed": true,
+  "required_citations": [
+    "ukpga/1984/3/section/1",
+    "ukpga/eliz2/5-6/31/section/1",
+    "ukpga/eliz2/5-6/31/section/2",
+    "ukpga/eliz2/5-6/31/section/5",
+    "ukpga/eliz2/8-9/30/section/1",
+    "ukpga/eliz2/8-9/30/section/3"
+  ],
+  "corrections": "n/a",
+  "notes": "none. Four margin comments. Applied by the maintainer without further review: the opening no longer frames the question as asking for a single definition (the question asked for definitions to synthesise from), and the 1960 Act definition, not 1957 Act s.1(2), is now called the most useful provision. Not applied, because their scope was not specified: \"might want to consider the answer including more definitions of 'occupier' in different statutes, as the question asked for\", and \"Westlaw returned over 400 results for various definitions of occupier, so ranking and displaying some of these would realistically be required.\"",
+  "signed_reference_sha256": "7a3b2bc442e7643a"
 }
