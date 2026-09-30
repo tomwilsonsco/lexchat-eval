@@ -39,13 +39,13 @@ logger = logging.getLogger(__name__)
 VERBOSE_TRUNCATE_CHARS = 500
 
 # The audit event shapes this module understands. LexChat bumps its
-# AUDIT_SCHEMA_VERSION on any change to the event. Versions 2 to 5 were all
+# AUDIT_SCHEMA_VERSION on any change to the event. Versions 2 to 6 were all
 # additive, each adding a key without moving one we already read: v2
 # delegations[].halted, v3 empty_completions, v4 halted.written_up, v5
-# mode_change. So accept that range and keep failing above it, because an
+# mode_change, v6 delegations[].lost. So accept that range and keep failing above it, because an
 # unknown version may have changed a field we depend on rather than added one.
 MIN_AUDIT_SCHEMA_VERSION = 1
-MAX_AUDIT_SCHEMA_VERSION = 5
+MAX_AUDIT_SCHEMA_VERSION = 6
 
 
 def _trunc(s: str, n: int = VERBOSE_TRUNCATE_CHARS) -> str:

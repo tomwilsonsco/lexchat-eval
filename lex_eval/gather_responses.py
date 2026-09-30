@@ -33,7 +33,11 @@ from typing import Any, Dict, IO, List, Optional
 
 from lex_eval.utils.audit_capture import audit_capture
 from lex_eval.utils.db import get_connection, insert_response, init_db, clear_responses
-from lex_eval.utils.get_llm import get_active_model, get_summarisation_model
+from lex_eval.utils.get_llm import (
+    get_active_model,
+    get_lexchat_build,
+    get_summarisation_model,
+)
 from lex_eval.utils.lexchat_client import get_authenticated_client
 
 logger = logging.getLogger(__name__)
@@ -464,6 +468,10 @@ def main() -> None:
     else:
         logger.info("Summarisation LLM: %s", summ_model_name)
 
+    # Read once per gather: a server redeployed mid-gather is not detected.
+    lexchat_build = get_lexchat_build()
+    logger.info("LexChat build: %s", lexchat_build)
+
     # ------------------------------------------------------------------
     # Load questions
     # ------------------------------------------------------------------
@@ -511,6 +519,7 @@ def main() -> None:
             "provider": model_provider,
             "summarisation_model": summ_model_name,
             "summarisation_provider": summ_provider,
+            "lexchat_build": lexchat_build,
             "deployment": deployment,
             "capture_revision": revision(),
             "capture_version": capture_version(),
@@ -521,6 +530,7 @@ def main() -> None:
     snapshot_by_id = {q["id"]: q for q in question_snapshot}
 
     def save_response(conn, record):
+        record["lexchat_build"] = lexchat_build
         conn.execute("BEGIN TRANSACTION")
         try:
             rid = insert_response(conn, record)
