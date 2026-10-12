@@ -30,6 +30,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -288,6 +290,12 @@ def audit_capture(
     _audit_event: Optional[Dict[str, Any]] = None
     is_error: bool = False
     error_message: str = ""
+    # An error event means the server failed the request, so a missing audit
+    # event that follows it is not evidence of an old build.
+    stream_error: str = ""
+    # A stream that went silent past the read timeout is retryable, unlike an
+    # error the server reported, so the caller needs to tell the two apart.
+    timed_out: bool = False
 
     try:
         # A per-request timeout overrides the client's, so this is the value
@@ -357,6 +365,7 @@ def audit_capture(
                 elif event_type == "error":
                     err_msg = data.get("error", "Unknown error")
                     logger.warning("Stream error: %s", err_msg)
+                    stream_error = stream_error or str(err_msg)
 
                 # queue and timing events carry no data the eval needs;
                 # they fall through and are silently ignored.
@@ -372,10 +381,18 @@ def audit_capture(
         logger.error("audit_capture failed: %s", exc)
         is_error = True
         error_message = str(exc)
+        if isinstance(exc, httpx.TimeoutException):
+            timed_out = True
+            error_message = f"Stream timed out: {exc}"
 
     # ------------------------------------------------------------------
     # Guards: the audit event is mandatory
     # ------------------------------------------------------------------
+    if _audit_event is None and stream_error and not is_error:
+        _vlog(_vf, f"ERROR: stream error with no audit event: {stream_error}")
+        is_error = True
+        error_message = f"LexChat stream error: {stream_error}"
+
     if _audit_event is None and not is_error:
         _vlog(_vf, "ERROR: No 'audit' event received from the stream.")
         if _vf:
@@ -612,6 +629,7 @@ def audit_capture(
         "summarisation_used": summarisation_used,
         "is_error": is_error,
         "error_message": error_message,
+        "timed_out": timed_out,
         # new keys
         "chat_mode": chat_mode_out,
         "provider": provider,

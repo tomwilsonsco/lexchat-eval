@@ -220,6 +220,10 @@ def process_question(
             capture_is_error = capture_result.get("is_error", False)
             capture_error_message = capture_result.get("error_message", "")
             failure_phrase = transport_failure_phrase(actual_output)
+            # A stream that went silent keeps whatever it had sent, so its
+            # partial answer would otherwise be stored as a final error row.
+            if capture_result.get("timed_out"):
+                failure_phrase = "stream timed out"
 
             if actual_output and not failure_phrase:
                 result = {

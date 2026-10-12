@@ -476,6 +476,8 @@ class TestCaptureKeysReachTheRecord:
         # gather_responses stores the configured summarisation model instead,
         # since the capture cannot see which model was configured.
         "summarisation_llm",
+        # A retry signal for gather_responses, not a property of the answer.
+        "timed_out",
     }
 
     def _record_keys(self, source: str) -> set:
@@ -575,3 +577,57 @@ class TestPlannerIsRetried:
         client = _MockClient(lines, plan_statuses=[200])
         self._run(client)
         assert client.plan_calls == 1
+
+
+class TestTimedOutStreamIsRetried:
+    """A stream that goes silent past the read timeout is retried.
+
+    It keeps the tokens it had sent, so before this its partial answer was
+    stored at once as an error row and never retried (Q16, 12 October 2026).
+    """
+
+    class _TimeoutThenOk(_MockClient):
+        def __init__(self, lines, timeouts):
+            super().__init__(lines)
+            self.timeouts = timeouts
+            self.stream_calls = 0
+
+        @contextmanager
+        def stream(self, method, url, **kwargs):
+            self.stream_calls += 1
+            if self.stream_calls <= self.timeouts:
+                yield _MockResponse(self._partial())
+            else:
+                yield _MockResponse(self._lines)
+
+        @staticmethod
+        def _partial():
+            yield _sse({"type": "token", "content": "partial answer"})
+            raise httpx.ReadTimeout("timed out")
+
+    def _run(self, client, retries=3):
+        with patch(
+            "lex_eval.gather_responses.get_authenticated_client",
+            return_value=client,
+        ):
+            return process_question(
+                question_id=1,
+                question="q",
+                model_name="m",
+                research_mode="legislation_only",
+                summarisation_llm="m",
+                max_retries=retries,
+            )
+
+    def test_a_timeout_is_retried_and_succeeds(self):
+        client = self._TimeoutThenOk(_sse_lines(AUDIT_SUCCESS), timeouts=1)
+        result = self._run(client)
+        assert client.stream_calls == 2
+        assert not result.get("is_error"), result.get("error_message")
+        assert result["attempts"] == 2
+
+    def test_a_persistent_timeout_fails_after_the_retries(self):
+        client = self._TimeoutThenOk(_sse_lines(AUDIT_SUCCESS), timeouts=99)
+        result = self._run(client, retries=2)
+        assert client.stream_calls == 2
+        assert "stream timed out" in result["error"]
