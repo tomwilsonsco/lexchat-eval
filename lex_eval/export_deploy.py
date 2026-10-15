@@ -37,6 +37,7 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable
 
+from lex_eval.reference.store import effective_verified
 from lex_eval.utils.db import DATA_DIR, _slim_reference, make_deploy_db
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -128,15 +129,31 @@ def _copy_modules(target: Path, files: Iterable[Path]) -> int:
     return count
 
 
+def _deploy_reference(record: dict) -> dict:
+    """One reference answer as the deployed dashboard gets it.
+
+    The retrieved text stays, because a lawyer's sign-off is checked against
+    it. Without it every signed-off answer reads as Stale on the live site.
+    """
+    slim = _slim_reference(record)
+    if "retrieval_context" in record:
+        slim["retrieval_context"] = record["retrieval_context"]
+    if effective_verified(slim) != effective_verified(record):
+        raise RuntimeError(
+            f"Q{record.get('question_id')}: the deployed copy loses its sign-off"
+        )
+    return slim
+
+
 def _copy_reference_manifest(target: Path) -> tuple[float, float]:
     """Copy the reference answers, keeping only the fields anything reads."""
     destination = target / MANIFEST.relative_to(REPO_ROOT)
     destination.parent.mkdir(parents=True, exist_ok=True)
     records = json.loads(MANIFEST.read_text(encoding="utf-8"))
     if isinstance(records, dict):
-        slimmed = {k: _slim_reference(v) for k, v in records.items()}
+        slimmed = {k: _deploy_reference(v) for k, v in records.items()}
     else:
-        slimmed = [_slim_reference(r) for r in records]
+        slimmed = [_deploy_reference(r) for r in records]
     destination.write_text(json.dumps(slimmed, indent=2), encoding="utf-8")
     return (
         MANIFEST.stat().st_size / 1024 / 1024,

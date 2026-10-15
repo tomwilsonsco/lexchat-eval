@@ -17,7 +17,6 @@ if _REPO_ROOT not in sys.path:
 from lex_eval.reference.store import (
     ANSWERS_DIR,
     MANIFEST_NAME,
-    effective_verified,
     load_reference_answers,
     reference_version,
 )
@@ -651,9 +650,7 @@ def _render_consistency_summary(m: dict, identity: dict | None) -> bool:
         f"&nbsp; {status} &nbsp; :gray[threshold {cohort['threshold']:.2f}]"
     )
     st.caption(
-        "One comparison shared by these responses, not one verdict each. It "
-        "measures how similar the wording is, not whether the answers agree on "
-        "the law."
+        "How similar the wording of these answers is to each other. One score covers all of them."
     )
     return True
 
@@ -679,10 +676,7 @@ def _render_metric_body(
 
     n = m.get("n_runs", len(rows))
     if n > 1 and not summarised:
-        st.caption(
-            f"{m['measured_count']} of {n} responses measured; "
-            "one selected score per response"
-        )
+        st.caption(f"{m['measured_count']} of {n} responses scored")
 
     # A metric with no row at all for a response is not a pass for it.
     scored_ids = {r["response_id"] for r in rows}
@@ -816,15 +810,14 @@ def _render_evidence(r: dict, rec: dict, heading: str) -> None:
     captured text.
     """
     with st.expander(f"Inspect evidence · {heading}"):
-        st.caption("The stored reason for this score, beside this response's own text.")
+        st.caption("Why this score was given, next to the response it was given for.")
         _reason_block(r.get("reason") or "")
         details = r.get("details")
         if details:
             _render_details(details)
         else:
             st.caption(
-                "This stored score has no passage-level evidence, so the whole "
-                "captured answer is shown for manual inspection."
+                "This score has no quoted passages, so the whole answer is shown."
             )
         answer_tab, worker_tab = st.tabs(
             ["Answer to the user", "Worker research report"]
@@ -833,8 +826,7 @@ def _render_evidence(r: dict, rec: dict, heading: str) -> None:
             _captured_text(rec.get("actual_output") or "_(no output captured)_")
         with worker_tab:
             st.caption(
-                "The Worker's report to the Manager. This is not the answer the "
-                "user saw."
+                "The research report the Worker gave the Manager. The user did not see this."
             )
             _captured_text(rec.get("research_output") or "_(no report captured)_")
 
@@ -1096,9 +1088,7 @@ def _render_chat_interaction(records: list[dict], identity: dict | None = None) 
             ]
             if tools_called:
                 _log_section(f"Tools called ({len(tools_called)})")
-                st.caption(
-                    "Captured order. The step view above preserves each delegation boundary."
-                )
+                st.caption("Every tool call, in the order it was made.")
                 # A long list of identical rows fills screens; one scrolling
                 # box keeps the section after it within reach.
                 with st.container(height=360):
@@ -1123,9 +1113,7 @@ def _render_chat_interaction(records: list[dict], identity: dict | None = None) 
                             elif output:
                                 st.code(str(output), language="text")
                             else:
-                                st.caption(
-                                    "No output captured; this is not proof of an empty search."
-                                )
+                                st.caption("No output was captured for this tool call.")
             else:
                 st.caption("No tool calls captured.")
 
@@ -1261,25 +1249,6 @@ def _render_attribution_flag(response_records: list[dict]) -> None:
         st.caption(note)
 
 
-def _reference_status_line() -> str:
-    """How many reference answers a lawyer has signed off, and how many are drafts.
-
-    The three reference metrics score against both, so the reader needs to know
-    how much of what they are looking at is measured against lawyer-approved
-    law and how much against a draft.
-    """
-    references = _reference_answers(_reference_manifest_mtime())
-    if not references:
-        return "No reference answers yet, so the reference metrics score nothing."
-    verified = sum(1 for r in references.values() if effective_verified(r))
-    drafts = len(references) - verified
-    return (
-        f"Reference answers in use: {verified} signed off by a lawyer, "
-        f"{drafts} unverified draft(s). A draft's scores measure agreement with "
-        "its author, not legal correctness."
-    )
-
-
 def _render_outcomes(records):
     counts = _display_counts(outcome_counts(records))
     st.dataframe(
@@ -1289,9 +1258,7 @@ def _render_outcomes(records):
         column_config=_column_help(OUTCOME_COLUMNS),
     )
     st.caption(
-        "Outcomes count all attempts. A response received is captured text, not "
-        "a judgement that the research finished. Research-limit and reformat "
-        "flags may overlap with a received response or an error."
+        "What happened on each attempt, including errors and retries. One attempt can count in more than one column."
     )
 
 
@@ -1430,8 +1397,7 @@ def _review_notes(key) -> dict:
             args=(field, widget_key),
         )
     st.caption(
-        "Notes stay in this browser session and go into both downloads. They "
-        "are not written to the database."
+        "Notes are kept until you close this page and are included in both downloads."
     )
     return notes
 
@@ -1470,7 +1436,7 @@ def _render_failure_summary(metrics: list[dict]) -> None:
         st.markdown(f":red[**Failed checks:**] {named}")
     if gaps:
         st.markdown(f":gray[**Checks with no verdict:** {_gap_phrase(gaps)}]")
-    st.caption("Failed checks are open below; the rest stay closed.")
+    st.caption("Failed checks are expanded below.")
 
 
 def _response_state_line(response_id, metrics: list[dict]) -> str:
@@ -1514,11 +1480,7 @@ def _render_response_comparison(
     Nothing is scored here: these are the stored answers as captured.
     """
     with st.expander(f"Compare two responses ({len(group)} captured)"):
-        st.caption(
-            "These are repeat attempts as captured. A later date does not make "
-            "an answer an improvement, and unknown deployment conditions still "
-            "apply to legacy responses."
-        )
+        st.caption("Two attempts at this question, side by side.")
         by_id = {rec["response_id"]: rec for rec in group}
         ordered = sorted(by_id, key=lambda rid: identity[rid]["run"])
         left, right = st.columns(2)
@@ -1615,22 +1577,14 @@ def _question_detail(key, group, rows, scoring_label: str = "Latest stored"):
             "Did this run find the legislation the reference answer relies on?"
         ):
             st.caption(
-                "For each Act the reference answer cites, this says where that Act was "
-                "lost: no search in the run found it, or a search found it and the "
-                "answer did not cite it. It reads the run's own stored tool calls and "
-                "answer, against the reference answer as it stands now, not the version "
-                "an older stored score was measured against. Acts only, so it says "
-                "nothing about sections, judgments, or whether the answer is legally "
-                "correct."
+                "For each Act the reference answer cites, whether a search in this run found it and whether the answer cited it."
             )
             for rec in group:
                 st.caption(_response_heading(rec["response_id"], identity))
                 _render_attribution_flag([rec])
     search_rows = [r for rec in group for r in searches(rec)]
     with st.expander("Searches and deep-research steps"):
-        st.caption(
-            "Counts describe returned items, not relevance. A later nonempty search is evidence of further results, not proof that the question was resolved."
-        )
+        st.caption("The searches this run made, and how many results each returned.")
         if search_rows:
             st.dataframe(
                 search_summary(search_rows),
@@ -1664,7 +1618,7 @@ def _question_detail(key, group, rows, scoring_label: str = "Latest stored"):
                     st.markdown(step["Report"] or "No report")
     with st.expander("Export review evidence"):
         st.caption(
-            "Includes answers, Worker reports, selected verdicts, question metadata and current reference statements. Draft agreement is not legal correctness."
+            "Download this question's answers, Worker reports, scores, question details and reference statements."
         )
         notes = _review_notes(key)
         notes["metric_caught_it"] = None
@@ -1741,10 +1695,7 @@ def _question_detail(key, group, rows, scoring_label: str = "Latest stored"):
             file_name=f"q{key[0]}_review.md",
             mime="text/markdown",
         )
-        st.caption(
-            "Both downloads describe the selection shown above and write nothing "
-            "to the database."
-        )
+        st.caption("Both downloads cover the question and responses shown above.")
 
 
 def _experiment_label(experiments: dict, value: str) -> str:
@@ -1813,10 +1764,7 @@ def _experiment_info(records, rows):
         column_config=_column_help({**EXPERIMENT_INFO_COLUMNS, **METRIC_TOOLTIPS}),
     )
     st.caption(
-        "Each check column counts the responses that have a stored result for "
-        "that check, whatever the verdict was. A zero means the check has not "
-        "been run against that question; n/a means it does not cover those "
-        "runs, for example a deep research check on conversational runs."
+        "How many responses have a result for each check. 0 means the check has not been run on that question. n/a means the check does not apply to those runs."
     )
     if pending:
         st.markdown(
@@ -1829,15 +1777,10 @@ def _experiment_info(records, rows):
             language="bash",
         )
         st.caption(
-            "Add --dry-run first to see what it would score. Results already "
-            "stored are skipped. AI judge checks need OPENROUTER_API_KEY in "
-            "lex_eval/.env."
+            "Run with --dry-run first to see what would be scored. Scores already stored are skipped. AI judge checks need OPENROUTER_API_KEY in lex_eval/.env."
         )
     else:
-        st.caption(
-            "Every check that covers these runs has a stored result for every "
-            "response here."
-        )
+        st.caption("Every check has a result for every response here.")
     with st.expander("Experiment conditions"):
         st.json(
             {
@@ -1857,10 +1800,7 @@ def _render_comparison_evidence(entries, sides, labels, records_by_id, changes):
     its evidence and a missing result read the same in both views.
     """
     st.markdown("#### Evidence for one check")
-    st.caption(
-        "The stored scores behind the tables above, on the scoring version "
-        "this comparison selected. Nothing here is rescored."
-    )
+    st.caption("The stored scores behind the tables above.")
     names = sorted(
         {entry["metric_name"] for entry in entries},
         # Name breaks the tie so a check the display order does not list keeps
@@ -1874,7 +1814,7 @@ def _render_comparison_evidence(entries, sides, labels, records_by_id, changes):
     for_check = [entry for entry in entries if entry["metric_name"] == check]
     with st.expander("Per question detail", expanded=True):
         st.caption(
-            "Results for the selected check. Select a question below for its modes, responses and evidence."
+            "Results for the selected check. Pick a question to see its responses and evidence."
         )
         st.table(
             [
@@ -1978,9 +1918,6 @@ def _compare_experiments(records, rows):
     )
     if chosen:
         sides = [[r for r in side if r["question_id"] in chosen] for side in sides]
-    st.caption(
-        "Matched question wording, snapshot and modes only. The latest shared scoring version is selected per metric; missing measurements remain visible. Two repeats describe observations, not statistical certainty."
-    )
     scoped = apply_scope(rows)
     summary, changes, outcomes = compare(*sides, scoped)
     st.markdown("#### Coverage")
@@ -2007,11 +1944,6 @@ def _compare_experiments(records, rows):
             hide_index=True,
             width="stretch",
             column_config=_column_help(COMPARISON_METRIC_COLUMNS),
-        )
-        st.caption(
-            "How often a check passed and its mean score can move in opposite "
-            "directions, so both are shown. Neither says the answers are more "
-            "legally correct."
         )
     st.markdown("#### Run outcomes")
     st.dataframe(
@@ -2051,7 +1983,6 @@ def _compare_experiments(records, rows):
 def main() -> None:
     st.set_page_config(page_title="LexChat Eval", layout="wide")
     st.title("LexChat evaluation")
-    st.caption(_reference_status_line())
     # The database path and the scoring selection are set once a session and
     # then repeat on every screen, so they are folded away and summarised in
     # the caption below the filters instead of leading the page.
@@ -2138,7 +2069,7 @@ def main() -> None:
             format_func=lambda r: r if r == "Latest stored" else f"{runs[r]} ({r[:8]})",
         )
         st.caption(
-            "One selected score per response and metric. Legacy scorer versions are unknown. An explicit scoring run shows its historical reference; the latest view excludes outdated reference verdicts."
+            "Which scoring run the scores come from. Latest stored uses the most recent score for each response."
         )
     scoring_label = (
         scoring if scoring == "Latest stored" else f"{runs[scoring]} ({scoring[:8]})"
