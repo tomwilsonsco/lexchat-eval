@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import hashlib
 import html
 import json
@@ -17,22 +18,27 @@ if _REPO_ROOT not in sys.path:
 from lex_eval.reference.store import (
     ANSWERS_DIR,
     MANIFEST_NAME,
-    effective_verified,
     load_reference_answers,
     reference_version,
 )
 from lex_eval.reports.attribution import caveat, worst_attribution
 from lex_eval.reports.comparison import (
+    NORMAL_VARIATION_RULE,
     PASS_FREQUENCY_CHANGE,
+    PASS_RATE_DELTA,
     change_counts,
     cohort_key,
     compare,
     matched_entries,
     metric_summary,
+    overview_markdown,
+    overview_rows,
     shared_cohorts,
+    up_to_date,
 )
 from lex_eval.reports.diagnostics import searches, search_summary, plan_steps
 from lex_eval.reports.data import (
+    NO_STORED_RESULT,
     NOT_MEASURED,
     coverage,
     apply_scope,
@@ -309,25 +315,59 @@ EXPERIMENT_INFO_COLUMNS: dict[str, str] = {
 
 COMPARISON_CHANGE_COUNT_COLUMNS: dict[str, str] = {
     "Checks": "How many checks the table below reports, which is every check with a stored result on either side.",
-    "More passes": "Checks the candidate passed more often than the baseline, over the runs both sides measured.",
-    "Fewer passes": "Checks the candidate passed less often than the baseline.",
-    "Same pass frequency": "Checks that passed equally often on both sides.",
+    "Better": "Checks the candidate passed more often than the baseline, by more than normal run-to-run variation.",
+    "Worse": "Checks the candidate passed less often than the baseline, by more than normal run-to-run variation.",
+    "Within normal variation": "Checks whose pass rate moved by no more than asking the same questions again can explain.",
     "Not measured": "Checks with nothing measured on one or both sides, for example a deep research check on conversational runs.",
     "Not comparable": "Checks where no shared question could be compared, because the two sides used different scoring versions or different judges.",
 }
 
 COMPARISON_METRIC_COLUMNS: dict[str, str] = {
     "Check": "The check these totals are for.",
-    "Baseline": "Baseline totals over the questions both experiments answered: measured passes out of measured runs, the mean of those scores, and how many runs the check could not measure.",
-    "Candidate": "The same totals for the candidate experiment.",
-    PASS_FREQUENCY_CHANGE: "How often the candidate passed compared with the baseline, over the runs both sides measured. This is not the movement in the mean score, which is shown in the two columns before it and can go the other way. Runs that could not be measured are not part of either.",
+    PASS_FREQUENCY_CHANGE: "Better or Worse when the pass rate moved by more than normal run-to-run variation. It follows how often the check passed, not the mean score, and the two can move in opposite directions.",
+    "Baseline passes": "Baseline runs that passed, over the questions both experiments answered. Consistency counts questions, not runs.",
+    "Baseline measured": "Baseline runs the check could measure.",
+    "Baseline mean": "Mean score of the baseline's measured runs.",
+    "Candidate passes": "Candidate runs that passed.",
+    "Candidate measured": "Candidate runs the check could measure.",
+    "Candidate mean": "Mean score of the candidate's measured runs.",
+    PASS_RATE_DELTA: "Candidate pass rate minus baseline pass rate, in percentage points. Better and Worse checks come first, then the rest, each largest change first.",
+    "Unmeasured runs": "Runs on either side the check could not measure. They are in no total.",
     "Questions compared": "How many shared questions are in these totals.",
-    "Not compared": "Shared questions left out because the two sides used different scoring versions or different judges. They are in no total here.",
+    "Not compared": "Shared questions left out because only one side has a stored result for them, or the two sides used different scoring versions or judges. They are in no total here.",
+}
+
+# Hover help for the overview table. Check columns take their help from
+# METRIC_TOOLTIPS.
+OVERVIEW_COLUMNS: dict[str, str] = {
+    "Experiment": "The recorded configuration these totals are for.",
+    "Model": "The model LexChat had active when these responses were gathered.",
+    "Responses": "Every captured run of the questions all selected experiments asked.",
+    "Answered": OUTCOME_COLUMNS["Response received"],
+    "Clarification": OUTCOME_COLUMNS["Clarification requested"],
+    "Error": OUTCOME_COLUMNS["Error"],
+    "No response text": OUTCOME_COLUMNS["No response text"],
+    "Limit reached": OUTCOME_COLUMNS["Research limit reached"],
+    "Total cost ($)": "LexChat's reported cost of these runs added together. Runs that recorded no cost are left out.",
+    "Mean cost ($)": "Average cost of one run, over the runs that recorded a cost.",
+    "Mean time (s)": "Average time LexChat took to answer one run.",
+    "Slowest (s)": "The longest single run.",
+    "Summarisation model": "The model that condensed tool results for these runs.",
 }
 
 COMPARISON_OUTCOME_COLUMNS: dict[str, str] = {
     "Experiment": "Which side of the comparison the counts on this row come from.",
     **OUTCOME_COLUMNS,
+    **{
+        name: OVERVIEW_COLUMNS[name]
+        for name in (
+            "Total cost ($)",
+            "Mean cost ($)",
+            "Mean time (s)",
+            "Slowest (s)",
+            "Summarisation model",
+        )
+    },
 }
 
 
@@ -651,9 +691,7 @@ def _render_consistency_summary(m: dict, identity: dict | None) -> bool:
         f"&nbsp; {status} &nbsp; :gray[threshold {cohort['threshold']:.2f}]"
     )
     st.caption(
-        "One comparison shared by these responses, not one verdict each. It "
-        "measures how similar the wording is, not whether the answers agree on "
-        "the law."
+        "How similar the wording of these answers is to each other. One score covers all of them."
     )
     return True
 
@@ -679,10 +717,7 @@ def _render_metric_body(
 
     n = m.get("n_runs", len(rows))
     if n > 1 and not summarised:
-        st.caption(
-            f"{m['measured_count']} of {n} responses measured; "
-            "one selected score per response"
-        )
+        st.caption(f"{m['measured_count']} of {n} responses scored")
 
     # A metric with no row at all for a response is not a pass for it.
     scored_ids = {r["response_id"] for r in rows}
@@ -816,15 +851,14 @@ def _render_evidence(r: dict, rec: dict, heading: str) -> None:
     captured text.
     """
     with st.expander(f"Inspect evidence · {heading}"):
-        st.caption("The stored reason for this score, beside this response's own text.")
+        st.caption("Why this score was given, next to the response it was given for.")
         _reason_block(r.get("reason") or "")
         details = r.get("details")
         if details:
             _render_details(details)
         else:
             st.caption(
-                "This stored score has no passage-level evidence, so the whole "
-                "captured answer is shown for manual inspection."
+                "This score has no quoted passages, so the whole answer is shown."
             )
         answer_tab, worker_tab = st.tabs(
             ["Answer to the user", "Worker research report"]
@@ -833,8 +867,7 @@ def _render_evidence(r: dict, rec: dict, heading: str) -> None:
             _captured_text(rec.get("actual_output") or "_(no output captured)_")
         with worker_tab:
             st.caption(
-                "The Worker's report to the Manager. This is not the answer the "
-                "user saw."
+                "The research report the Worker gave the Manager. The user did not see this."
             )
             _captured_text(rec.get("research_output") or "_(no report captured)_")
 
@@ -1096,9 +1129,7 @@ def _render_chat_interaction(records: list[dict], identity: dict | None = None) 
             ]
             if tools_called:
                 _log_section(f"Tools called ({len(tools_called)})")
-                st.caption(
-                    "Captured order. The step view above preserves each delegation boundary."
-                )
+                st.caption("Every tool call, in the order it was made.")
                 # A long list of identical rows fills screens; one scrolling
                 # box keeps the section after it within reach.
                 with st.container(height=360):
@@ -1123,9 +1154,7 @@ def _render_chat_interaction(records: list[dict], identity: dict | None = None) 
                             elif output:
                                 st.code(str(output), language="text")
                             else:
-                                st.caption(
-                                    "No output captured; this is not proof of an empty search."
-                                )
+                                st.caption("No output was captured for this tool call.")
             else:
                 st.caption("No tool calls captured.")
 
@@ -1261,25 +1290,6 @@ def _render_attribution_flag(response_records: list[dict]) -> None:
         st.caption(note)
 
 
-def _reference_status_line() -> str:
-    """How many reference answers a lawyer has signed off, and how many are drafts.
-
-    The three reference metrics score against both, so the reader needs to know
-    how much of what they are looking at is measured against lawyer-approved
-    law and how much against a draft.
-    """
-    references = _reference_answers(_reference_manifest_mtime())
-    if not references:
-        return "No reference answers yet, so the reference metrics score nothing."
-    verified = sum(1 for r in references.values() if effective_verified(r))
-    drafts = len(references) - verified
-    return (
-        f"Reference answers in use: {verified} signed off by a lawyer, "
-        f"{drafts} unverified draft(s). A draft's scores measure agreement with "
-        "its author, not legal correctness."
-    )
-
-
 def _render_outcomes(records):
     counts = _display_counts(outcome_counts(records))
     st.dataframe(
@@ -1289,9 +1299,7 @@ def _render_outcomes(records):
         column_config=_column_help(OUTCOME_COLUMNS),
     )
     st.caption(
-        "Outcomes count all attempts. A response received is captured text, not "
-        "a judgement that the research finished. Research-limit and reformat "
-        "flags may overlap with a received response or an error."
+        "What happened on each attempt, including errors and retries. One attempt can count in more than one column."
     )
 
 
@@ -1430,8 +1438,7 @@ def _review_notes(key) -> dict:
             args=(field, widget_key),
         )
     st.caption(
-        "Notes stay in this browser session and go into both downloads. They "
-        "are not written to the database."
+        "Notes are kept until you close this page and are included in both downloads."
     )
     return notes
 
@@ -1470,7 +1477,7 @@ def _render_failure_summary(metrics: list[dict]) -> None:
         st.markdown(f":red[**Failed checks:**] {named}")
     if gaps:
         st.markdown(f":gray[**Checks with no verdict:** {_gap_phrase(gaps)}]")
-    st.caption("Failed checks are open below; the rest stay closed.")
+    st.caption("Failed checks are expanded below.")
 
 
 def _response_state_line(response_id, metrics: list[dict]) -> str:
@@ -1514,11 +1521,7 @@ def _render_response_comparison(
     Nothing is scored here: these are the stored answers as captured.
     """
     with st.expander(f"Compare two responses ({len(group)} captured)"):
-        st.caption(
-            "These are repeat attempts as captured. A later date does not make "
-            "an answer an improvement, and unknown deployment conditions still "
-            "apply to legacy responses."
-        )
+        st.caption("Two attempts at this question, side by side.")
         by_id = {rec["response_id"]: rec for rec in group}
         ordered = sorted(by_id, key=lambda rid: identity[rid]["run"])
         left, right = st.columns(2)
@@ -1615,22 +1618,14 @@ def _question_detail(key, group, rows, scoring_label: str = "Latest stored"):
             "Did this run find the legislation the reference answer relies on?"
         ):
             st.caption(
-                "For each Act the reference answer cites, this says where that Act was "
-                "lost: no search in the run found it, or a search found it and the "
-                "answer did not cite it. It reads the run's own stored tool calls and "
-                "answer, against the reference answer as it stands now, not the version "
-                "an older stored score was measured against. Acts only, so it says "
-                "nothing about sections, judgments, or whether the answer is legally "
-                "correct."
+                "For each Act the reference answer cites, whether a search in this run found it and whether the answer cited it."
             )
             for rec in group:
                 st.caption(_response_heading(rec["response_id"], identity))
                 _render_attribution_flag([rec])
     search_rows = [r for rec in group for r in searches(rec)]
     with st.expander("Searches and deep-research steps"):
-        st.caption(
-            "Counts describe returned items, not relevance. A later nonempty search is evidence of further results, not proof that the question was resolved."
-        )
+        st.caption("The searches this run made, and how many results each returned.")
         if search_rows:
             st.dataframe(
                 search_summary(search_rows),
@@ -1664,7 +1659,7 @@ def _question_detail(key, group, rows, scoring_label: str = "Latest stored"):
                     st.markdown(step["Report"] or "No report")
     with st.expander("Export review evidence"):
         st.caption(
-            "Includes answers, Worker reports, selected verdicts, question metadata and current reference statements. Draft agreement is not legal correctness."
+            "Download this question's answers, Worker reports, scores, question details and reference statements."
         )
         notes = _review_notes(key)
         notes["metric_caught_it"] = None
@@ -1741,10 +1736,7 @@ def _question_detail(key, group, rows, scoring_label: str = "Latest stored"):
             file_name=f"q{key[0]}_review.md",
             mime="text/markdown",
         )
-        st.caption(
-            "Both downloads describe the selection shown above and write nothing "
-            "to the database."
-        )
+        st.caption("Both downloads cover the question and responses shown above.")
 
 
 def _experiment_label(experiments: dict, value: str) -> str:
@@ -1813,10 +1805,7 @@ def _experiment_info(records, rows):
         column_config=_column_help({**EXPERIMENT_INFO_COLUMNS, **METRIC_TOOLTIPS}),
     )
     st.caption(
-        "Each check column counts the responses that have a stored result for "
-        "that check, whatever the verdict was. A zero means the check has not "
-        "been run against that question; n/a means it does not cover those "
-        "runs, for example a deep research check on conversational runs."
+        "How many responses have a result for each check. 0 means the check has not been run on that question. n/a means the check does not apply to those runs."
     )
     if pending:
         st.markdown(
@@ -1829,15 +1818,10 @@ def _experiment_info(records, rows):
             language="bash",
         )
         st.caption(
-            "Add --dry-run first to see what it would score. Results already "
-            "stored are skipped. AI judge checks need OPENROUTER_API_KEY in "
-            "lex_eval/.env."
+            "Run with --dry-run first to see what would be scored. Scores already stored are skipped. AI judge checks need OPENROUTER_API_KEY in lex_eval/.env."
         )
     else:
-        st.caption(
-            "Every check that covers these runs has a stored result for every "
-            "response here."
-        )
+        st.caption("Every check has a result for every response here.")
     with st.expander("Experiment conditions"):
         st.json(
             {
@@ -1857,10 +1841,7 @@ def _render_comparison_evidence(entries, sides, labels, records_by_id, changes):
     its evidence and a missing result read the same in both views.
     """
     st.markdown("#### Evidence for one check")
-    st.caption(
-        "The stored scores behind the tables above, on the scoring version "
-        "this comparison selected. Nothing here is rescored."
-    )
+    st.caption("The stored scores behind the tables above.")
     names = sorted(
         {entry["metric_name"] for entry in entries},
         # Name breaks the tie so a check the display order does not list keeps
@@ -1874,7 +1855,7 @@ def _render_comparison_evidence(entries, sides, labels, records_by_id, changes):
     for_check = [entry for entry in entries if entry["metric_name"] == check]
     with st.expander("Per question detail", expanded=True):
         st.caption(
-            "Results for the selected check. Select a question below for its modes, responses and evidence."
+            "Results for the selected check. Pick a question to see its responses and evidence."
         )
         st.table(
             [
@@ -1909,6 +1890,175 @@ def _render_comparison_evidence(entries, sides, labels, records_by_id, changes):
             _render_metric_body(
                 total, identity, records_by_id, evidence_for_passes=True
             )
+
+
+# The checks the overview always shows: does the answer state the law the
+# reference answer states, and does it say the same thing when asked twice.
+# Everything else explains why one of these moved, so it is optional.
+HEADLINE_CHECKS = ("reference_answer_agreement", "citation_agreement", "consistency")
+_CONSISTENCY_COLUMN = "Consistency (questions passed / measured)"
+
+
+def _overview(records, rows):
+    st.markdown(
+        "How each experiment did overall, on the questions every selected "
+        "experiment asked. Use "
+        "Compare experiments to see which questions moved."
+    )
+    scored = {row["response_id"] for row in rows}
+    experiments = {
+        r["experiment_id"]: r.get("experiment", {})
+        for r in records
+        if r.get("experiment_id") and r["response_id"] in scored
+    }
+    if not experiments:
+        st.info(
+            "No recorded experiment has stored metric results yet. Experiment "
+            "info lists every experiment and what is still to be scored."
+        )
+        return
+    # Conversational and deep research answer different kinds of request, so
+    # their pass rates are never added together.
+    modes = sorted(
+        {r.get("chat_mode") or "unknown" for r in records if r["response_id"] in scored}
+    )
+    left, right = st.columns([1, 3])
+    mode = left.selectbox("Chat mode", modes, key="overview_mode")
+    options = sorted(
+        {
+            r["experiment_id"]
+            for r in records
+            if r.get("experiment_id") in experiments
+            and (r.get("chat_mode") or "unknown") == mode
+        },
+        key=lambda e: _experiment_label(experiments, e),
+    )
+    current = up_to_date(options, rows) or options
+    st.session_state["overview_experiments"] = [
+        e for e in st.session_state.get("overview_experiments", current) if e in options
+    ] or current
+    chosen = right.multiselect(
+        "Experiments",
+        options,
+        key="overview_experiments",
+        format_func=lambda e: _experiment_label(experiments, e),
+        help="Selected at first: the experiments scored with the current version "
+        "of every check. Adding one scored with an older version makes those "
+        "checks Not comparable.",
+    )
+    if not chosen:
+        st.info("Select at least one experiment.")
+        return
+    sides = [
+        [
+            r
+            for r in records
+            if r.get("experiment_id") == exp
+            and (r.get("chat_mode") or "unknown") == mode
+        ]
+        for exp in chosen
+    ]
+    matched, totals = overview_rows(sides, apply_scope(rows))
+    if not matched:
+        st.info(
+            "These experiments have no question in common, asked with the same "
+            "wording and the same modes, so there is nothing to put side by side."
+        )
+        return
+    st.caption(
+        f"{matched} question and mode combination(s) asked by every selected "
+        "experiment. Questions only some of them asked are left out."
+    )
+    show_diagnostics = st.checkbox(
+        "Show diagnostic checks",
+        help="The checks on how the research was done. They explain why the "
+        "headline checks moved, rather than measuring the answer itself.",
+    )
+    names = {key: name for key, name, _tip in METRICS}
+    staged = [
+        key for stage in STAGES.values() for key in sorted(stage, key=_metric_order)
+    ]
+    every_check = [*HEADLINE_CHECKS, *(k for k in staged if k not in HEADLINE_CHECKS)]
+    labels = {
+        names[k]: (
+            _CONSISTENCY_COLUMN
+            if k == "consistency"
+            else f"{names[k]} (runs passed / measured)"
+        )
+        for k in every_check
+    }
+    shown = every_check if show_diagnostics else list(HEADLINE_CHECKS)
+    columns = {names[k]: labels[names[k]] for k in shown}
+    entries = []
+    for exp, side, total in zip(chosen, sides, totals, strict=True):
+        model = ", ".join(sorted({r["llm_name"] for r in side}))
+        entries.append(
+            {
+                "Experiment": _experiment_label(experiments, exp),
+                "Column": f"{model} ({exp[:8]})",
+                "Model": model,
+                **total,
+            }
+        )
+    table = [
+        {
+            "Experiment": e["Experiment"],
+            "Model": e["Model"],
+            **{
+                label: e["checks"].get(name, NO_STORED_RESULT)
+                for name, label in columns.items()
+            },
+            **{k: v for k, v in e.items() if k not in {"checks", "Column"}},
+        }
+        for e in entries
+    ]
+    st.dataframe(
+        table,
+        hide_index=True,
+        width="stretch",
+        column_config=_column_help(
+            {
+                **OVERVIEW_COLUMNS,
+                **{label: METRIC_TOOLTIPS[name] for name, label in columns.items()},
+                _CONSISTENCY_COLUMN: "Questions whose repeated answers were similar "
+                "enough, out of questions asked at least twice. "
+                + METRIC_TOOLTIPS[names["consistency"]],
+            }
+        ),
+    )
+    st.download_button(
+        "Download as Markdown",
+        overview_markdown(
+            mode, matched, entries, labels, datetime.date.today().isoformat()
+        ),
+        file_name=f"overview-{mode}.md",
+        mime="text/markdown",
+        help="Both tables, with every check, in the layout of a findings document.",
+    )
+    cells = {str(v) for row in table for v in row.values()}
+    if NO_STORED_RESULT in cells:
+        st.caption(
+            "No stored result means the check has no score for that experiment. "
+            "Consistency needs each question answered at least twice. Any other "
+            "check may not have been run yet; Experiment info shows the command."
+        )
+    if "Not compared" in cells or any("not compared)" in v for v in cells):
+        st.caption(
+            "Not compared means only some of the selected experiments have a "
+            "result for that check on the same questions, so their totals would "
+            "cover different questions. A count marked not compared leaves those "
+            "questions out."
+        )
+    if any(v.startswith("Not comparable") for v in cells):
+        st.caption(
+            "Not comparable means the selected experiments were not all scored "
+            "with the same version of that check. Rescore the older experiment, "
+            "or leave it out, to compare them. Experiment info shows the command."
+        )
+
+
+def _metric_order(key: str) -> int:
+    return [k for k, _name, _tip in METRICS].index(key)
 
 
 def _compare_experiments(records, rows):
@@ -1962,6 +2112,21 @@ def _compare_experiments(records, rows):
             "same wording and the same modes, so there is nothing to compare."
         )
         return
+    # Conversational and deep research answer different kinds of request, so
+    # their pass rates, costs and times are never added together.
+    modes = sorted({key[2] or "unknown" for key in shared})
+    if st.session_state.get("compare_mode") not in modes:
+        st.session_state["compare_mode"] = modes[0]
+    mode = st.selectbox(
+        "Chat mode",
+        modes,
+        key="compare_mode",
+        help="Only the chat modes both experiments asked questions in.",
+    )
+    sides = [
+        [r for r in side if (r.get("chat_mode") or "unknown") == mode] for side in sides
+    ]
+    shared = shared_cohorts(*sides)
     question_options = sorted({key[0] for key in shared})
     st.session_state["compare_questions"] = [
         q
@@ -1978,9 +2143,6 @@ def _compare_experiments(records, rows):
     )
     if chosen:
         sides = [[r for r in side if r["question_id"] in chosen] for side in sides]
-    st.caption(
-        "Matched question wording, snapshot and modes only. The latest shared scoring version is selected per metric; missing measurements remain visible. Two repeats describe observations, not statistical certainty."
-    )
     scoped = apply_scope(rows)
     summary, changes, outcomes = compare(*sides, scoped)
     st.markdown("#### Coverage")
@@ -1990,12 +2152,10 @@ def _compare_experiments(records, rows):
         width="stretch",
         column_config=_column_help(COMPARISON_SUMMARY_COLUMNS),
     )
-    totals = sorted(
-        metric_summary(*sides, scoped),
-        key=lambda row: _metric_sort_key({"metric_name": row["Check"]}),
-    )
+    totals = metric_summary(*sides, scoped)
     if totals:
         st.markdown("#### Results by check")
+        st.caption(NORMAL_VARIATION_RULE)
         st.dataframe(
             [change_counts(totals)],
             hide_index=True,
@@ -2007,11 +2167,6 @@ def _compare_experiments(records, rows):
             hide_index=True,
             width="stretch",
             column_config=_column_help(COMPARISON_METRIC_COLUMNS),
-        )
-        st.caption(
-            "How often a check passed and its mean score can move in opposite "
-            "directions, so both are shown. Neither says the answers are more "
-            "legally correct."
         )
     st.markdown("#### Run outcomes")
     st.dataframe(
@@ -2051,7 +2206,6 @@ def _compare_experiments(records, rows):
 def main() -> None:
     st.set_page_config(page_title="LexChat Eval", layout="wide")
     st.title("LexChat evaluation")
-    st.caption(_reference_status_line())
     # The database path and the scoring selection are set once a session and
     # then repeat on every screen, so they are folded away and summarised in
     # the caption below the filters instead of leading the page.
@@ -2070,7 +2224,7 @@ def main() -> None:
         return
     view = st.radio(
         "View",
-        ["Review questions", "Compare experiments", "Experiment info"],
+        ["Overview", "Review questions", "Compare experiments", "Experiment info"],
         horizontal=True,
         key="view",
     )
@@ -2083,6 +2237,9 @@ def main() -> None:
     # The comparison view chooses its own experiments and then its own
     # questions from what those two share, so the filters below, which narrow
     # the records first, do not apply to it.
+    if view == "Overview":
+        _overview(records, rows)
+        return
     if view == "Compare experiments":
         _compare_experiments(records, rows)
         return
@@ -2138,7 +2295,7 @@ def main() -> None:
             format_func=lambda r: r if r == "Latest stored" else f"{runs[r]} ({r[:8]})",
         )
         st.caption(
-            "One selected score per response and metric. Legacy scorer versions are unknown. An explicit scoring run shows its historical reference; the latest view excludes outdated reference verdicts."
+            "Which scoring run the scores come from. Latest stored uses the most recent score for each response."
         )
     scoring_label = (
         scoring if scoring == "Latest stored" else f"{runs[scoring]} ({scoring[:8]})"

@@ -20,7 +20,9 @@ condition. Internal HTTP retries remain part of the response's attempt count.
 For a prompt change, start a new experiment. Supply the actual deployed build,
 prompt version, and relevant settings using `--deployment-config path/to/config.json`
 on both gathers. This file is a user-supplied snapshot, not a claim that the
-harness inspected the server's prompts. For example:
+harness inspected the server's prompts. Keep these snapshots, one per build and
+model, in `lex_eval/data/deployment_info/` and commit them, so the condition
+behind each experiment stays readable outside the database. For example:
 
 ```json
 {
@@ -101,7 +103,9 @@ links each failed check to the stage it is under.
   deep-research-only check is Not applicable on a research or conversational
   run, while a deep research run genuinely missing its plan stays Not measured.
 - **Attempts and outcomes** include clarification, errors, empty answers, halts,
-  and report repair. Flags can overlap with a received response. "Response
+  and report repair. A clarification is either a deep research plan that asked
+  one, or any other answer that called no tool and ends in a question, since
+  outside deep research the model asks in its answer text. Flags can overlap with a received response. "Response
   received" means final text was captured, not that the research finished, and a
   run that reached the research limit says so beside the response itself.
 - **Scoring selection** takes one row per response and metric. The latest view
@@ -135,11 +139,37 @@ question's recorded historical failure is also distinct from its general
 reference-agreement verdict. Read the two together before claiming a regression
 was fixed or reproduced.
 
+## Overview
+
+The dashboard opens on **Overview**: one row per experiment, for one chat mode at
+a time, totalled over the questions every selected experiment asked. Each check
+reads passes out of measured runs, and Consistency is counted per question,
+since both runs of a question share one verdict. Run outcomes, cost, time and
+the summarisation model sit beside them. Reference Answer Agreement, Citation
+Agreement and Consistency are shown first; **Show diagnostic checks** adds the
+rest, which explain why those moved.
+
+The experiments selected at first are those scored with the current version of
+every check. A check reads Not comparable when the selected experiments do not
+share a scoring version for it, so adding an experiment scored with an older
+version blanks that check for all of them. Totals only count questions where
+every selected experiment has a stored result, so a missing score can never
+read as a change. An experiment with no result for a check, such as Consistency
+on questions it asked only once, reads No stored result, and the others read
+Not compared or mark how many questions were left out. Use
+Compare experiments to see which questions moved.
+
+**Download as Markdown** writes the same selection as two tables, runs and cost
+then pass counts by check, with every check rather than only those on screen.
+It is a starting point for a findings document, so its numbers are generated
+rather than counted by hand.
+
 ## Compare experiments
 
 The comparison view requires two recorded experiments with stored metric
 results; an experiment nothing has been scored against is listed under
-Experiment info instead. Choose the two first: the question filter below them
+Experiment info instead. Choose the two first, then one chat mode they share,
+since conversational and deep research are never added together. The question filter below them
 offers only the questions both experiments asked, with the same wording,
 snapshot, chat mode and research mode, and selecting none uses all of them. The model and mode filters of the question review do not
 apply here, since both are properties of the experiments being compared.
@@ -148,20 +178,25 @@ For each metric it selects the latest scoring version shared by both sides.
 Missing or incompatible results remain explicit; they cannot imply an
 improvement.
 
-Above the checks, one row counts how many of them the candidate passed more
-often, less often, or equally often, and how many could not be measured or
-compared at all.
+Each check reads **Better**, **Worse** or **Within normal variation**. A change
+of 2 runs or fewer, out of about 24, is within normal run-to-run variation. The
+gap in runs is the difference in pass rate times the larger side's measured
+runs. One row above the checks counts how many fell each way, and how many
+could not be measured or compared at all.
 
-The summary has one row per check, totalled over the shared questions: measured
-passes out of measured runs, the mean of those scores, and how many runs the
-check could not measure, for each side. A shared question whose two sides used
-different scoring versions or different judges is counted under "Not compared"
-and is in none of those totals. Its direction column is named **Change in pass
-frequency**, because how often a check passed and its mean score can move in
-opposite directions. The per question rows are behind **Per question detail**
-beneath the selected check. The table shows only that check, with both sides and the change in
-wrapping columns. Modes and response identities appear in the question evidence
-below.
+The summary has one row per check, totalled over the shared questions: passes,
+measured runs and mean score for each side, the change in pass rate in
+percentage points, and how many runs the check could not measure. A run the
+check does not apply to, such as a conversational run for a deep research
+check, is not counted as unmeasured. Consistency
+is counted per question. A shared question whose two sides used different
+scoring versions or different judges is counted under "Not compared" and is in
+none of those totals, and so is a shared question only one side has a stored
+result for. Better and Worse checks come first. The change follows
+how often a check passed, not its mean score, and the two can move in opposite
+directions. The per question rows are behind **Per question detail** beneath
+the selected check. Run outcomes also give each side's cost, time and
+summarisation model.
 
 **Evidence for one check** is where a change is explained. Select a check and
 one of the questions both experiments asked, and the stored scores for that

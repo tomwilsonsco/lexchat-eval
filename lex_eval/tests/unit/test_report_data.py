@@ -3,6 +3,7 @@
 import pytest
 
 from lex_eval.reports.data import (
+    asked_instead_of_researching,
     aggregate_metrics,
     outcome_counts,
     question_groups,
@@ -341,3 +342,23 @@ def test_deep_research_checks_do_not_apply_to_other_chat_modes():
         [row("plan_coverage", None, "No research plan for this record;")]
     )[0]
     assert unmeasured_state(unknown) == NOT_MEASURED
+
+
+@pytest.mark.parametrize(
+    "overrides, expected",
+    [
+        ({}, True),
+        ({"chat_mode": "deep_research"}, False),
+        ({"tool_sequence": ["delegate_research"]}, False),
+        ({"actual_output": "The Act applies."}, False),
+        ({"is_error": True}, False),
+    ],
+)
+def test_an_answer_that_only_asks_back_is_a_clarification(overrides, expected):
+    rec = {
+        "chat_mode": "conversational",
+        "tool_sequence": [],
+        "tools_called": [],
+        "actual_output": "This is a broad question. Could you narrow this down? ",
+    } | overrides
+    assert asked_instead_of_researching(rec) is expected

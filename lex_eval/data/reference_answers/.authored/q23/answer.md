@@ -12,7 +12,7 @@ Three commencement steps have happened:
 
 Everything else awaits further regulations under section 27(2). So substantive provisions, including the section 17 inflation uprating duty, **are** in force, and an answer saying the substantive provisions all await commencement is wrong.
 
-The failure this question exists to catch is not a wrong date. It is **not finding the Act at all**, including after being handed its full title and the citation 2025 asp 2, and then not finding the commencement instruments. An answer that reports the Act does not exist, or that its commencement cannot be established, is wrong on both counts.
+The question was designed to test how an answer handles commencement for one purpose only: section 18, brought into force solely for the purpose of consultation. The recorded failure came earlier and was unexpected: **not finding the Act at all**, including after being handed its full title and the citation 2025 asp 2, and then not finding the commencement instruments. An answer that reports the Act does not exist, or that its commencement cannot be established, is wrong on both counts.
 
 ---
 
@@ -40,7 +40,7 @@ This is worth stating plainly because the recorded failure was a claim that the 
 
 Subsection (1) commences only the tail of the Act: [s.25 Ancillary provision](http://www.legislation.gov.uk/id/asp/2025/2/section/25), [s.26 Regulation-making powers](http://www.legislation.gov.uk/id/asp/2025/2/section/26), s.27 itself and [s.28 Short title](http://www.legislation.gov.uk/id/asp/2025/2/section/28), plus s.24. **None of the substantive social security provisions is commenced by section 27(1).**
 
-Subsection (3)(b) matters for how the answer must be phrased. Because regulations may "make different provision for different purposes", a provision can be in force for some purposes and not others. "Is the Act in force?" therefore has no single yes or no answer, and a correct response says so.
+Subsection (3)(b) matters for how the answer must be phrased. Because regulations may "make different provision for different purposes", a provision can be in force for some purposes and not others. A plain yes or no to "Is the Act in force?" is possible only before Royal Assent, when nothing is in force, or once every provision has been brought in for all purposes without conditions. Neither is the case for this Act, so a correct response says it is partly in force and which parts.
 
 #### 2.3 The commencement instruments
 

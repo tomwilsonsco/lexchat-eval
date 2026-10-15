@@ -589,7 +589,7 @@ The following offices are specified for the purposes of section 126(8)(b) of the
 	d) Assistant Inspector of the Scottish Fire and Rescue Service appointed under section  43A(2) of the 2005 Act. 
 
 ### Revocations
-`http://www.legislation.gov.uk/id/uksi/2012/3073/article/3`
+`http://www.legislation.gov.uk/id/uksi/2012/3073/article/4`
 
 Section 3) **Revocations**
 In the Schedule to the Scottish Administration (Offices) Order 1999  , the following entries in column 1, together with the corresponding entries in column 2, are revoked— 
@@ -598,7 +598,7 @@ In the Schedule to the Scottish Administration (Offices) Order 1999  , the follo
 4) The Scottish Administration (Offices) Order 2005  is revoked. 
 
 ### Revocations
-`http://www.legislation.gov.uk/id/uksi/2012/3073/article/4`
+`http://www.legislation.gov.uk/id/uksi/2012/3073/article/3`
 
 Section 3) **Revocations**
 In the Schedule to the Scottish Administration (Offices) Order 1999  , the following entries in column 1, together with the corresponding entries in column 2, are revoked— 
@@ -616,3 +616,1014 @@ Section 1) **Citation, commencement and interpretation**
 3) Articles 2(a) and 3 come into force on the day on which section 71 of the Police and Fire Reform (Scotland) Act 2012  comes into force. 
 4) Articles 2(b) to (d) and 4 come into force on the day on which section 119 of the Police and Fire Reform (Scotland) Act 2012 comes into force. 
 5) In this Order “the 2005 Act” means the Fire (Scotland) Act 2005  . 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "section 104 power to make provision consequential on legislation of the Parliament",
+ "legislation_id": "ukpga/1998/46",
+ "limit": 10
+}
+```
+
+### Power to make provision consequential on legislation of, or scrutinised by, the Parliament.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/104`
+
+Section 104) **Power to make provision consequential on legislation of, or scrutinised by, the Parliament.**
+
+1) Subordinate legislation may make such provision as the person making the legislation considers necessary or expedient in consequence of any provision made by or under any Act of the Scottish Parliament or made by legislation mentioned in subsection (2). 
+2) The legislation is subordinate legislation under an Act of Parliament made by— 
+	a) a member of the Scottish Government , 
+	b) a Scottish public authority with mixed functions or no reserved functions, or 
+	c) any other person (not being a Minister of the Crown) if the function of making the legislation is exercisable within devolved competence. 
+3) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+
+### Power to make provision consequential on this Act.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/105`
+
+Section 105) **Power to make provision consequential on this Act.**
+Subordinate legislation may make such modifications in any pre-commencement enactment or prerogative instrument or any other instrument or document as appear to the person making the legislation necessary or expedient in consequence of this Act. 
+
+### Subordinate legislation: particular provisions.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/114`
+
+Section 114) **Subordinate legislation: particular provisions.**
+
+1) A power to make subordinate legislation conferred by any of the following provisions of this Act may be exercised by modifying any enactment comprised in or made under this Act (except Schedules 4 and 5): sections 12B, 66(5), 89, 104, 107, 108 and 129(1). 
+2) The reference in subsection (1) to a power to make subordinate legislation includes a power as extended by section 113. 
+3) A power to make subordinate legislation conferred by any of the following provisions of this Act may be exercised so as to make provision having retrospective effect: sections 30, 58(4), 104 and 107. 
+
+### Legislative power to remedy ultra vires acts.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/107`
+
+Section 107) **Legislative power to remedy ultra vires acts.**
+Subordinate legislation may make such provision as the person making the legislation considers necessary or expedient in consequence of— 
+	a) an Act of the Scottish Parliament or any provision of an Act of the Scottish Parliament which is not, or may not be, within the legislative competence of the Parliament, or 
+	b) any purported exercise by a member of the Scottish Government of his functions which is not, or may not be, an exercise or a proper exercise of those functions. 
+
+### Enactments etc. protected from modification
+`http://www.legislation.gov.uk/ukpga/1998/46/schedule/4`
+
+SCHEDULE 4 Enactments etc. protected from modification Sections 29 and 53(4). ## Part I
+## The protected provisions
+
+*Particular enactments*
+
+1) 
+1) An Act of the Scottish Parliament cannot modify, or confer power by subordinate legislation to modify, any of the following provisions. 
+2) The provisions are— 
+	a) Articles 4 and 6 of the  Union with Scotland Act 1706 and of the  Union with England Act 1707 so far as they relate to freedom of trade, 
+	b) the  Private Legislation Procedure (Scotland) Act 1936, 
+	c) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+	d) paragraphs 5(3)(b) and 15(4)(b) of Schedule 32 to the  Local Government, Planning and Land Act 1980 (designation of enterprise zones), 
+	e) sections 140A to 140G of the  Social Security Administration Act 1992 (rent rebate and rent allowance subsidy and council tax benefit), 
+	f) the  Human Rights Act 1998 , 
+	g) the European Union (Withdrawal) Act 2018 (other than any excluded provision of that Act and any regulations made under that Act) , and 
+	h) the United Kingdom Internal Market Act 2020. 
+3) For the purposes of sub-paragraph (2)(g), the following are excluded provisions of the European Union (Withdrawal) Act 2018— 
+	a) section 1B(3) and (4), 
+	b) sections 8A to 8C, 
+	c) section 10(3) and (4), 
+	d) sections 13A and 13B, 
+	e) sections 15A to 15C, 
+	f) Parts 1A to 1C of Schedule 2, 
+	g) paragraphs 8A to 8G of Schedule 7, and 
+	h) paragraphs 31 to 35 of Schedule 8. *The law on reserved matters*
+
+2) 
+1) An Act of the Scottish Parliament cannot modify, or confer power by subordinate legislation to modify, the law on reserved matters. 
+2) In this paragraph, “the law on reserved matters” means— 
+	a) any enactment the subject-matter of which is a reserved matter and which is comprised in an Act of Parliament or subordinate legislation under an Act of Parliament, and 
+	b) any rule of law which is not contained in an enactment and the subject-matter of which is a reserved matter, and in this sub-paragraph “Act of Parliament” does not include this Act. 
+3) Sub-paragraph (1) applies in relation to a rule of Scots private law or Scots criminal law (whether or not contained in an enactment) only to the extent that the rule in question is special to a reserved matter or the subject-matter of the rule is— 
+	a) interest on sums due in respect of taxes or excise duties and refunds of such taxes or duties, or 
+	b) the obligations, in relation to occupational or personal pension schemes, of the trustees or managers or 
+	c) the obligations under an order made by virtue of section 12A(2) or (3) of the Family Law (Scotland) Act 1985  (orders relating to pensions lump sums) of the person responsible for a pension arrangement other than an occupational or personal pension scheme; or 
+	d) the obligations under Chapter I of Part IV of the Welfare Reform and Pensions Act 1999  (sharing of rights under pension arrangements) of the person responsible for such a pension arrangement; or 
+	e) the effect of Chapter II of Part IV of that Act of 1999 (sharing of rights in state pension schemes) as read with Part II of the Social Security Contributions and Benefits Act 1992  (contributory benefits) and Part 1 of the Pensions Act 2014 (state pension) . 
+4) In sub paragraph (3)(c) “pension arrangement” and “person responsible for a pension arrangement” have the same meaning as in section 27(1) of the Family Law (Scotland) Act 1985. 
+5) Sub-paragraph (3) does not affect sub-paragraph (1) as it applies to an Act of the Scottish Parliament so far as any matter to which a provision of the Act relates falls within exception 10 of Section F1 of Part 2 of Schedule 5. 
+3) 
+1) Paragraph 2 does not apply to modifications which— 
+	a) are incidental to, or consequential on, provision made (whether by virtue of the Act in question or another enactment) which does not relate to reserved matters, and 
+	b) do not have a greater effect on reserved matters than is necessary to give effect to the purpose of the provision. 
+2) In determining for the purposes of sub-paragraph (1)(b) what is necessary to give effect to the purpose of a provision, any power to make laws other than the power of the Parliament is to be disregarded. 
+3) Sub-paragraph (1) does not affect the application of paragraph 2 to modifications which are incidental to, or consequential on, any provision, if it is only by virtue of exception 10 of Section F1 of Part 2 of Schedule 5 that the provision does not relate to reserved matters. *This Act*
+
+4) 
+1) An Act of the Scottish Parliament cannot modify, or confer power by subordinate legislation to modify, this Act. 
+2) This paragraph does not apply to modifying— 
+	a) the following sections in Part 1 (the Scottish Parliament)— 
+		i) section 1(2) to (5), 
+		ii) section 2(1), (2), (2B) and (3) to (6), 
+		iii) sections 3 to 12, 
+		iv) sections 13 to 22, 
+		v) sections 24 to 26, 
+		vi) section 27(1) and (2), 
+		vii) section 28(4) and (5), 
+		viii) section 31(3), 
+		ix) section 36(1)(a) and (b), and (2) and (3), and 
+		x) sections 38 to 42, 
+	b) the following sections in Part 2 (the Scottish Administration)— 
+		i) section 44(1)(a) to (c) and (2), 
+		ii) section 45(3) to (7), 
+		iii) section 46(1) to (3), 
+		iv) section 47(2) and (3)(b) to (e), 
+		v) section 48(2) to (4), 
+		vi) section 49(2), (3) and (4)(b) to (e), and 
+		vii) section 50, 
+	c) in Part 3 (financial provisions)— 
+		i) section 69(2) to (5), and 
+		ii) section 70(1) to (5) and (7) to (9), 
+	d) in Part 5 (miscellaneous and general), sections 81 to 83, 85, 91, 92(1), (2) and (4) to (6), 93, 94 and 97, 
+	e) the following provisions in Part 6 (supplementary)— 
+		i) section 112(1) and (3) to (5), section 113 (except the application of subsection (9)), section 115 and Schedule 7 (so far as those sections and that Schedule apply to any power exercisable within devolved competence to make subordinate legislation), 
+		ii) sections 118, 120 and 121, and 
+		iii) section 124 (so far as that section applies to any power exercisable within devolved competence to make subordinate legislation), 
+	f) Schedule 1 (constituencies, regions and regional members), 
+	g) paragraphs 1, 2(1) and 3 to 6 of Schedule 2 (Scottish Parliamentary corporate body), and 
+	h) paragraphs 1 to 6 of Schedule 3 (standing orders - further provision). 
+2A) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+2B) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+2C) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+3) This paragraph does not apply to modifying any provision of this Act (other than sections 64(7), 66(2), 71(7), 77, 78 and 119) which— 
+	a) charges any sum on the Scottish Consolidated Fund, 
+	b) requires any sum to be paid out of that Fund without further approval,  . . . 
+	c) requires any sum to be payable out of that Fund, or 
+	d) requires or authorises the payment of any sum into that Fund. 
+4) This paragraph does not apply to any modifications of Part III which are necessary or expedient for the purpose or in consequence of the establishment of a new fund, in addition to the Scottish Consolidated Fund, out of which loans may be made by the Scottish Ministers. 
+5) This paragraph does not apply to— 
+	a) modifying so much of any enactment as is modified by this Act, 
+	b) repealing so much of any provision of this Act as amends any enactment, if the provision ceases to have effect in consequence of any enactment comprised in or made under an Act of the Scottish Parliament. 
+4A) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . *Enactments modified by this Act*
+
+5) An Act of the Scottish Parliament cannot modify, or confer power by subordinate legislation to modify— 
+	a) the effect of section 119(3) in relation to any provision of an Act of Parliament relating to judicial salaries, 
+	b) so much of any enactment as— 
+		i) is amended by paragraph 2, 7 or 32 of Schedule 8, and 
+		ii) relates to the Advocate General, 
+	c) so much of any enactment as is amended by paragraph 9(b) or 29 of Schedule 8. *Shared powers*
+
+6) An Act of the Scottish Parliament cannot modify, or confer power by subordinate legislation to modify, any enactment so far as the enactment relates to powers exercisable by a Minister of the Crown by virtue of section 56. ## Part II
+## General exceptions
+
+*Restatement, etc.*
+
+7) 
+1) Part I of this Schedule does not prevent an Act of the Scottish Parliament— 
+	a) restating the law (or restating it with such modifications as are not prevented by that Part), or 
+	b) repealing any spent enactment, or conferring power by subordinate legislation to do so. 
+2) For the purposes of paragraph 2, the law on reserved matters includes any restatement in an Act of the Scottish Parliament, or subordinate legislation under such an Act, of the law on reserved matters if the subject-matter of the restatement is a reserved matter. *Effect of Interpretation Act 1978*
+
+8) Part I of this Schedule does not prevent the operation of any provision of the  Interpretation Act 1978. *Change of title etc.*
+
+9) 
+1) Part I of this Schedule does not prevent an Act of the Scottish Parliament amending, or conferring power by subordinate legislation to amend, any enactment by changing— 
+	a) any of the titles referred to in sub-paragraph (2), or 
+	b) any reference to a declarator, in consequence of any provision made by or under an Act of the Scottish Parliament. 
+2) The titles are those of— 
+	a) any court or tribunal or any judge, chairman or officer of a court or tribunal, 
+	b) any holder of an office in the Scottish Administration which is not a ministerial office or any member of the staff of the Scottish Administration, 
+	c) any register. *Accounts and audit and maladministration*
+
+10) Part I of this Schedule does not prevent an Act of the Scottish Parliament modifying, or conferring power by subordinate legislation to modify, any enactment for or in connection with the purposes of section 70 or 91. *Subordinate legislation*
+
+11) 
+1) Part I of this Schedule does not prevent an Act of the Scottish Parliament modifying, or conferring power by subordinate legislation to modify, any enactment for or in connection with any of the following purposes. 
+2) Those purposes are— 
+	a) making different provision in respect of the document by which a power to make subordinate legislation within sub-paragraph (3) is to be exercised, 
+	b) making different provision (or no provision) for the procedure, in relation to the Parliament, to which legislation made in the exercise of such a power (or the instrument or other document in which it is contained) is to be subject, 
+	c) applying any enactment comprised in or made under an Act of the Scottish Parliament relating to the documents by which such powers may be exercised. 
+3) The power to make the subordinate legislation, or a power to confirm or approve the legislation, must be exercisable by— 
+	a) a member of the Scottish Executive, 
+	b) any Scottish public authority with mixed functions or no reserved functions, 
+	c) any other person (not being a Minister of the Crown) within devolved competence. 
+4) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ## Part III
+## Consequential modification of sections 53 and 54
+
+
+12) 
+1) This paragraph applies to a function which (apart from this Schedule) would be transferred to the Scottish Ministers by virtue of section 53(2)(c). 
+2) If, because of anything in Part I of this Schedule, a provision of an Act of the Scottish Parliament modifying an enactment so as to provide for the function to be exercisable by a different person would be outside the legislative competence of the Parliament, the function is not so transferred. 
+13) 
+1) Paragraph 12 does not apply to any function conferred by any provision of— 
+	a) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+	b) the  Human Rights Act 1998, except sections 1, 5, 14 to 17 and 22 of that Act, 
+	c) the law on reserved matters (for the purposes of paragraph 2) so far as contained in an enactment. 
+2) For the purpose of determining— 
+	a) whether any function under any of the provisions referred to in sub-paragraph (1) is transferred to the Scottish Ministers by virtue of section 53, and 
+	b) the extent to which any such function (other than a function of making, confirming or approving subordinate legislation) is exercisable by them, the references in section 54 to the legislative competence of the Parliament are to be read as if section 29(2)(c) were omitted. 
+3) Part I of this Schedule does not prevent an Act of the Scottish Parliament modifying, or conferring power by subordinate legislation to modify, any of the provisions mentioned in sub-paragraph (1) so as to provide for a function transferred to the Scottish Ministers by virtue of section 53 to be exercisable by a different person. 
+14) If any pre-commencement enactment or prerogative instrument is modified by subordinate legislation under section 105 or under section 71 of the Scotland Act 2016 , a function under that enactment or instrument (whether as it has effect before or after the modification) is not transferred by virtue of section 53 if the subordinate legislation provides that it is not to be so transferred. 
+
+### Subordinate legislation: scope of powers.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/113`
+
+Section 113) **Subordinate legislation: scope of powers.**
+
+1) References in this section to a power are to an open power and to any other power to make subordinate legislation conferred by this Act which is exercisable by Her Majesty in Council or by a Minister of the Crown, and include a power as extended by this section. 
+1A) Subsections (2) to (11), except subsection (9), apply also to the power of the Scottish Ministers to make an order under section 12 or regulations under section 12B . 
+2) A power may be exercised so as to make different provision for different purposes. 
+3) A power (as well as being exercisable in relation to all cases to which it extends) may be exercised in relation to— 
+	a) those cases subject to specified exceptions, or 
+	b) any particular case or class of case. 
+4) A power includes power to make— 
+	a) any supplementary, incidental or consequential provision, and 
+	b) any transitory, transitional or saving provision, which the person making the legislation considers necessary or expedient. 
+5) A power may be exercised by modifying— 
+	a) any enactment or prerogative instrument, 
+	b) any other instrument or document, if the subordinate legislation (or a statutory instrument containing it) would be subject to any of the types of procedure referred to in Schedule 7. 
+6) But a power to modify enactments does not (unless otherwise stated) extend to making modifications of this Act or subordinate legislation under it. 
+7) A power may be exercised so as to make provision for the delegation of functions. 
+8) A power includes power to make provision for sums to be payable out of the Scottish Consolidated Fund or charged on the Fund. 
+9) A power includes power to make provision for the payment of sums out of money provided by Parliament or for sums to be charged on and paid out of the Consolidated Fund. 
+9A) A power may not be exercised so as to create any criminal offence punishable with any of the penalties specified for the offence in subsection (9B) or (10). 
+9B) In relation to Scotland, the specified penalties are— 
+	a) where the offence is triable on summary complaint only, imprisonment for a period exceeding 12 months and a fine exceeding level 5 on the standard scale, 
+	b) where an offence triable either on indictment or on summary complaint is tried on summary complaint, imprisonment for a period exceeding 12 months and a fine exceeding the statutory maximum, 
+	c) where the offence is tried on indictment, imprisonment for a period exceeding two years. 
+10) In relation to England and Wales and Northern Ireland, the specified penalties are— 
+	a) where the offence is tried summarily, imprisonment for a period exceeding the prescribed term and a fine exceeding— 
+		i) in the case of a summary offence, level 5 on the standard scale, 
+		ii) in the case of an offence triable either way, the statutory maximum, 
+	b) where the offence is tried on indictment, imprisonment for a period exceeding two years. 
+10A) In subsection (10)(a),  “the prescribed term” means— 
+	a) in relation to England and Wales, where the offence is a summary offence, 51 weeks; 
+	b) in relation to England and Wales, where the offence is triable either way, the general limit in a magistrates’ court ; 
+	c) in relation to ... Northern Ireland, three months. 
+10AA) If a power— 
+	a) is exercised so as to make provision for a summary offence under the law of England and Wales to be punishable with imprisonment for more than 6 months (“the relevant provision”) and 
+	b) is so exercised— 
+		i) on or after 2 May 2022, but 
+		ii) before the day on which section 281(5) of the Criminal Justice Act 2003 comes into force, the power must also be exercised so as to provide that, in relation to an offence committed before the day referred to in paragraph (b)(ii), any reference in the relevant provision to a term of imprisonment of more than 6 months is to be read as a reference to a term of imprisonment of 6 months. 
+11) The fact that a power is conferred does not prejudice the extent of any other power. 
+12) Her Majesty may by Order in Council amend subsection (9B) or (10) so as to change— 
+	a) any period of imprisonment specified there, or 
+	b) the amount of any fine so specified. 
+
+### Subordinate legislation: procedure.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/115`
+
+Section 115) **Subordinate legislation: procedure.**
+
+1) Schedule 7 (which determines the procedure which is to apply to subordinate legislation under this Act in relation to each House of Parliament and the Scottish Parliament) shall have effect. 
+2) In spite of the fact that that Schedule provides for subordinate legislation under a particular provision of this Act (or the statutory instrument containing it) to be subject to any type of procedure in relation to the Parliament, the provision conferring the power to make that legislation may be brought into force at any time after the passing of this Act. 
+3) Accordingly, any subordinate legislation (or the statutory instrument containing it) made in the exercise of the power in the period beginning with that time and ending immediately before the principal appointed day is to be subject to such other type of procedure (if any) as may be specified in subordinate legislation made under section 129(1). 
+
+### Subordinate legislation: general.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/112`
+
+Section 112) **Subordinate legislation: general.**
+
+1) Any power to make subordinate legislation conferred by this Act shall, if no other provision is made as to the person by whom the power is exercisable, be exercisable by Her Majesty by Order in Council or by a Minister of the Crown by order. 
+2) But the power to make subordinate legislation under section 129(1) providing— 
+	a) for the appropriation of sums forming part of the Scottish Consolidated Fund, or 
+	b) for sums received by any person to be appropriated in aid of sums appropriated as mentioned in paragraph (a), shall be exercisable only by Her Majesty by Order in Council. 
+3) References in this Act to an open power are to a power to which subsection (1) applies (and include a power to make subordinate legislation under section 129(1) whether or not the legislation makes provision as mentioned in subsection (2)). 
+4) An Order in Council under an open power may revoke, amend or re-enact an order, as well as an Order in Council, under the power; and an order under an open power may revoke, amend or re-enact an Order in Council, as well as an order, under the power. 
+5) Any power to make subordinate legislation conferred by this Act shall, in relation to its exercise by a Minister of the Crown or a member of the Scottish Government , be exercisable by statutory instrument. 
+6) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+
+### Private legislation.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/94`
+
+Section 94) **Private legislation.**
+
+1) This section applies where a pre-commencement enactment makes provision which has the effect of— 
+	a) requiring any order to be confirmed by Act of Parliament, or 
+	b) requiring any order (within the meaning of the  Statutory Orders (Special Procedure) Act 1945) to be subject to special parliamentary procedure, and power to make, confirm or approve the order in question is exercisable by the Scottish Ministers by virtue of section 53. 
+2) The provision shall have effect, so far as it relates to the exercise of the power to make, confirm or approve the order by virtue of section 53, as if it required the order— 
+	a) to be confirmed by an Act of the Scottish Parliament, or 
+	b) (as the case may be) to be subject to such special procedure as may be provided by or under such an Act. 
+
+### Power to adapt functions.
+`http://www.legislation.gov.uk/ukpga/1998/46/section/106`
+
+Section 106) **Power to adapt functions.**
+
+1) Subordinate legislation may make such provision (including, in particular, provision modifying a function exercisable by a Minister of the Crown) as the person making the legislation considers appropriate for the purpose of enabling or otherwise facilitating the transfer of a function to the Scottish Ministers by virtue of section 53 or 63. 
+2) Subordinate legislation under subsection (1) may, in particular, provide for any function which— 
+	a) is not exercisable separately in or as regards Scotland to be so exercisable, or 
+	b) is not otherwise exercisable separately within devolved competence to be so exercisable. 
+3) The reference in subsection (1) to the transfer of a function to the Scottish Ministers shall be read as including the sharing of a function with the Scottish Ministers or its other adaptation. 
+4) No recommendation shall be made to Her Majesty in Council to make, and no Minister of the Crown shall make, subordinate legislation under this section which modifies a function of observing or implementing an obligation mentioned in subsection (5) unless the Scottish Ministers have been consulted about the modification. 
+5) The obligation is an international obligation, or an assimilated obligation , to achieve a result defined by reference to a quantity (whether expressed as an amount, proportion or ratio or otherwise), where the quantity relates to the United Kingdom (or to an area including the United Kingdom or to an area consisting of a part of the United Kingdom which includes the whole or part of Scotland). 
+6) If subordinate legislation under this section modifies a function of observing or implementing such an international obligation so that the function to be transferred to the Scottish Ministers relates only to achieving so much of the result to be achieved under the obligation as is specified in the legislation, references in section 58 to the international obligation are to be read as references to the requirement to achieve that much of the result. 
+7) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
+ "query": "Scottish Administration (Offices) Order",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `uksi/2015/200`, **The Scottish Administration (Offices) Order 2015** (2015, final, extent n/a)
+- `uksi/1999/1127`, **The Scottish Administration (Offices) Order 1999** (1999, final, extent n/a)
+- `uksi/2005/1467`, **The Scottish Administration (Offices) Order 2005** (2005, final, extent n/a)
+- `uksi/2018/781`, **The Scottish Administration (Offices) Order 2018** (2018, final, extent n/a)
+- `uksi/2012/3073`, **The Scottish Administration (Offices) Order 2012** (2012, final, extent n/a)
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
+ "query": "is part of the Scottish Administration Order",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `uksi/1981/1537`, **The Parliamentary Commissioner (No. 2) Order 1981** (1981, final, extent n/a)
+- `uksi/2012/700`, **The Housing (Scotland) Act 2010 (Consequential Provisions and Modifications) Order 2012** (2012, final, extent n/a)
+- `uksi/2017/241`, **The Scottish Fiscal Commission Act 2016 (Consequential Provisions and Modifications) Order 2017** (2017, final, extent n/a)
+- `uksi/2009/2231`, **The Judiciary and Courts (Scotland) Act 2008 (Consequential Provisions and Modifications) Order 2009** (2009, final, extent n/a)
+- `uksi/2014/3294`, **The Revenue Scotland and Tax Powers Act 2014 (Consequential Provisions and Modifications) Order 2014** (2014, final, extent n/a)
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
+ "query": "Status as part of the Scottish Administration Consequential Provisions and Modifications Order",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `uksi/1999/1750`, **The Scotland Act 1998 (Transfer of Functions to the Scottish Ministers etc. ) Order 1999** (1999, revised, extent United Kingdom)
+- `uksi/2015/700`, **The Courts Reform (Scotland) Act 2014 (Consequential Provisions and Modifications) Order 2015** (2015, final, extent n/a)
+- `uksi/2000/3253`, **The Scotland Act 1998 (Transfer of Functions to the Scottish Ministers etc.) (No. 2) Order 2000** (2000, final, extent n/a)
+- `uksi/2001/3504`, **The Scotland Act 1998 (Transfer of Functions to the Scottish Ministers etc.) (No. 2) Order 2001** (2001, final, extent n/a)
+- `uksi/2017/241`, **The Scottish Fiscal Commission Act 2016 (Consequential Provisions and Modifications) Order 2017** (2017, final, extent n/a)
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
+ "query": "Revenue Scotland Consequential Provisions Order",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `uksi/2014/3294`, **The Revenue Scotland and Tax Powers Act 2014 (Consequential Provisions and Modifications) Order 2014** (2014, final, extent n/a)
+- `asp/2014/16`, **Revenue Scotland and Tax Powers Act 2014** (2014, revised, extent Scotland)
+- `uksi/2022/34`, **The Consumer Scotland Act 2020 (Consequential Provisions and Modifications) Order 2022** (2022, final, extent n/a)
+- `uksi/2013/728`, **The Scotland Act 2012 (Consequential Provisions) Order 2013** (2013, final, extent n/a)
+- `uksi/2025/275`, **The Moveable Transactions (Scotland) Act 2023 (Financial Collateral Arrangements and Financial Instruments) (Consequential Provisions and Modifications) Order 2025** (2025, final, extent n/a)
+
+---
+
+## `search_legislation`, HTTP 200
+
+```json
+{
+ "query": "Food Standards Scotland Consequential Provisions Order",
+ "year_from": null,
+ "year_to": null,
+ "limit": 5,
+ "include_text": false
+}
+```
+
+- `ssi/2015/100`, **The Food (Scotland) Act 2015 (Consequential and Transitional Provisions) Order 2015** (2015, revised, extent Scotland)
+- `ssi/2000/62/made`, **The Food Standards Act 1999 (Transitional and Consequential Provisions and Savings) (Scotland) Regulations 2000** (2000, final, extent n/a)
+- `uksi/2015/444`, **The Food (Scotland) Act 2015 (Consequential Provisions) Order 2015** (2015, final, extent n/a)
+- `uksi/1990/2625`, **The Food Safety Act 1990 (Consequential Modifications) (Scotland) Order 1990** (1990, final, extent n/a)
+- `ssi/2010/373`, **The Animal Feed (Scotland) Regulations 2010** (2010, revised, extent Scotland)
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "Specification of offices section 126(8)(b) Scottish Administration",
+ "legislation_id": "uksi/1999/1127",
+ "limit": 10
+}
+```
+
+### Specification of offices
+`http://www.legislation.gov.uk/id/uksi/1999/1127/article/2`
+
+Section 2) **Specification of offices**
+As from the date when section 44(1)(c) of the Act comes into force  , the following offices are specified for the purposes of section 126(8)(b) of the Act (offices in the Scottish Administration which are not ministerial offices), namely the offices of procurator fiscal and procurator fiscal depute to which appointments may be made under sections 1(2) and 2 respectively of the Sheriff Courts and Legal Officers (Scotland) Act 1927  . 
+3) As from the principal appointed day  , the offices which are mentioned in column 1 of the Schedule to this Order and which are established by, or referred to in, the enactment mentioned in the corresponding entry in column 2 of that Schedule, are also specified for the purposes of section 126(8)(b) of the Act. 
+
+### Specification of offices
+`http://www.legislation.gov.uk/id/uksi/1999/1127/article/3`
+
+Section 2) **Specification of offices**
+As from the date when section 44(1)(c) of the Act comes into force  , the following offices are specified for the purposes of section 126(8)(b) of the Act (offices in the Scottish Administration which are not ministerial offices), namely the offices of procurator fiscal and procurator fiscal depute to which appointments may be made under sections 1(2) and 2 respectively of the Sheriff Courts and Legal Officers (Scotland) Act 1927  . 
+3) As from the principal appointed day  , the offices which are mentioned in column 1 of the Schedule to this Order and which are established by, or referred to in, the enactment mentioned in the corresponding entry in column 2 of that Schedule, are also specified for the purposes of section 126(8)(b) of the Act. 
+
+### Citation, commencement and interpretation
+`http://www.legislation.gov.uk/id/uksi/1999/1127/article/1`
+
+Section 1) **Citation, commencement and interpretation**
+
+1) This Order may be cited as the Scottish Administration (Offices) Order 1999 and shall come into force on 6th May 1999. 
+2) In this Order, “the Act” means the Scotland Act 1998. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "Specification of offices section 126(8)(b) Scottish Administration",
+ "legislation_id": "uksi/2005/1467",
+ "limit": 10
+}
+```
+
+### Specification of Office
+`http://www.legislation.gov.uk/id/uksi/2005/1467/article/2`
+
+Section 2) **Specification of Office**
+The following offices are specified for the purposes of section 126(8)(b) of the Scotland Act 1998 (offices in the Scottish Administration which are not ministerial offices)– 
+	a) Her Majesty’s Chief Inspector of Fire and Rescue Authorities appointed under section 43(1)(a) of the Act; 
+	b) Her Majesty’s Inspector of Fire and Rescue Authorities appointed under section 43(1)(b) of the Act; and 
+	c) Assistant Inspector of Fire and Rescue Authorities appointed under section 43(2) of the Act. 
+
+### Partial revocation of the Scottish Administration (Offices) Order 1999
+`http://www.legislation.gov.uk/id/uksi/2005/1467/article/3`
+
+Section 3) **Partial revocation of the Scottish Administration (Offices) Order 1999**
+In the Schedule to the Scottish Administration (Offices) Order 1999  , the following entries are hereby revoked– 
+	a) the entry relating to Her Majesty’s Inspector of Fire Services for Scotland, together with the corresponding entry in column 2 of the Schedule; and 
+	b) the entry relating to Assistant Inspector of Fire Services for Scotland, together with the corresponding entry in column 2 of the Schedule. 
+
+### Citation, commencement and interpretation
+`http://www.legislation.gov.uk/id/uksi/2005/1467/article/1`
+
+Section 1) **Citation, commencement and interpretation**
+
+1) This Order may be cited as the Scottish Administration (Offices) Order 2005 and shall come into force on the day on which section 43 of the Fire (Scotland) Act 2005  comes into force. 
+2) In this Order, “the Act” means the Fire (Scotland) Act 2005. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "Specification of offices section 126(8)(b) Scottish Administration",
+ "legislation_id": "uksi/2018/781",
+ "limit": 10
+}
+```
+
+### Specification of offices
+`http://www.legislation.gov.uk/id/uksi/2018/781/article/2`
+
+Section 2) **Specification of offices**
+The following offices are specified for the purposes of section 126(8)(b) of the Scotland Act 1998 (offices in the Scottish Administration which are not ministerial offices)— 
+	a) the Auditor of the Court of Session appointed under section 14(3) of the Civil Litigation (Expenses and Group Proceedings) (Scotland) Act 2018; 
+	b) the auditor of the Sheriff Appeal Court appointed under that section; 
+	c) the auditor of the sheriff court appointed under that section. 
+
+### Citation and commencement
+`http://www.legislation.gov.uk/id/uksi/2018/781/article/1`
+
+Section 1) **Citation and commencement**
+This Order may be cited as the Scottish Administration (Offices) Order 2018 and comes into force on the same day as section 14 of the Civil Litigation (Expenses and Group Proceedings) (Scotland) Act 2018 (auditors of court)  comes into force. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "status as part of the Scottish Administration office-holder",
+ "legislation_id": "uksi/2009/2231",
+ "limit": 10
+}
+```
+
+### Construction of references to an office-holder in the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2009/2231/article/3`
+
+Section 3) **Construction of references to an office-holder in the Scottish Administration**
+
+1) Unless the context otherwise requires, references in the Scotland Act 1998 and any other enactment (except the Crown Suits (Scotland) Act 1857  ) to an office-holder in the Scottish Administration are to be taken to include a reference to the Scottish Court Service established by section 60(1) of the 2008 Act. 
+2) Paragraph (1) applies whether or not the enactment defines the expression “office-holder in the Scottish Administration” by reference to the Scotland Act 1998 or any specific provision of that Act. 
+
+### Status of the Scottish Court Service as part of the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2009/2231/article/2`
+
+Section 2) **Status of the Scottish Court Service as part of the Scottish Administration**
+The Scottish Court Service established by section 60(1) of the 2008 Act is part of the Scottish Administration. 
+
+### Chapter 2 of Part 2 of 2008 Act: extent
+`http://www.legislation.gov.uk/id/uksi/2009/2231/article/4`
+
+Section 4) **Chapter 2 of Part 2 of 2008 Act: extent**
+Chapter 2 of Part 2 of the 2008 Act (senior judiciary: vacancy, incapacity and suspension) extends to England and Wales and Northern Ireland. 
+
+### Citation and commencement
+`http://www.legislation.gov.uk/id/uksi/2009/2231/article/1`
+
+Section 1) **Citation and commencement**
+
+1) This Order may be cited as the Judiciary and Courts (Scotland) Act 2008 (Consequential Provisions and Modifications) Order 2009. 
+2) Articles 2 and 3 come into force on the day that section 60(1) of the Judiciary and Courts (Scotland) Act 2008  (referred to in this Order as the “2008 Act”) comes into force. 
+3) Otherwise this Order comes into force on 14th  September 2009. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "status as part of the Scottish Administration office-holder",
+ "legislation_id": "uksi/2012/700",
+ "limit": 10
+}
+```
+
+### Status of the Scottish Housing Regulator as part of the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2012/700/article/2`
+
+Section 2) **Status of the Scottish Housing Regulator as part of the Scottish Administration**
+The Scottish Housing Regulator  is part of the Scottish Administration. 
+
+### Construction of references to an office-holder in the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2012/700/article/3`
+
+Section 3) **Construction of references to an office-holder in the Scottish Administration**
+
+1) Unless the context otherwise requires, references in the Scotland Act 1998 and any other enactment (except the Crown Suits (Scotland) Act 1857  ) to an office-holder in the Scottish Administration are to be taken to include a reference to the Scottish Housing Regulator. 
+2) Paragraph (1) applies whether or not the enactment defines the expression “office-holder in the Scottish Administration” by reference to the Scotland Act 1998 or any specific provision of that Act. 
+
+### MODIFICATIONS OF PUBLIC GENERAL ACTS
+`http://www.legislation.gov.uk/id/uksi/2012/700/schedule`
+
+SCHEDULE Article 4 ## PART 1
+## MODIFICATIONS OF PUBLIC GENERAL ACTS
+
+House of Commons Disqualification Act 1975 (c.24) 
+1) In Part 2 of Schedule 1 to the House of Commons Disqualification Act 1975 (bodies of which all members are disqualified)  , insert at the appropriate place— The Scottish Housing Regulator . Housing Associations Act 1985 (c.69) 
+2) In section 2B of the Housing Associations Act 1985 (meaning of “registered housing association”, “registered social landlord” etc. ), in paragraph (c) of the definition of “unregistered”  , for “Part 3 of the Housing (Scotland) Act 2001 (asp 10)” substitute “Part 2 of the Housing (Scotland) Act 2010 (asp 17)”. Insolvency Act 1986 (c.45) 
+3) In section 72G(b) of the Insolvency Act 1986 (exception in respect of social landlords)  , for “Part 3 of the Housing (Scotland) Act 2001 (asp 10)” substitute “Part 2 of the Housing (Scotland) Act 2010 (asp 17)”. Taxation of Chargeable Gains Act 1992 (c.12) 
+4) 
+1) The Taxation of Chargeable Gains Act 1992 is amended as follows. 
+2) In section 219(1)(c) (disposals following direction by housing regulator)  , after “Housing and Regeneration Act 2008” insert “, section 106 of the Housing (Scotland) Act 2010”. 
+3) In section 219(2) (disposals by housing related bodies: definitions)  — 
+	a) in the definition of “housing regulator”, after “the Regulator of Social Housing” insert— , the Scottish Housing Regulator ; and 
+	b) in paragraph (c) of the definition of “relevant housing provider”, for “section 57 of the Housing (Scotland) Act 2001” substitute “section 20(1) of the Housing (Scotland) Act 2010”. 
+4) In section 259(3)(c) (gifts to housing associations: definition of “relevant housing provider”)  , for “section 57 of the Housing (Scotland) Act 2001” substitute “section 20(1) of the Housing (Scotland) Act 2010”. Value Added Tax Act 1994 (c.23) 
+5) 
+1) The Value Added Tax Act 1994 is amended as follows. 
+2) For paragraph  (b) of Note (21) of Group 5 of Schedule 8 (meaning of “relevant housing association”)  substitute — 
+	b) a registered social landlord within the meaning of the Housing (Scotland) Act 2010 (asp17)  which is either— 
+		i) a society registered under the Co-operative and Community Benefit Societies and Credit Unions Act 1965 (c.12)  , or 
+		ii) a company within the meaning of the Companies Act 2006 (c.46) , or . 
+3) For paragraph 10(3)(b) of Part  1 of Schedule 10  , substitute— 
+	b) a registered social landlord within the meaning of the Housing (Scotland) Act 2010 (asp17) which is either— 
+		i) a society registered under the Co-operative and Community Benefit Societies and Credit Unions Act 1965 (c.12) , or 
+		ii) a company within the meaning of the Companies Act 2006 (c.46) , or . Enterprise Act 2002 (c.40) 
+6) In section 255(3)(b) of the Enterprise Act 2002 (application of law about company arrangement or administration to non-company)  , for “Part 3 of the Housing (Scotland) Act 2001 (asp 10)” substitute “Part 2 of the Housing (Scotland) Act 2010 (asp 17)”. Finance Act 2003 (c.14) 
+7) 
+1) The Finance Act 2003 is amended as follows. 
+2) In section 121 (minor definitions)  , in paragraph (b) of the definition of “registered social landlord”, for “section 57 of the Housing (Scotland) Act 2001 (asp 10)” substitute “section 20(1) of the Housing (Scotland) Act 2010 (asp 17)”. 
+3) In section 128(2)(b) (exemption from stamp duty: definition of “registered social landlord”), for “section 57 of the Housing (Scotland) Act 2001 (asp 10)” substitute “section 20(1) of the Housing (Scotland) Act 2010 (asp 17)”. Income Tax Act 2007 (c.3) 
+8) In applying section 555(3)(b) of the Income Tax Act 2007 (substantial donor exceptions: definition of “relevant housing provider”)  in accordance with paragraph  27 of Schedule  3 to the Finance Act 2011  , paragraph  (b) has effect as if for “section 57 of the Housing (Scotland) Act 2001 (asp 10)” there were substituted “section 20(1) of the Housing (Scotland) Act 2010 (asp 17)”. Corporation Tax Act 2010 (c.4) 
+9) In applying section 508(2)(b)(ii) of the Corporation Tax Act 2010 (exceptions in respect of donors), in accordance with paragraph  27 of Schedule  3 to the Finance Act 2011  , paragraph  (b)(ii) has effect as if for “section 57 of the Housing (Scotland) Act 2001 (asp 10)” there were substituted “section 20(1) of the Housing (Scotland) Act 2010 (asp 17)”. ## PART 2
+## MODIFICATIONS OF SUBORDINATE LEGISLATION
+
+Social Security (Claims and Payments) Regulations 1987 (S.I. 1987/1968) 
+10) In paragraph 1(1) of Schedule 9 to the Social Security (Claims and Payments) Regulations 1987 (interpretation), in paragraph (b)(ii) of the definition of “hostel”  , for “Part 3 of the Housing (Scotland) Act 2001” substitute “Part 2 of the Housing (Scotland) Act 2010”. National Minimum Wage Regulations 1999 (S.I. 1999/584) 
+11) In regulation 31(5)(b) of the National Minimum Wage Regulations 1999 (meaning of “registered social landlord”)  , for “section 57 of the Housing (Scotland) Act 2001” substitute “section 20(1) of the Housing (Scotland) Act 2010”. Financial Services and Markets Act 2000 (Exemption) Order 2001 (S.I. 2001/1201) 
+12) In paragraph 48(2)(b) of Part  4 of the Schedule to the Financial Services and Markets Act 2000 (Exemption) Order 2001 (meaning of “relevant housing body”)  , for “the Housing (Scotland) Act 2001” substitute “the Housing (Scotland) Act 2010”. Communications (Television Licensing) Regulations 2004 (S.I. 2004/692) 
+13) In paragraph 7(1)(b)(ii) of Part  2 of Schedule 4 to the Communications (Television Licensing) Regulations 2004 (accommodation for residential care licences)  , for “section 57 of the Housing (Scotland) Act 2001” substitute “section 165 of the Housing (Scotland) Act 2010”. Displaced Persons (Temporary Protection) Regulations 2005 (S.I. 2005/1379) 
+14) In regulation 2(1)(f)(ii) of the Displaced Persons (Temporary Protection) Regulations 2005 (interpretation)  , for “section 57 of the Housing (Scotland) Act 2001” substitute “section 20(1) of the Housing (Scotland) Act 2010”. Housing Benefit Regulations 2006 (S.I. 2006/213) 
+15) 
+1) The Housing Benefit Regulations 2006 are amended as follows. 
+2) In regulation 2(1) (interpretation), in paragraph (c) of the definition of “registered housing association”  , for “by Scottish Ministers by virtue of section 57(3)(b) of the Housing (Scotland) Act 2001” substitute “in the register maintained by the Scottish Housing Regulator under section 20(1) of the Housing (Scotland) Act 2010”. 
+3) In the definition of “registered social landlord” in regulation 13C(6) (when a maximum rent (LHA) is to be determined)  , for “sections 57 and 59 of the Housing (Scotland) Act 2001” substitute “section 165 of the Housing (Scotland) Act 2010”. Housing Benefit (Persons who have attained the qualifying age for state pension credit) Regulations 2006 (S.I. 2006/214) 
+16) 
+1) The Housing Benefit (Persons who have attained the qualifying age for state pension credit) Regulations 2006 are amended as follows. 
+2) In regulation 2(1) (interpretation), in paragraph (c) of the definition of “registered housing association”  , for “by Scottish Ministers by virtue of section 57(3)(b) of the Housing (Scotland) Act 2001” substitute “in the register maintained by the Scottish Housing Regulator under section 20(1) of the Housing (Scotland) Act 2010”. 
+3) In the definition of “registered social landlord” in regulation 13C(6) (when a maximum rent (LHA) is to be determined)  , for “sections 57 and 59 of the Housing (Scotland) Act 2001” substitute “section 165 of the Housing (Scotland) Act 2010”. Community Benefit Societies (Restriction on Use of Assets) Regulations 2006 (S.I. 2006/264) 
+17) In regulation 2 of the Community Benefit Societies (Restriction on Use of Assets) Regulations 2006 (interpretation)  , in paragraph (b) of the definition of “registered social landlord”, for “Scottish Ministers under section 57 of the Housing (Scotland) Act 2001” substitute “Scottish Housing Regulator under section 20(1) of the Housing (Scotland) Act 2010”. Regulated Covered Bonds Regulations 2008 (S.I. 2008/346) 
+18) In regulation 2(3) of the Regulated Covered Bonds Regulations 2008 (eligible property)  , in paragraph (b) of the definition of “registered social landlord”, for “Part 3 of the 2001 Act” substitute “Part 2 of the Housing (Scotland) Act 2010”. Companies Act 2006 (Consequential Amendments etc) Order 2008 (S.I. 2008/948) 
+19) Paragraph 219 of Schedule 1 to the Companies Act 2006 (Consequential Amendments etc) Order 2008 (amendments to the Housing (Scotland) Act 2001)  is revoked. Companies (Disclosure of Address) Regulations 2009 (S.I. 2009/214) 
+20) In Schedule 1 to the Companies (Disclosure of Address) Regulations 2009 (specified public authorities)  , insert after “a police force”— ; the Scottish Housing Regulator . Overseas Companies Regulations 2009 (S.I. 2009/1801) 
+21) In Schedule 1 to the Overseas Companies Regulations 2009 (specified public authorities)  , insert after “a police force”— ; the Scottish Housing Regulator . Companies Act 2006 (Consequential Amendments, Transitional Provisions and Savings) Order 2009 (S.I.2009/1941) 
+22) Paragraph 191(2), (3), (5) and (6) of Schedule 1 to the Companies Act 2006 (Consequential Amendments, Transitional Provisions and Savings) Order 2009 (amendments to the Housing (Scotland) Act 2001) are revoked. 
+
+### Citation, extent and commencement
+`http://www.legislation.gov.uk/id/uksi/2012/700/article/1`
+
+Section 1) **Citation, extent and commencement**
+
+1) This Order may be cited as the Housing (Scotland) Act 2010 (Consequential Provisions and Modifications) Order 2012. 
+2) Paragraph  2 of the Schedule extends to England and Wales only. 
+3) This Order comes into force on 1st April 2012. 
+
+### Modifications
+`http://www.legislation.gov.uk/id/uksi/2012/700/article/4`
+
+Section 4) **Modifications**
+The modifications specified in the Schedule have effect. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "status as part of the Scottish Administration office-holder",
+ "legislation_id": "uksi/2014/3294",
+ "limit": 10
+}
+```
+
+### Status of Revenue Scotland as part of the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2014/3294/article/2`
+
+Section 2) **Status of Revenue Scotland as part of the Scottish Administration**
+Revenue Scotland  is part of the Scottish Administration. 
+
+### Construction of references to an office-holder in the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2014/3294/article/3`
+
+Section 3) **Construction of references to an office-holder in the Scottish Administration**
+
+1) Unless the context otherwise requires, references in the Scotland Act 1998 and any other enactment to an office-holder in the Scottish Administration are to be taken to include a reference to Revenue Scotland. 
+2) Paragraph (1) applies whether or not the enactment defines the expression “office-holder in the Scottish Administration” by reference to the Scotland Act 1998 or any specific provision of that Act. 
+
+### Public Interest Disclosure (Prescribed Persons) Order 2014
+`http://www.legislation.gov.uk/id/uksi/2014/3294/article/6`
+
+Section 6) **Public Interest Disclosure (Prescribed Persons) Order 2014**
+In the Schedule to the Public Interest Disclosure (Prescribed Persons) Order 2014  (prescribed persons)— 
+	a) insert the entries set out in the following table at the appropriate place— First ColumnSecond ColumnPersons and descriptions of peopleDescription of matters
+The Keeper of the Registers of ScotlandLand and buildings transaction tax.Revenue ScotlandDevolved taxes (within the meaning of section 80A(4) of the Scotland Act 1998). 
+	b) in the entry for the Scottish Environment Protection Agency, in the second column, at the end, insert— Scottish landfill tax. 
+
+### House of Commons Disqualification Act 1975
+`http://www.legislation.gov.uk/id/uksi/2014/3294/article/5`
+
+Section 5) **House of Commons Disqualification Act 1975**
+In Part 2 of Schedule 1 to the House of Commons Disqualification Act 1975  (bodies of which all members are disqualified), insert the following entry at the appropriate place— Revenue Scotland . 
+
+### Information sharing
+`http://www.legislation.gov.uk/id/uksi/2014/3294/article/4`
+
+Section 4) **Information sharing**
+
+1) In the Commissioners for Revenue and Customs Act 2005  — 
+	a) in section 18 (confidentiality)— 
+		i) in subsection (2)(i), for “the Scottish Ministers” substitute “Revenue Scotland”; 
+		ii) omit subsection (2A); 
+	b) in section 19 (wrongful disclosure)— 
+		i) in subsection (1), omit “or (2A)”; 
+		ii) in subsection (8), omit “or (2A)”. 
+2) In section 24 of the Scotland Act 2012  (amendments relating to the Commissioners for Revenue and Customs), omit subsections (4) and (5). 
+3) For the purposes of section 15 of the Revenue Scotland and Tax Powers Act 2014, a disclosure is permitted if it is made to the Commissioners for Her Majesty’s Revenue and Customs in connection with the collection and management of revenue within the meaning of section 5 of the Commissioners for Revenue and Customs Act 2005. 
+
+### Citation, commencement and extent
+`http://www.legislation.gov.uk/id/uksi/2014/3294/article/1`
+
+Section 1) **Citation, commencement and extent**
+
+1) This Order may be cited as the Revenue Scotland and Tax Powers Act 2014 (Consequential Provisions and Modifications) Order 2014. 
+2) This Order comes into force on the same day as section 2 (establishment of Revenue Scotland) of the Revenue Scotland and Tax Powers Act 2014  comes into force. 
+3) Article 6 extends to Scotland and to England and Wales only. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "status as part of the Scottish Administration office-holder",
+ "legislation_id": "uksi/2015/444",
+ "limit": 10
+}
+```
+
+### Construction of references to an office-holder in the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2015/444/article/3`
+
+Section 3) **Construction of references to an office-holder in the Scottish Administration**
+
+1) Unless the context otherwise requires, references in the Scotland Act 1998 and any other enactment (except the Crown Suits (Scotland) Act 1857  ) to an office-holder in the Scottish Administration are to be taken to include a reference to Food Standards Scotland. 
+2) Paragraph (1) applies whether or not the enactment defines the expression “office-holder in the Scottish Administration” by reference to the Scotland Act 1998 or any specific provision of that Act. 
+
+### Status of the Food Standards Scotland as part of the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2015/444/article/2`
+
+Section 2) **Status of the Food Standards Scotland as part of the Scottish Administration**
+Food Standards Scotland  is part of the Scottish Administration. 
+
+### Citation and commencement
+`http://www.legislation.gov.uk/id/uksi/2015/444/article/1`
+
+Section 1) **Citation and commencement**
+
+1) This Order may be cited as the Food (Scotland) Act 2015 (Consequential Provisions) Order 2015. 
+2) This Order comes into force on the day on which section 1 of the Food (Scotland) Act 2015  comes into force. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "status as part of the Scottish Administration office-holder",
+ "legislation_id": "uksi/2017/241",
+ "limit": 10
+}
+```
+
+### Status of the Scottish Fiscal Commission as part of the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2017/241/article/2`
+
+Section 2) **Status of the Scottish Fiscal Commission as part of the Scottish Administration**
+The Scottish Fiscal Commission  is part of the Scottish Administration. 
+
+### Construction of references to an office-holder in the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2017/241/article/3`
+
+Section 3) **Construction of references to an office-holder in the Scottish Administration**
+
+1) Unless the context otherwise requires, references in the Scotland Act 1998 and any other enactment (except the Crown Suits (Scotland) Act 1857  ) to an office-holder in the Scottish Administration are to be taken to include a reference to the Scottish Fiscal Commission. 
+2) Paragraph (1) applies whether or not the enactment defines the expression “office-holder in the Scottish Administration” by reference to the Scotland Act 1998 or any specific provision of that Act. 
+
+### House of Commons Disqualification Act 1975
+`http://www.legislation.gov.uk/id/uksi/2017/241/article/5`
+
+Section 5) **House of Commons Disqualification Act 1975**
+In Part 2 of Schedule 1 to the House of Commons Disqualification Act 1975  (bodies of which all members are disqualified), insert the following entry at the appropriate place— The Scottish Fiscal Commission . 
+
+### Office for Budget Responsibility: duty to co-operate
+`http://www.legislation.gov.uk/id/uksi/2017/241/article/4`
+
+Section 4) **Office for Budget Responsibility: duty to co-operate**
+After section 7 of the Budget Responsibility and National Audit Act 2011  , insert— 
+
+Section 7A) **Duty to co-operate with the Scottish Fiscal Commission**
+The Office must, so far as necessary for the performance of the Scottish Fiscal Commission’s functions, co-operate with the Commission. . 
+
+### Citation and commencement
+`http://www.legislation.gov.uk/id/uksi/2017/241/article/1`
+
+Section 1) **Citation and commencement**
+
+1) This Order may be cited as the Scottish Fiscal Commission Act 2016 (Consequential Provisions and Modifications) Order 2017. 
+2) This Order comes into force on the same day as section 1 (establishment of the Scottish Fiscal Commission) of the Scottish Fiscal Commission Act 2016  comes into force. 
+
+---
+
+## `search_legislation_sections`, HTTP 200
+
+```json
+{
+ "query": "status as part of the Scottish Administration office-holder",
+ "legislation_id": "uksi/2022/34",
+ "limit": 10
+}
+```
+
+### Status of Consumer Scotland as part of the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2022/34/article/2`
+
+Section 2) **Status of Consumer Scotland as part of the Scottish Administration**
+Consumer Scotland  is part of the Scottish Administration  . 
+
+### Construction of references to an office-holder in the Scottish Administration
+`http://www.legislation.gov.uk/id/uksi/2022/34/article/3`
+
+Section 3) **Construction of references to an office-holder in the Scottish Administration**
+
+1) Unless the context otherwise requires, references in the Scotland Act 1998 and any other enactment (except the Crown Suits (Scotland) Act 1857  ) to an office-holder in the Scottish Administration are to be taken to include a reference to Consumer Scotland. 
+2) Paragraph (1) applies whether or not the enactment defines the expression “office-holder in the Scottish Administration” by reference to the Scotland Act 1998 or any specific provision of that Act. 
+
+### Transitional and saving provisions
+`http://www.legislation.gov.uk/id/uksi/2022/34/article/5`
+
+Section 5) **Transitional and saving provisions**
+
+1) Nothing in this Order affects the validity of anything done (or having effect as if done) by or in relation to the Scottish Association of Citizens Advice Bureaux  before its coming into force. 
+2) Anything done (or having effect as if done) at the coming into force of this Order by or in relation to the Scottish Association of Citizens Advice Bureaux, so far as it relates to any function of the Scottish Association of Citizens Advice Bureaux transferred to Consumer Scotland by this Order, has effect, so far as is necessary for continuing its effect after the coming into force of this Order, as if done by or in relation to Consumer Scotland. 
+3) Anything (including legal proceedings) which at the coming into force of this Order is in the process of being done by or in relation to the Scottish Association of Citizens Advice Bureaux, so far as it relates to any function transferred by this Order, may be continued by or in relation to Consumer Scotland. 
+4) So far as may be necessary for the purposes of or in consequence of a transfer of a function by this Order, a reference to the Scottish Association of Citizens Advice Bureaux in an instrument or other document is to be treated as a reference to Consumer Scotland. 
+
+### MODIFICATIONS OF PUBLIC GENERAL ACTS
+`http://www.legislation.gov.uk/id/uksi/2022/34/schedule`
+
+SCHEDULE Article 4 ## PART 1
+## MODIFICATIONS OF PUBLIC GENERAL ACTS
+
+
+
+Section 1) **House of Commons Disqualification Act 1975**
+
+1) The House of Commons Disqualification Act 1975  is amended as follows. 
+2) In Part 2 of Schedule 1 (bodies of which all members are disqualified), insert the following entry at the appropriate place— Consumer Scotland. . 
+
+Section 2) **Gas Act 1986**
+
+1) The Gas Act 1986  is amended as follows. 
+2) In section 4AB  (guidance on social and environmental matters), in subsection (3)(ba), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+3) In section 6A  (exemptions from prohibition on unlicensed activities), in subsection (1B)(a), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+4) In section 8  (standard conditions of licenses), in subsection (5)(b), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+5) In section 23  (modification of conditions of licenses), in subsection (4)(b)(v), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+6) In section 23B  (appeal to the Competition and Markets Authority)— 
+	a) in subsection (2)(d), for “Citizens Advice Scotland” substitute “Consumer Scotland” , and 
+	b) in subsection (4)(c), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+7) In section 27A  (determination of disputes by the Gas and Electricity Markets Authority), in subsection (1)(a)(ii), for “Citizens Advice or Citizens Advice Scotland or Citizens Advice and Citizens Advice Scotland acting jointly” substitute “Citizens Advice, Citizens Advice Scotland or Consumer Scotland or those bodies or any two of them acting jointly” . 
+8) In section 30A  (penalties), in subsection (7)(d), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+9) In section 33AB  (standards of performance in individual cases: disputes)— 
+	a) in subsection (1)(a)(ii), for “Citizens Advice or Citizens Advice Scotland or Citizens Advice and Citizens Advice Scotland acting jointly” substitute “Citizens Advice, Citizens Advice Scotland or Consumer Scotland or those bodies or any two of them acting jointly” , and 
+	b) in subsection (1)(b), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” . 
+10) In section 33BAA  (procedures for prescribing or determining standards of performance), in subsection (1)(c), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+11) In section 33BC  (promotion of reductions in carbon emissions), in subsection (11), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+12) In section 41D  (application by the Gas and Electricity Markets Authority for order including new activities), in subsection (2), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+13) In section 41E  (references to the Competition and Markets Authority), in subsection (4), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+14) In section 41F  (reports on references)— 
+	a) in subsection (7), for “Citizens Advice Scotland”, in both places it occurs, substitute “Consumer Scotland” , and 
+	b) in subsection (8), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+15) In section 41G  (application by the Gas and Electricity Markets Authority for order excluding activities), in subsection (2)(a), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+16) In section 41H  (consultation by Secretary of State about order excluding activities), in subsection (2)(a), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+17) In section 41I  (service of notices)— 
+	a) in the heading, for “Citizens Advice Scotland” substitute “Consumer Scotland” , and 
+	b) for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+18) In Schedule 2B  (the Gas Code)— 
+	a) in paragraph 6A  (use of pre-payment meters), in subparagraph (4)(aa), for “Citizens Advice Scotland” substitute “Consumer Scotland” , and 
+	b) in paragraph 8  (deemed contracts), in subparagraph (11)(b), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+
+Section 3) **Electricity Act 1989**
+
+1) The Electricity Act 1989  is amended as follows. 
+2) In section 3B  (guidance on social and environmental matters), in subsection (3)(ba), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+3) In section 5  (exemptions from prohibition on unlicensed supply), in subsection (3)(a), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+4) In section 8A  (standard conditions of licenses), in subsection (4)(b), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+5) In section 11A  (modifications of conditions of licenses), in subsection (4)(b)(iv), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+6) In section 11C  (appeal to the Competition and Markets Authority)— 
+	a) in subsection (2)(d), for “Citizens Advice Scotland” substitute “Consumer Scotland” , and 
+	b) in subsection (4)(c), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+7) In section 23  (determination of disputes), in subsection (1A)(a)(ii), for “Citizens Advice or Citizens Advice Scotland or Citizens Advice and Citizens Advice Scotland acting jointly” substitute “Citizens Advice, Citizens Advice Scotland or Consumer Scotland or those bodies or any two of them acting jointly” . 
+8) In section 27A  (penalties), in subsection (7)(d), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+9) In section 32L  (renewables obligation orders: procedure), in subsection (1)(ba), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+10) In section 39B  (standards of performance in individual cases: disputes)— 
+	a) in subsection (1)(a)(ii), for “Citizens Advice or Citizens Advice Scotland or Citizens Advice and Citizens Advice Scotland acting jointly” substitute “Citizens Advice, Citizens Advice Scotland or Consumer Scotland or those bodies or any two of them acting jointly” , and 
+	b) in subsection (1)(b), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” . 
+11) In section 40B  (procedures for prescribing or determining standards of performance), in subsection (1)(c), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+12) In section 41A(  ) (promotion of reductions in carbon emissions), in subsection (11), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+13) In section 56B  (application by the Gas and Electricity Markets Authority for order including new activities), in subsection (2), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+14) In section 56C  (references to the Competition and Markets Authority), in subsection (4), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+15) In section 56D  (reports on references)— 
+	a) in subsection (7), for “Citizens Advice Scotland”, in both places it occurs, substitute “Consumer Scotland” , and 
+	b) in subsection (8), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+16) In section 56E  (application by the Gas and Electricity Markets Authority for order excluding activities), in subsection (2)(a), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+17) In section 56F  (consultation by Secretary of State about order excluding activities), in subsection (2)(a), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+18) In section 56G  (service of notices)— 
+	a) in the heading, for “Citizens Advice Scotland” substitute “Consumer Scotland” , and 
+	b) for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+19) In Schedule 6  , in paragraph 3(10)(b) (the Electricity Code: deemed contracts), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+20) In Schedule 7  , in paragraph 12(5)(aa) (special provision for pre-payment electricity meters), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+
+Section 4) **Postal Services Act 2000**
+
+1) The Postal Services Act 2000  is amended as follows. 
+2) In section 93  (power to modify sections 89 to 92), in subsection (2), after “Citizens Advice Scotland,” insert “Consumer Scotland,” . 
+
+Section 5) **Utilities Act 2000**
+
+1) The Utilities Act 2000  is amended as follows. 
+2) In section 4  (forward work programmes), in subsection (6), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+3) In section 5  (annual and other reports of the Gas and Electricity Markets Authority), in subsection (7), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+4) In section 103  (overall carbon emissions reduction targets), in subsection (4), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+5) In section 103A  (overall home-heating cost reduction targets), in subsection (5), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+6) In section 105  (general restrictions on disclosure of information)— 
+	a) in subsection (3)(a), after “Citizens Advice Scotland” insert “, Consumer Scotland” , 
+	b) in subsection (5), omit the “and” following paragraph (m), 
+	c) after subsection (5)(n) insert— , and 
+		o) Consumer Scotland. , and 
+	d) in subsection (11A), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” . 
+
+Section 6) **Communications Act 2003**
+
+1) The Communications Act 2003  is amended as follows. 
+2) In section 17  (membership of the Consumer Panel)— 
+	a) after subsection (4BB) insert— 
+	4BC) The Secretary of State may direct OFCOM to appoint as a member of the Consumer Panel a person specified by the Secretary of State who— 
+		a) is a member or a member of staff of Consumer Scotland, and 
+		b) is nominated for the purposes of this subsection by Consumer Scotland after consultation with OFCOM. 
+	4BD) Only one person may, at any time, be a member of the Consumer Panel appointed in accordance with a direction under subsection (4BC); but that does not prevent OFCOM appointing as a member of the Consumer Panel any person who is also a member or member of staff of Consumer Scotland. , 
+	b) after subsection (4C) insert— 
+	4D) A person appointed in accordance with a direction under subsection (4BC) ceases to be a member of the Consumer Panel— 
+		a) on ceasing to be a member or, as the case may be, a member of staff of Consumer Scotland, or 
+		b) if Consumer Scotland decides that the person is no longer to be on the Consumer Panel. , and 
+	c) in subsection (5), for “and (4BA)” substitute “, (4BA) and (4BC)” . 
+
+Section 7) **Consumers, Estate Agents and Redress Act 2007**
+
+1) The Consumers, Estate Agents and Redress Act 2007  is amended as follows. 
+2) In section 1  (the consumer advocacy bodies)— 
+	a) in subsection (2), after paragraph (b) (and before the “or” following it) insert— 
+		ba) Consumer Scotland, , and 
+	b) for subsection (3) substitute— 
+	3) Except where this Act otherwise provides— 
+		a) a function conferred on Citizens Advice, Citizens Advice Scotland or Consumer Scotland by or under this Act may be carried out by that body jointly with one or both of the other bodies, and 
+		b) each of those bodies may carry out on behalf of another of those bodies a function that is conferred on that other body by or under this Act, with the agreement of that other body. . 
+3) In section 4  (designated consumers), in subsection (4)(aa), after “Citizens Advice Scotland” insert “and Consumer Scotland” . 
+4) In section 5  (forward work programmes of the General Consumer Council for Northern Ireland), in subsection (4A)(b), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+5) In section 12  (investigation of complaints made by vulnerable designated consumers)— 
+	a) for subsection (5) substitute— 
+	5) Where a complaint is referred to Citizens Advice, Citizens Advice Scotland or Consumer Scotland, that body may agree with another of those bodies that the complaint is to be treated as having been referred to that other body. , and 
+	b) in subsection (6), for “Citizens Advice and Citizens Advice Scotland” substitute “two of those bodies” . 
+6) In section 13  (investigation of complaints relating to disconnection of gas or electricity)— 
+	a) for subsection (5A) substitute— 
+	5A) Where a complaint is referred to a consumer advocacy body, that body may agree with another consumer advocacy body that the complaint is to be treated as having been referred to that other body. , and 
+	b) in subsection (5B), for “Citizens Advice or Citizens Advice Scotland” substitute “two consumer advocacy bodies” . 
+7) In section 16  (investigations relating to public post offices), in subsection (1)(a), for “and Citizens Advice Scotland” substitute “, Citizens Advice Scotland and Consumer Scotland” . 
+8) In section 19A  (guidance for energy consumers), in subsection (8C), after “include a reference to” insert “Citizens Advice Scotland or” . 
+9) In section 24  (provision of information to the consumer advocacy bodies), in subsection (2A), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” . 
+10) In section 27  (provision of information by a consumer advocacy body), in subsection (1)(b), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” . 
+11) In section 29  (disclosure of information)— 
+	a) in subsection (3)(a), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” , 
+	b) in subsection (3B), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” , 
+	c) in subsection (3C)— 
+		i) after “means” insert “, in relation to Citizens Advice or Citizens Advice Scotland,” , and 
+		ii) after paragraph (b) insert— and, in relation to Consumer Scotland, a function conferred under section 3, 4 or 5 of the Consumer Scotland Act 2020 (asp 11) . , 
+	d) in subsection (4)(ca), for “Citizens Advice Scotland” substitute “Consumer Scotland” , and 
+	e) in subsection (4)(cb), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” . 
+12) In section 43  (standards for handling complaints), in subsection (8), after paragraph (ba) (and before the “and” following it) insert— 
+	bb) Consumer Scotland, . 
+13) In section 45  (information with respect to compliance with complaints handling standards), in subsection (2), for “Citizens Advice and Citizens Advice Scotland must publish such statistical information as Citizens Advice or, as the case may be, Citizens Advice Scotland” substitute “Citizens Advice, Citizens Advice Scotland and Consumer Scotland must publish such statistical information as Citizens Advice, Citizens Advice Scotland or, as the case may be, Consumer Scotland” . 
+14) In section 49  (approval of redress schemes)— 
+	a) for subsection (7)(e)(i) substitute— 
+			i) to Citizens Advice Scotland, for the purposes of any qualifying public consumer advice scheme supported by the body (on its own or jointly with one or both of Citizens Advice and Consumer Scotland), 
+			ia) to Consumer Scotland, for the purposes of any qualifying public consumer advice scheme supported by the body (on its own or jointly with one or both of Citizens Advice and Citizens Advice Scotland), and , 
+	b) in subsection (7)(e)(ii), for “or Citizens Advice Scotland, or by them jointly” substitute “, Citizens Advice Scotland or Consumer Scotland, or by all or any two of those bodies jointly” , 
+	c) in subsection (8)(ca), after “Citizens Advice Scotland” insert “and Consumer Scotland” , and 
+	d) in subsection (9), for “or Citizens Advice Scotland, or by” substitute “, Citizens Advice Scotland or Consumer Scotland, or by all or any two of” . 
+
+Section 8) **Postal Services Act 2011**
+
+1) The Postal Services Act 2011  is amended as follows. 
+2) In section 61  (duties in relation to social and environmental matters)— 
+	a) in subsection (3)(ba), for “Citizens Advice Scotland” substitute “Consumer Scotland” , and 
+	b) in subsection (3A), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+3) In Schedule 5  , in paragraph 1 (approval of redress schemes), after sub-paragraph (7)(f) (and before the “and” following it) insert— 
+	fa) Consumer Scotland, . 
+
+Section 9) **Smart Meters Act 2018**
+
+1) The Smart Meters Act 2018  is amended as follows. 
+2) In section 12 (modification under section 11), in subsection (2)(d), for “Citizens Advice Scotland” substitute “Consumer Scotland” . 
+
+Section 10) **Domestic Gas and Electricity (Tariff Cap) Act 2018**
+
+1) The Domestic Gas and Electricity (Tariff Cap) Act 2018  is amended as follows. 
+2) In section 4 (notice of proposed modifications), in subsection (4)(d), for “Citizens Advice Scotland” substitute “Consumer Scotland” . ## PART 2
+## MODIFICATION OF SUBORDINATE LEGISLATION
+
+
+
+Section 11) **Electricity and Gas (Standards of Performance) (Suppliers) Regulations 2015**
+
+1) The Electricity and Gas (Standards of Performance) (Suppliers) Regulations 2015  are amended as follows. 
+2) In the Schedule, in paragraph 1(2)(a) (standards of performance: determination of disputes), for “or Citizens Advice Scotland” substitute “, Citizens Advice Scotland or Consumer Scotland” . 
+
+### Citation, commencement and extent
+`http://www.legislation.gov.uk/id/uksi/2022/34/article/1`
+
+Section 1) **Citation, commencement and extent**
+
+1) This Order may be cited as the Consumer Scotland Act 2020 (Consequential Provisions and Modifications) Order 2022 and comes into force on the day after the day on which it is made. 
+2) Any modification made by this Order has the same extent as the provision modified. 
+
+### Modifications
+`http://www.legislation.gov.uk/id/uksi/2022/34/article/4`
+
+Section 4) **Modifications**
+The modifications specified in the Schedule have effect. 

@@ -260,11 +260,11 @@ AUDIT_FAILED = {
     "error": "Worker agent timed out",
 }
 
-# Above MAX_AUDIT_SCHEMA_VERSION. Versions 2 to 5 are supported, so an
+# Above MAX_AUDIT_SCHEMA_VERSION. Versions 2 to 6 are supported, so an
 # unsupported fixture has to sit past the top of that range.
 AUDIT_WRONG_SCHEMA = {
     "type": "audit",
-    "schema_version": 6,
+    "schema_version": 7,
     "request_id": "wrong456",
     "chat_mode": "research",
     "research_mode": "legislation_only",
@@ -510,6 +510,16 @@ class TestMissingAuditEvent:
         with pytest.raises(RuntimeError, match="da3070d"):
             audit_capture(_MockClient(lines), "test question", "test-model")
 
+    def test_stream_error_is_an_error_result_not_an_old_build(self):
+        """A server error with no audit event is a failed request, not an old build."""
+        lines = _sse_lines(
+            {"type": "error", "error": "Service temporarily unavailable."},
+        )
+        result = audit_capture(_MockClient(lines), "test question", "test-model")
+        assert result["is_error"] is True
+        assert "Service temporarily unavailable" in result["error_message"]
+        assert result["actual_output"] == ""
+
 
 # ---------------------------------------------------------------------------
 # Tests, unknown schema version
@@ -532,14 +542,14 @@ class TestUnknownSchemaVersion:
         with pytest.raises(RuntimeError, match="schema_version"):
             audit_capture(_MockClient(lines), "test question", "test-model")
 
-    @pytest.mark.parametrize("version", [0, 6, 99, "5", None, "abc"])
+    @pytest.mark.parametrize("version", [0, 7, 99, "5", None, "abc"])
     def test_unsupported_or_malformed_versions_raise(self, version):
         """A non-integer version must raise the clear error, not a TypeError."""
         event = {**AUDIT_WRONG_SCHEMA, "schema_version": version}
         with pytest.raises(RuntimeError, match="schema_version"):
             audit_capture(_MockClient(_sse_lines(event)), "test question", "test-model")
 
-    @pytest.mark.parametrize("version", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("version", [1, 2, 3, 4, 5, 6])
     def test_supported_versions_are_captured(self, version):
         """Every version in the supported range should capture normally."""
         event = {**AUDIT_WRONG_SCHEMA, "schema_version": version}

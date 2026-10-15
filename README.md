@@ -177,7 +177,8 @@ export panel are kept for the browser session against that question.
 
 Use `--label` and `--experiment-id` when gathering to identify repeat sweeps.
 Scoring runs have their own identity, so rejudging an answer cannot count as an
-extra response. The comparison view matches questions and compatible scoring
+extra response. The dashboard opens on an overview with one row per experiment,
+showing each check's passes, run outcomes, cost and time side by side. The comparison view matches questions and compatible scoring
 versions across two recorded experiments that have been scored. Experiment info
 lists every experiment, scored or not, with the questions it gathered, which
 checks have a result for each of them, and the `run_evals.py` command for the

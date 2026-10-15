@@ -1,11 +1,18 @@
 {
-  "verified": false,
-  "verified_by": null,
-  "verified_at": null,
-  "verdict": null,
-  "citations_reviewed": false,
-  "required_citations": [],
-  "corrections": "",
-  "notes": "",
-  "signed_reference_sha256": null
+  "verified": true,
+  "verified_by": "Cambeul Walker",
+  "verified_at": "2026-09-28",
+  "verdict": "Approve",
+  "citations_reviewed": true,
+  "required_citations": [
+    "ukpga/1998/46/section/126",
+    "ukpga/1998/46/section/44",
+    "ukpga/1998/46/section/48",
+    "ukpga/1998/46/section/51",
+    "uksi/2012/3073/article/2",
+    "uksi/2015/200/article/2"
+  ],
+  "corrections": "See above",
+  "notes": "none. The changes are tracked insertions: the answer's statement that a complete list requires collecting every Order in Council under section 126(8)(b) should add \"and section 104 Orders\", and a new key statement, marked Accept: \"Section 104 Orders have been used in practice to designate that certain bodies as part of the Scottish Administration. To provide a full and complete answer, these Orders, which are not Orders in Council under section 126(8)(b), must too be referenced and their contents listed.\" Decision line read \"Changes required\"; the maintainer applied those changes (section 104 Orders researched, listed in the answer, and the new statement added, with the two \"list is incomplete\" statements merged to stay within five) and recorded the result as Approve without further review.",
+  "signed_reference_sha256": "6671733f61c916db"
 }

@@ -31,5 +31,105 @@
       "legislation_id": "uksi/2012/3073",
       "query": "Scottish Administration offices non ministerial office holder"
     }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "ukpga/1998/46",
+      "query": "section 104 power to make provision consequential on legislation of the Parliament"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Scottish Administration (Offices) Order"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "is part of the Scottish Administration Order"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Status as part of the Scottish Administration Consequential Provisions and Modifications Order"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Revenue Scotland Consequential Provisions Order"
+    }
+  },
+  {
+    "tool": "search_legislation",
+    "args": {
+      "query": "Food Standards Scotland Consequential Provisions Order"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/1999/1127",
+      "query": "Specification of offices section 126(8)(b) Scottish Administration"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2005/1467",
+      "query": "Specification of offices section 126(8)(b) Scottish Administration"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2018/781",
+      "query": "Specification of offices section 126(8)(b) Scottish Administration"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2009/2231",
+      "query": "status as part of the Scottish Administration office-holder"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2012/700",
+      "query": "status as part of the Scottish Administration office-holder"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2014/3294",
+      "query": "status as part of the Scottish Administration office-holder"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2015/444",
+      "query": "status as part of the Scottish Administration office-holder"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2017/241",
+      "query": "status as part of the Scottish Administration office-holder"
+    }
+  },
+  {
+    "tool": "search_legislation_sections",
+    "args": {
+      "legislation_id": "uksi/2022/34",
+      "query": "status as part of the Scottish Administration office-holder"
+    }
   }
 ]

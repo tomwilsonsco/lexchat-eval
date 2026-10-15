@@ -37,6 +37,7 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable
 
+from lex_eval.reference.store import effective_verified
 from lex_eval.utils.db import DATA_DIR, _slim_reference, make_deploy_db
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -51,9 +52,13 @@ MANIFEST = DATA_DIR / "reference_answers" / "reference_answers.json"
 
 # Streamlit Cloud installs these. numpy, pydantic and scikit-learn arrive
 # because reports/attribution.py imports a metric, and metrics/__init__.py
-# imports every metric, including the ones that score with them.
+# imports every metric, including the ones that score with them. httpx arrives
+# because attribution.py imports utils.test_helpers, and utils/__init__.py
+# imports audit_capture. The smoke check runs in this environment, where all of
+# these are installed, so it cannot catch one missing from this list.
 REQUIREMENTS = """streamlit>=1.31.0
 duckdb>=1.0
+httpx
 numpy
 pydantic
 scikit-learn
@@ -124,15 +129,31 @@ def _copy_modules(target: Path, files: Iterable[Path]) -> int:
     return count
 
 
+def _deploy_reference(record: dict) -> dict:
+    """One reference answer as the deployed dashboard gets it.
+
+    The retrieved text stays, because a lawyer's sign-off is checked against
+    it. Without it every signed-off answer reads as Stale on the live site.
+    """
+    slim = _slim_reference(record)
+    if "retrieval_context" in record:
+        slim["retrieval_context"] = record["retrieval_context"]
+    if effective_verified(slim) != effective_verified(record):
+        raise RuntimeError(
+            f"Q{record.get('question_id')}: the deployed copy loses its sign-off"
+        )
+    return slim
+
+
 def _copy_reference_manifest(target: Path) -> tuple[float, float]:
     """Copy the reference answers, keeping only the fields anything reads."""
     destination = target / MANIFEST.relative_to(REPO_ROOT)
     destination.parent.mkdir(parents=True, exist_ok=True)
     records = json.loads(MANIFEST.read_text(encoding="utf-8"))
     if isinstance(records, dict):
-        slimmed = {k: _slim_reference(v) for k, v in records.items()}
+        slimmed = {k: _deploy_reference(v) for k, v in records.items()}
     else:
-        slimmed = [_slim_reference(r) for r in records]
+        slimmed = [_deploy_reference(r) for r in records]
     destination.write_text(json.dumps(slimmed, indent=2), encoding="utf-8")
     return (
         MANIFEST.stat().st_size / 1024 / 1024,
@@ -205,8 +226,6 @@ def push(target: Path, branch: str) -> None:
     commit = capture("commit-tree", tree, "-m", f"deploy {date.today().isoformat()}")
     run("push", "--force", "origin", f"{commit}:refs/heads/{branch}")
     run("checkout", "-q", "-B", branch, commit)
-    # Left behind by a version of this script that used a temporary branch.
-    subprocess.run(["git", "branch", "-D", "_deploy_build"], cwd=target, check=False)
 
 
 def main() -> None:

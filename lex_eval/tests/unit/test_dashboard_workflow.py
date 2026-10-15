@@ -7,11 +7,15 @@ from streamlit.testing.v1 import AppTest
 
 from lex_eval.reports.comparison import (
     PASS_FREQUENCY_CHANGE,
+    PASS_RATE_DELTA,
     change_counts,
     compare,
     matched_entries,
     metric_summary,
+    overview_markdown,
+    overview_rows,
     shared_cohorts,
+    up_to_date,
 )
 from lex_eval.reports.data import coverage
 from lex_eval.reports.diagnostics import searches, search_summary
@@ -39,6 +43,7 @@ def test_error_only_dashboard_renders(tmp_path):
     app = AppTest.from_string(
         f"from pathlib import Path\nfrom lex_eval.reports import streamlit_report as r\nr.RESPONSES_DB=Path({str(path)!r})\nr.main()"
     )
+    app.session_state["view"] = "Review questions"
     app.run(timeout=30)
     assert not app.exception
     assert any("Q1" in str(frame.value) for frame in app.dataframe)
@@ -129,11 +134,13 @@ def test_metric_summary_totals_the_shared_questions():
     ]
     row = metric_summary(baseline, candidate, rows)[0]
     assert row["Questions compared"] == 2 and row["Not compared"] == 0
-    assert row["Baseline"] == "1/2 measured passes · mean 0.70"
-    assert row["Candidate"] == "2/2 measured passes · mean 0.70"
-    # The header names which of the two movements it reports: the means are
-    # equal here while the pass frequency rose.
-    assert row[PASS_FREQUENCY_CHANGE] == "More passes"
+    assert (row["Baseline passes"], row["Baseline measured"]) == (1, 2)
+    assert (row["Candidate passes"], row["Candidate measured"]) == (2, 2)
+    # The means are equal while the pass rate rose, by one run, which is
+    # within normal variation.
+    assert row["Baseline mean"] == row["Candidate mean"] == 0.7
+    assert row[PASS_RATE_DELTA] == 50
+    assert row[PASS_FREQUENCY_CHANGE] == "Within normal variation"
 
 
 def test_change_counts_account_for_every_check():
@@ -148,7 +155,7 @@ def test_change_counts_account_for_every_check():
     totals = metric_summary(baseline, candidate, rows)
     counts = change_counts(totals)
     assert counts["Checks"] == len(totals) == 2
-    assert counts["More passes"] == 1 and counts["Same pass frequency"] == 1
+    assert counts["Within normal variation"] == 2
     assert sum(counts[state] for state in counts if state != "Checks") == 2
 
 
@@ -163,7 +170,8 @@ def test_metric_summary_excludes_incompatible_versions_from_the_totals():
     ]
     row = metric_summary(baseline, candidate, rows)[0]
     assert row["Questions compared"] == 1 and row["Not compared"] == 1
-    assert row["Baseline"].startswith("0/1") and row["Candidate"].startswith("1/1")
+    assert (row["Baseline passes"], row["Baseline measured"]) == (0, 1)
+    assert (row["Candidate passes"], row["Candidate measured"]) == (1, 1)
 
 
 def test_metric_summary_reports_unmeasured_runs_beside_the_totals():
@@ -172,7 +180,7 @@ def test_metric_summary_reports_unmeasured_runs_beside_the_totals():
         [record(2), record(3)],
         [verdict(1, True), verdict(2, True)],
     )[0]
-    assert row["Candidate"].endswith("1 unmeasured")
+    assert row["Unmeasured runs"] == 1
 
 
 def test_evidence_gets_the_rows_the_totals_were_built_from():
@@ -421,7 +429,8 @@ def test_comparison_view_renders_recorded_experiments(tmp_path):
         assert f"{label} answer" in text
         assert f"{other} answer" not in text
     # The evidence panel is on the page, and it selects a check and a question.
-    assert [box.label for box in app.selectbox][2:4] == ["Check", "Question"]
+    labels = [box.label for box in app.selectbox]
+    assert labels[2:5] == ["Chat mode", "Check", "Question"]
     assert any("Failed" in str(item.value) for item in app.markdown)
 
 
@@ -607,6 +616,8 @@ def _run_dashboard(path):
     app = AppTest.from_string(
         f"from pathlib import Path\nfrom lex_eval.reports import streamlit_report as r\nr.RESPONSES_DB=Path({str(path)!r})\nr.main()"
     )
+    # The page opens on the overview; these tests are about the question review.
+    app.session_state["view"] = "Review questions"
     app.run(timeout=60)
     assert not app.exception
     return app
@@ -914,3 +925,265 @@ def test_markdown_export_carries_scoring_provenance():
     assert "scored 2026-09-07T07:54:23" in document
     assert "judge: openai/gpt-4o" in document
     assert "legacy scorer version unknown" in document
+
+
+def test_overview_counts_consistency_per_question_and_shows_cost():
+    rows = [
+        verdict(1, True, test_name="consistency", metric_name="Consistency"),
+        verdict(2, True, test_name="consistency", metric_name="Consistency"),
+        verdict(3, False, test_name="consistency", metric_name="Consistency"),
+        verdict(4, False, test_name="consistency", metric_name="Consistency"),
+        verdict(1, True),
+        verdict(2, False),
+        verdict(3, True),
+        verdict(4, True),
+    ]
+    matched, (base, cand) = overview_rows(
+        [
+            [record(1, total_cost_usd=0.1), record(2, total_cost_usd=0.3)],
+            [
+                record(3, total_ms=4000),
+                record(4, total_ms=8000),
+                record(5, question_id=9),
+            ],
+        ],
+        rows,
+    )
+    assert matched == 1
+    assert base["checks"] == {"Consistency": "1/1", "Agreement": "1/2"}
+    assert cand["checks"] == {"Consistency": "0/1", "Agreement": "2/2"}
+    # Question 9 was asked by one side only, so it is in neither total.
+    assert cand["Responses"] == 2
+    assert base["Total cost ($)"] == 0.4 and base["Mean time (s)"] is None
+    assert cand["Slowest (s)"] == 8
+
+
+def test_overview_needs_a_scoring_version_every_side_shares():
+    _, totals = overview_rows(
+        [[record(1)], [record(2)], [record(3)]],
+        [verdict(1, True), verdict(2, True), verdict(3, True, "v2")],
+    )
+    assert {t["checks"]["Agreement"] for t in totals} == {"Not comparable"}
+
+
+def test_overview_starts_with_experiments_scored_on_every_current_version():
+    rows = [
+        verdict(1, True, "v2", experiment_id="current", run_at="2026-10-14"),
+        verdict(2, True, "v1", experiment_id="old", run_at="2026-09-01"),
+        verdict(3, True, "v2", experiment_id="partial", run_at="2026-10-14"),
+        verdict(1, True, "t1", experiment_id="current", test_name="tool_usage"),
+        # Consistency stores nothing for a question asked once, so its absence
+        # does not make an experiment out of date.
+        verdict(1, True, "c1", experiment_id="current", test_name="consistency"),
+    ]
+    assert up_to_date(["current", "old", "partial"], rows) == ["current"]
+    asked_once = verdict(3, True, "t1", experiment_id="partial", test_name="tool_usage")
+    assert up_to_date(["current", "partial"], [*rows, asked_once]) == [
+        "current",
+        "partial",
+    ]
+
+
+def test_a_gap_wider_than_normal_variation_is_better_or_worse():
+    def asked(rid, qid):
+        return record(rid, question_id=qid, question=f"q{qid}")
+
+    def judged(rid, qid, passed):
+        return verdict(rid, passed, question_id=qid)
+
+    baseline = [asked(q, q) for q in range(1, 5)]
+    candidate = [asked(10 + q, q) for q in range(1, 5)]
+    rows = [judged(q, q, False) for q in range(1, 5)] + [
+        judged(10 + q, q, True) for q in range(1, 5)
+    ]
+    row = metric_summary(baseline, candidate, rows)[0]
+    assert row[PASS_FREQUENCY_CHANGE] == "Better" and row[PASS_RATE_DELTA] == 100
+    row = metric_summary(candidate, baseline, rows)[0]
+    assert row[PASS_FREQUENCY_CHANGE] == "Worse"
+
+
+def test_comparison_counts_consistency_per_question():
+    def similar(rid, passed):
+        return verdict(rid, passed, test_name="consistency", metric_name="Consistency")
+
+    row = metric_summary(
+        [record(1), record(2)],
+        [record(3), record(4)],
+        [similar(1, True), similar(2, True), similar(3, False), similar(4, False)],
+    )[0]
+    assert (row["Baseline passes"], row["Baseline measured"]) == (1, 1)
+    assert (row["Candidate passes"], row["Candidate measured"]) == (0, 1)
+
+
+def test_comparison_never_adds_chat_modes_together():
+    baseline = [record(1), record(3, question_id=2, chat_mode="deep_research")]
+    candidate = [record(2), record(4, question_id=2, chat_mode="deep_research")]
+    modes = {key[2] for key in shared_cohorts(baseline, candidate)}
+    assert modes == {"research", "deep_research"}
+
+
+def test_overview_markdown_is_the_findings_tables():
+    _, totals = overview_rows(
+        [[record(1, total_cost_usd=0.5)], [record(2)]],
+        [verdict(1, False), verdict(2, True)],
+    )
+    entries = [
+        {**t, "Column": column, "Experiment": column, "Model": "m"}
+        for column, t in zip(("A (1)", "B (2)"), totals, strict=True)
+    ]
+    text = overview_markdown(
+        "research",
+        1,
+        entries,
+        {"Agreement": "Agreement", "Step Completion": "Step Completion"},
+        "2026-10-15",
+    )
+    assert text.startswith("# Overview, research (2026-10-15)")
+    assert "| Check | A (1) | B (2) |" in text
+    assert "| Agreement | 0/1 | 1/1 |" in text
+    # A check no experiment has a result for is left out, and a missing cost
+    # reads n/a rather than None.
+    assert "Step Completion" not in text and "None" not in text
+
+
+def test_a_check_that_does_not_apply_leaves_no_unmeasured_runs():
+    def skipped(rid):
+        return verdict(
+            rid,
+            False,
+            measured=False,
+            not_applicable=True,
+            reason="Not applicable: deep research only.",
+        )
+
+    row = metric_summary([record(1)], [record(2)], [skipped(1), skipped(2)])[0]
+    assert row["Unmeasured runs"] == 0
+    _, changes, _ = compare([record(1)], [record(2)], [skipped(1), skipped(2)])
+    assert changes[0]["Change"] == "Not applicable"
+
+
+def test_a_check_one_experiment_never_stored_does_not_block_the_others():
+    """Consistency writes nothing for a question asked once."""
+
+    def similar(rid, passed):
+        return verdict(rid, passed, test_name="consistency", metric_name="Consistency")
+
+    _, (once, twice) = overview_rows(
+        [[record(1)], [record(2), record(3)]],
+        [similar(2, True), similar(3, True)],
+    )
+    assert once["checks"]["Consistency"] == "No stored result"
+    # Nothing to set the other side's result against, so it is not totalled.
+    assert twice["checks"]["Consistency"] == "Not compared"
+    # A side whose rows carry no known version still cannot be compared.
+    _, totals = overview_rows(
+        [[record(1)], [record(2)]],
+        [verdict(1, True, None), verdict(2, True)],
+    )
+    assert {t["checks"]["Agreement"] for t in totals} == {"Not comparable"}
+
+
+def test_a_question_scored_on_one_side_only_is_in_no_total():
+    """Baseline 1/4, candidate scored only on the question both passed.
+
+    Totalling each side over its own questions read this as Better by 75
+    points, a change made entirely of missing evaluations.
+    """
+    baseline = [record(q, question_id=q, question=f"q{q}") for q in range(1, 5)]
+    candidate = [record(10 + q, question_id=q, question=f"q{q}") for q in range(1, 5)]
+    rows = [verdict(1, True, question_id=1), verdict(11, True, question_id=1)] + [
+        verdict(q, False, question_id=q) for q in range(2, 5)
+    ]
+    row = metric_summary(baseline, candidate, rows)[0]
+    assert (row["Baseline passes"], row["Baseline measured"]) == (1, 1)
+    assert (row["Candidate passes"], row["Candidate measured"]) == (1, 1)
+    assert row[PASS_FREQUENCY_CHANGE] == "Within normal variation"
+    assert row["Questions compared"] == 1 and row["Not compared"] == 3
+    _, (base, cand) = overview_rows([baseline, candidate], rows)
+    assert (
+        base["checks"]["Agreement"]
+        == cand["checks"]["Agreement"]
+        == ("1/1 (3 not compared)")
+    )
+    _, changes, _ = compare(baseline, candidate, rows)
+    assert {c["Change"] for c in changes if c["Question"] != "Q1"} == {
+        "Not compared: no stored result on one side"
+    }
+
+
+def test_evidence_for_a_check_one_side_never_stored_does_not_crash(tmp_path):
+    """Consistency between a once-asked baseline and a repeated candidate."""
+    from lex_eval.utils.db import init_eval_table, insert_eval_result
+    from lex_eval.utils.versioning import start_gather, link_response, start_scoring
+
+    path = tmp_path / "one_sided.db"
+    conn = get_connection(path)
+    init_db(conn)
+    for metric in ("tool_usage", "consistency"):
+        init_eval_table(conn, metric)
+    run = start_scoring(conn, dict(source_version="v1", judge={}))
+
+    def store(metric, rid, reason="ok"):
+        insert_eval_result(
+            conn,
+            metric,
+            dict(
+                response_id=rid,
+                question_id=1,
+                question="q",
+                llm_name="m",
+                score=1.0,
+                threshold=0.5,
+                passed=True,
+                reason=reason,
+                scoring_run_id=run,
+                metric_version="v1",
+            ),
+        )
+
+    for label, runs in (("baseline", 1), ("candidate", 2)):
+        exp, gather = start_gather(
+            conn, label=label, config={"label": label}, question_ids=[1]
+        )
+        for _ in range(runs):
+            rid = insert_response(
+                conn,
+                dict(
+                    question_id=1,
+                    question="q",
+                    llm_name="m",
+                    timestamp="2026-09-07",
+                    actual_output=f"{label} answer",
+                ),
+            )
+            link_response(conn, rid, gather, exp, {"id": 1, "question": "q"})
+            store("tool_usage", rid)
+            if runs > 1:
+                store(
+                    "consistency",
+                    rid,
+                    "Mean cosine similarity: 0.9 (across 2 responses)",
+                )
+    conn.close()
+    app = AppTest.from_string(
+        f"from pathlib import Path\nfrom lex_eval.reports import streamlit_report as r\nr.RESPONSES_DB=Path({str(path)!r})\nr.main()"
+    )
+    app.run(timeout=30)
+    assert not app.exception
+    app.radio[0].set_value("Compare experiments").run(timeout=30)
+    check = next(box for box in app.selectbox if box.label == "Check")
+    check.set_value("Consistency (Cosine)").run(timeout=30)
+    assert not app.exception
+    assert any(
+        "no stored result on one side" in str(item.value) for item in app.markdown
+    )
+
+
+def test_a_check_that_failed_to_score_on_both_sides_is_not_measured():
+    def failed(rid):
+        return verdict(
+            rid, False, measured=False, reason="Not measured: judge call failed."
+        )
+
+    _, changes, _ = compare([record(1)], [record(2)], [failed(1), failed(2)])
+    assert changes[0]["Change"] == "Not measured"
