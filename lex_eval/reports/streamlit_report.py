@@ -334,7 +334,7 @@ COMPARISON_METRIC_COLUMNS: dict[str, str] = {
     PASS_RATE_DELTA: "Candidate pass rate minus baseline pass rate, in percentage points. Better and Worse checks come first, then the rest, each largest change first.",
     "Unmeasured runs": "Runs on either side the check could not measure. They are in no total.",
     "Questions compared": "How many shared questions are in these totals.",
-    "Not compared": "Shared questions left out because the two sides used different scoring versions or different judges. They are in no total here.",
+    "Not compared": "Shared questions left out because only one side has a stored result for them, or the two sides used different scoring versions or judges. They are in no total here.",
 }
 
 # Hover help for the overview table. Check columns take their help from
@@ -2041,6 +2041,13 @@ def _overview(records, rows):
             "No stored result means the check has no score for that experiment. "
             "Consistency needs each question answered at least twice. Any other "
             "check may not have been run yet; Experiment info shows the command."
+        )
+    if "Not compared" in cells or any("not compared)" in v for v in cells):
+        st.caption(
+            "Not compared means only some of the selected experiments have a "
+            "result for that check on the same questions, so their totals would "
+            "cover different questions. A count marked not compared leaves those "
+            "questions out."
         )
     if any(v.startswith("Not comparable") for v in cells):
         st.caption(

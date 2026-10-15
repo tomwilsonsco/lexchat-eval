@@ -152,10 +152,11 @@ rest, which explain why those moved.
 The experiments selected at first are those scored with the current version of
 every check. A check reads Not comparable when the selected experiments do not
 share a scoring version for it, so adding an experiment scored with an older
-version, or never scored with a check, blanks that check for all of them. The
-exception is a check with no stored result for one experiment, such as
-Consistency on questions it asked only once: that experiment reads No stored
-result and the others keep their totals. Use
+version blanks that check for all of them. Totals only count questions where
+every selected experiment has a stored result, so a missing score can never
+read as a change. An experiment with no result for a check, such as Consistency
+on questions it asked only once, reads No stored result, and the others read
+Not compared or mark how many questions were left out. Use
 Compare experiments to see which questions moved.
 
 **Download as Markdown** writes the same selection as two tables, runs and cost
@@ -190,7 +191,8 @@ check does not apply to, such as a conversational run for a deep research
 check, is not counted as unmeasured. Consistency
 is counted per question. A shared question whose two sides used different
 scoring versions or different judges is counted under "Not compared" and is in
-none of those totals. Better and Worse checks come first. The change follows
+none of those totals, and so is a shared question only one side has a stored
+result for. Better and Worse checks come first. The change follows
 how often a check passed, not its mean score, and the two can move in opposite
 directions. The per question rows are behind **Per question detail** beneath
 the selected check. Run outcomes also give each side's cost, time and

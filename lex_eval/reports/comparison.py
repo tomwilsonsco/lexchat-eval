@@ -54,15 +54,10 @@ def matched_entries(baseline, candidate, rows):
     return _matched_entries(groups, groups[0].keys() & groups[1].keys(), rows)
 
 
-# The totals of a side that has no stored row for a check.
-_NO_STORED_RESULT = {
-    "pass_count": 0,
-    "measured_count": 0,
-    "score": 0.0,
-    "state": NO_STORED_RESULT,
-    "n_runs": 0,
-    "not_scored_rows": [],
-}
+# Why a shared question is left out when one side has no score for it, such
+# as Consistency on a question one experiment asked only once. Totals over
+# different questions would make the missing score look like a change.
+NOT_STORED_ON_A_SIDE = "Not compared: no stored result on one side"
 
 
 def _matched_entries(groups, matched, rows):
@@ -102,14 +97,14 @@ def _matched_entries(groups, matched, rows):
                     metric,
                 ),
                 "ids": ids,
+                "stored": [bool(side) for side in sides],
             }
-            # A side with no stored row at all, such as Consistency on a
-            # question asked once, has no version to disagree with. It is
-            # reported as No stored result rather than blocking the others.
+            if not all(sides):
+                entries.append({**entry, "excluded": NOT_STORED_ON_A_SIDE})
+                continue
             versions = [
                 {signature(r) for r in side if r.get("metric_version")}
                 for side in sides
-                if side
             ]
             common = set.intersection(*versions)
             if not common:
@@ -150,10 +145,7 @@ def _matched_entries(groups, matched, rows):
                     **entry,
                     "excluded": None,
                     "selected": selected,
-                    "totals": [
-                        aggregate_metrics(side)[0] if side else _NO_STORED_RESULT
-                        for side in selected
-                    ],
+                    "totals": [aggregate_metrics(side)[0] for side in selected],
                 }
             )
     return entries
@@ -209,12 +201,14 @@ def compare(baseline, candidate, rows):
             responses[f"{label} responses"] = ", ".join(
                 str(r["response_id"]) for r in side
             )
+        unmeasured = [
+            _unmeasured(t, side_ids) for t, side_ids in zip(totals, ids, strict=True)
+        ]
         if not any(t["measured_count"] for t in totals):
-            change = "Not applicable"
-        elif any(
-            _unmeasured(t, side_ids) or not t["measured_count"]
-            for t, side_ids in zip(totals, ids, strict=True)
-        ):
+            # Only runs the check excludes by design are Not applicable. A run
+            # that failed to score, such as a judge error, is Not measured.
+            change = "Not measured" if any(unmeasured) else "Not applicable"
+        elif any(unmeasured) or not all(t["measured_count"] for t in totals):
             change = "Incomplete measurements"
         else:
             change = _direction(
@@ -308,10 +302,12 @@ def metric_summary(baseline, candidate, rows):
                 ],
                 "compared": 0,
                 "excluded": 0,
+                "mismatched": 0,
             },
         )
         if item["excluded"]:
             row["excluded"] += 1
+            row["mismatched"] += item["excluded"] != NOT_STORED_ON_A_SIDE
             continue
         row["compared"] += 1
         for side, total, ids in zip(
@@ -334,7 +330,9 @@ def metric_summary(baseline, candidate, rows):
         sides = row["sides"]
         delta = None
         if not row["compared"]:
-            change = "Not comparable"
+            # Comparable only fails when versions or judges differ. A check
+            # one side never stored is unmeasured there, not incomparable.
+            change = "Not comparable" if row["mismatched"] else "Not measured"
         elif not all(side["measured"] for side in sides):
             change = "Not measured"
         else:
@@ -385,9 +383,11 @@ def overview_rows(sides, rows):
     """One row per experiment, totalled over the questions every side asked.
 
     Returns how many question and mode combinations were matched, and for each
-    side its run outcomes, cost, time and the passes of every check. A check
-    reads "Not comparable" when no shared question had a scoring version common
-    to every side. Consistency gives one verdict per question, so it is counted
+    side its run outcomes, cost, time and the passes of every check, counted
+    only on questions where every side has a stored result. A check reads
+    "Not comparable" when no shared question had a scoring version common to
+    every side, and "Not compared" when no shared question had a result on
+    every side. Consistency gives one verdict per question, so it is counted
     per question rather than per response.
     """
     groups = [_cohorts(records) for records in sides]
@@ -412,14 +412,21 @@ def overview_rows(sides, rows):
     for item in _matched_entries(groups, matched, rows):
         tally = tallies.setdefault(
             item["metric_name"],
-            {"sides": [[0, 0, False] for _ in groups], "compared": 0, "excluded": 0},
+            {
+                "sides": [[0, 0, False] for _ in groups],
+                "compared": 0,
+                "excluded": 0,
+                "mismatched": 0,
+            },
         )
+        for side, stored in zip(tally["sides"], item["stored"], strict=True):
+            side[2] = side[2] or stored
         if item["excluded"]:
             tally["excluded"] += 1
+            tally["mismatched"] += item["excluded"] != NOT_STORED_ON_A_SIDE
             continue
         tally["compared"] += 1
         for side, total in zip(tally["sides"], item["totals"], strict=True):
-            side[2] = side[2] or total["state"] != NO_STORED_RESULT
             if item["test_name"] == "consistency":
                 if total["measured_count"]:
                     side[0] += total["pass_count"] == total["measured_count"]
@@ -431,10 +438,10 @@ def overview_rows(sides, rows):
         for row, (passes, measured_count, stored) in zip(
             output, tally["sides"], strict=True
         ):
-            if not tally["compared"]:
-                text = "Not comparable"
-            elif not stored:
+            if not stored:
                 text = NO_STORED_RESULT
+            elif not tally["compared"]:
+                text = "Not comparable" if tally["mismatched"] else "Not compared"
             elif not measured_count:
                 text = "Not measured"
             else:
