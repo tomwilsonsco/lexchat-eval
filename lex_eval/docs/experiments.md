@@ -20,7 +20,9 @@ condition. Internal HTTP retries remain part of the response's attempt count.
 For a prompt change, start a new experiment. Supply the actual deployed build,
 prompt version, and relevant settings using `--deployment-config path/to/config.json`
 on both gathers. This file is a user-supplied snapshot, not a claim that the
-harness inspected the server's prompts. For example:
+harness inspected the server's prompts. Keep these snapshots, one per build and
+model, in `lex_eval/data/deployment_info/` and commit them, so the condition
+behind each experiment stays readable outside the database. For example:
 
 ```json
 {

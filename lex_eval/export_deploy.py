@@ -51,9 +51,13 @@ MANIFEST = DATA_DIR / "reference_answers" / "reference_answers.json"
 
 # Streamlit Cloud installs these. numpy, pydantic and scikit-learn arrive
 # because reports/attribution.py imports a metric, and metrics/__init__.py
-# imports every metric, including the ones that score with them.
+# imports every metric, including the ones that score with them. httpx arrives
+# because attribution.py imports utils.test_helpers, and utils/__init__.py
+# imports audit_capture. The smoke check runs in this environment, where all of
+# these are installed, so it cannot catch one missing from this list.
 REQUIREMENTS = """streamlit>=1.31.0
 duckdb>=1.0
+httpx
 numpy
 pydantic
 scikit-learn

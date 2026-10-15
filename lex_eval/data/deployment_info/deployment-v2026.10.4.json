@@ -1,0 +1,31 @@
+{
+  "recorded_by": "eval team, 12 October 2026",
+  "what_this_is": "A snapshot of the LexChat build this gather ran against. The release and build are read from the server itself (GET /api/bot-info), not asserted from the local clone.",
+  "server_reported": {
+    "version": "2026.10.4",
+    "build": "v2026.10.4-4-g1da18ce",
+    "research_mode": "",
+    "scottish_judgments": false,
+    "source": "GET /api/bot-info at gather time"
+  },
+  "lexchat_commit": "1da18ce",
+  "lexchat_commit_subject": "docs(todo): D24, cache the SCTS API results (feasibility first)",
+  "lexchat_commit_date": "2026-10-12T12:39:37+01:00",
+  "fix_programme": {
+    "name": "pre-pilot defect fixes",
+    "releases_since_previous_test": ["v2026.10.1", "v2026.10.2", "v2026.10.3", "v2026.10.4"],
+    "rows_fixed": "71 of 103, 9 of 14 buckets (as of v2026.10.1)",
+    "previous_tested_build": "v2026.09.3 (30 September gather)"
+  },
+  "audit_schema_version": 6,
+  "observed_at_capture": {
+    "active_model": "glm-5.2:cloud",
+    "provider": "ollama",
+    "summarisation_model": "glm-5.2:cloud"
+  },
+  "unknown": [
+    "The server's RESEARCH_MODE environment override beyond the empty value /api/bot-info reports.",
+    "Feature flag settings other than scottish_judgments.",
+    "Prompt or corpus changes made outside the commit history."
+  ]
+}
