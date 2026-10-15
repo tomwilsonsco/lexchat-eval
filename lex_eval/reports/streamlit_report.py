@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import hashlib
 import html
 import json
@@ -22,16 +23,22 @@ from lex_eval.reference.store import (
 )
 from lex_eval.reports.attribution import caveat, worst_attribution
 from lex_eval.reports.comparison import (
+    NORMAL_VARIATION_RULE,
     PASS_FREQUENCY_CHANGE,
+    PASS_RATE_DELTA,
     change_counts,
     cohort_key,
     compare,
     matched_entries,
     metric_summary,
+    overview_markdown,
+    overview_rows,
     shared_cohorts,
+    up_to_date,
 )
 from lex_eval.reports.diagnostics import searches, search_summary, plan_steps
 from lex_eval.reports.data import (
+    NO_STORED_RESULT,
     NOT_MEASURED,
     coverage,
     apply_scope,
@@ -308,25 +315,59 @@ EXPERIMENT_INFO_COLUMNS: dict[str, str] = {
 
 COMPARISON_CHANGE_COUNT_COLUMNS: dict[str, str] = {
     "Checks": "How many checks the table below reports, which is every check with a stored result on either side.",
-    "More passes": "Checks the candidate passed more often than the baseline, over the runs both sides measured.",
-    "Fewer passes": "Checks the candidate passed less often than the baseline.",
-    "Same pass frequency": "Checks that passed equally often on both sides.",
+    "Better": "Checks the candidate passed more often than the baseline, by more than normal run-to-run variation.",
+    "Worse": "Checks the candidate passed less often than the baseline, by more than normal run-to-run variation.",
+    "Within normal variation": "Checks whose pass rate moved by no more than asking the same questions again can explain.",
     "Not measured": "Checks with nothing measured on one or both sides, for example a deep research check on conversational runs.",
     "Not comparable": "Checks where no shared question could be compared, because the two sides used different scoring versions or different judges.",
 }
 
 COMPARISON_METRIC_COLUMNS: dict[str, str] = {
     "Check": "The check these totals are for.",
-    "Baseline": "Baseline totals over the questions both experiments answered: measured passes out of measured runs, the mean of those scores, and how many runs the check could not measure.",
-    "Candidate": "The same totals for the candidate experiment.",
-    PASS_FREQUENCY_CHANGE: "How often the candidate passed compared with the baseline, over the runs both sides measured. This is not the movement in the mean score, which is shown in the two columns before it and can go the other way. Runs that could not be measured are not part of either.",
+    PASS_FREQUENCY_CHANGE: "Better or Worse when the pass rate moved by more than normal run-to-run variation. It follows how often the check passed, not the mean score, and the two can move in opposite directions.",
+    "Baseline passes": "Baseline runs that passed, over the questions both experiments answered. Consistency counts questions, not runs.",
+    "Baseline measured": "Baseline runs the check could measure.",
+    "Baseline mean": "Mean score of the baseline's measured runs.",
+    "Candidate passes": "Candidate runs that passed.",
+    "Candidate measured": "Candidate runs the check could measure.",
+    "Candidate mean": "Mean score of the candidate's measured runs.",
+    PASS_RATE_DELTA: "Candidate pass rate minus baseline pass rate, in percentage points. Better and Worse checks come first, then the rest, each largest change first.",
+    "Unmeasured runs": "Runs on either side the check could not measure. They are in no total.",
     "Questions compared": "How many shared questions are in these totals.",
     "Not compared": "Shared questions left out because the two sides used different scoring versions or different judges. They are in no total here.",
+}
+
+# Hover help for the overview table. Check columns take their help from
+# METRIC_TOOLTIPS.
+OVERVIEW_COLUMNS: dict[str, str] = {
+    "Experiment": "The recorded configuration these totals are for.",
+    "Model": "The model LexChat had active when these responses were gathered.",
+    "Responses": "Every captured run of the questions all selected experiments asked.",
+    "Answered": OUTCOME_COLUMNS["Response received"],
+    "Clarification": OUTCOME_COLUMNS["Clarification requested"],
+    "Error": OUTCOME_COLUMNS["Error"],
+    "No response text": OUTCOME_COLUMNS["No response text"],
+    "Limit reached": OUTCOME_COLUMNS["Research limit reached"],
+    "Total cost ($)": "LexChat's reported cost of these runs added together. Runs that recorded no cost are left out.",
+    "Mean cost ($)": "Average cost of one run, over the runs that recorded a cost.",
+    "Mean time (s)": "Average time LexChat took to answer one run.",
+    "Slowest (s)": "The longest single run.",
+    "Summarisation model": "The model that condensed tool results for these runs.",
 }
 
 COMPARISON_OUTCOME_COLUMNS: dict[str, str] = {
     "Experiment": "Which side of the comparison the counts on this row come from.",
     **OUTCOME_COLUMNS,
+    **{
+        name: OVERVIEW_COLUMNS[name]
+        for name in (
+            "Total cost ($)",
+            "Mean cost ($)",
+            "Mean time (s)",
+            "Slowest (s)",
+            "Summarisation model",
+        )
+    },
 }
 
 
@@ -1851,6 +1892,168 @@ def _render_comparison_evidence(entries, sides, labels, records_by_id, changes):
             )
 
 
+# The checks the overview always shows: does the answer state the law the
+# reference answer states, and does it say the same thing when asked twice.
+# Everything else explains why one of these moved, so it is optional.
+HEADLINE_CHECKS = ("reference_answer_agreement", "citation_agreement", "consistency")
+_CONSISTENCY_COLUMN = "Consistency (questions passed / measured)"
+
+
+def _overview(records, rows):
+    st.markdown(
+        "How each experiment did overall, on the questions every selected "
+        "experiment asked. Use "
+        "Compare experiments to see which questions moved."
+    )
+    scored = {row["response_id"] for row in rows}
+    experiments = {
+        r["experiment_id"]: r.get("experiment", {})
+        for r in records
+        if r.get("experiment_id") and r["response_id"] in scored
+    }
+    if not experiments:
+        st.info(
+            "No recorded experiment has stored metric results yet. Experiment "
+            "info lists every experiment and what is still to be scored."
+        )
+        return
+    # Conversational and deep research answer different kinds of request, so
+    # their pass rates are never added together.
+    modes = sorted(
+        {r.get("chat_mode") or "unknown" for r in records if r["response_id"] in scored}
+    )
+    left, right = st.columns([1, 3])
+    mode = left.selectbox("Chat mode", modes, key="overview_mode")
+    options = sorted(
+        {
+            r["experiment_id"]
+            for r in records
+            if r.get("experiment_id") in experiments
+            and (r.get("chat_mode") or "unknown") == mode
+        },
+        key=lambda e: _experiment_label(experiments, e),
+    )
+    current = up_to_date(options, rows) or options
+    st.session_state["overview_experiments"] = [
+        e for e in st.session_state.get("overview_experiments", current) if e in options
+    ] or current
+    chosen = right.multiselect(
+        "Experiments",
+        options,
+        key="overview_experiments",
+        format_func=lambda e: _experiment_label(experiments, e),
+        help="Selected at first: the experiments scored with the current version "
+        "of every check. Adding one scored with an older version makes those "
+        "checks Not comparable.",
+    )
+    if not chosen:
+        st.info("Select at least one experiment.")
+        return
+    sides = [
+        [
+            r
+            for r in records
+            if r.get("experiment_id") == exp
+            and (r.get("chat_mode") or "unknown") == mode
+        ]
+        for exp in chosen
+    ]
+    matched, totals = overview_rows(sides, apply_scope(rows))
+    if not matched:
+        st.info(
+            "These experiments have no question in common, asked with the same "
+            "wording and the same modes, so there is nothing to put side by side."
+        )
+        return
+    st.caption(
+        f"{matched} question and mode combination(s) asked by every selected "
+        "experiment. Questions only some of them asked are left out."
+    )
+    show_diagnostics = st.checkbox(
+        "Show diagnostic checks",
+        help="The checks on how the research was done. They explain why the "
+        "headline checks moved, rather than measuring the answer itself.",
+    )
+    names = {key: name for key, name, _tip in METRICS}
+    staged = [
+        key for stage in STAGES.values() for key in sorted(stage, key=_metric_order)
+    ]
+    every_check = [*HEADLINE_CHECKS, *(k for k in staged if k not in HEADLINE_CHECKS)]
+    labels = {
+        names[k]: (
+            _CONSISTENCY_COLUMN
+            if k == "consistency"
+            else f"{names[k]} (runs passed / measured)"
+        )
+        for k in every_check
+    }
+    shown = every_check if show_diagnostics else list(HEADLINE_CHECKS)
+    columns = {names[k]: labels[names[k]] for k in shown}
+    entries = []
+    for exp, side, total in zip(chosen, sides, totals, strict=True):
+        model = ", ".join(sorted({r["llm_name"] for r in side}))
+        entries.append(
+            {
+                "Experiment": _experiment_label(experiments, exp),
+                "Column": f"{model} ({exp[:8]})",
+                "Model": model,
+                **total,
+            }
+        )
+    table = [
+        {
+            "Experiment": e["Experiment"],
+            "Model": e["Model"],
+            **{
+                label: e["checks"].get(name, NO_STORED_RESULT)
+                for name, label in columns.items()
+            },
+            **{k: v for k, v in e.items() if k not in {"checks", "Column"}},
+        }
+        for e in entries
+    ]
+    st.dataframe(
+        table,
+        hide_index=True,
+        width="stretch",
+        column_config=_column_help(
+            {
+                **OVERVIEW_COLUMNS,
+                **{label: METRIC_TOOLTIPS[name] for name, label in columns.items()},
+                _CONSISTENCY_COLUMN: "Questions whose repeated answers were similar "
+                "enough, out of questions asked at least twice. "
+                + METRIC_TOOLTIPS[names["consistency"]],
+            }
+        ),
+    )
+    st.download_button(
+        "Download as Markdown",
+        overview_markdown(
+            mode, matched, entries, labels, datetime.date.today().isoformat()
+        ),
+        file_name=f"overview-{mode}.md",
+        mime="text/markdown",
+        help="Both tables, with every check, in the layout of a findings document.",
+    )
+    cells = {str(v) for row in table for v in row.values()}
+    if NO_STORED_RESULT in cells:
+        st.caption(
+            "No stored result means the check has no score for that experiment. "
+            "Consistency needs each question answered at least twice. Any other "
+            "check may not have been run yet; Experiment info shows the command."
+        )
+    if any(v.startswith("Not comparable") for v in cells):
+        st.caption(
+            "Not comparable means the selected experiments were not all scored "
+            "with the same version of that check. Rescore the older experiment, "
+            "or leave it out, to compare them. Experiment info shows the command."
+        )
+
+
+def _metric_order(key: str) -> int:
+    return [k for k, _name, _tip in METRICS].index(key)
+
+
 def _compare_experiments(records, rows):
     # An experiment with no stored metric result has nothing to compare, so it
     # is not offered here. Experiment info lists every experiment, scored or
@@ -1902,6 +2105,21 @@ def _compare_experiments(records, rows):
             "same wording and the same modes, so there is nothing to compare."
         )
         return
+    # Conversational and deep research answer different kinds of request, so
+    # their pass rates, costs and times are never added together.
+    modes = sorted({key[2] or "unknown" for key in shared})
+    if st.session_state.get("compare_mode") not in modes:
+        st.session_state["compare_mode"] = modes[0]
+    mode = st.selectbox(
+        "Chat mode",
+        modes,
+        key="compare_mode",
+        help="Only the chat modes both experiments asked questions in.",
+    )
+    sides = [
+        [r for r in side if (r.get("chat_mode") or "unknown") == mode] for side in sides
+    ]
+    shared = shared_cohorts(*sides)
     question_options = sorted({key[0] for key in shared})
     st.session_state["compare_questions"] = [
         q
@@ -1927,12 +2145,10 @@ def _compare_experiments(records, rows):
         width="stretch",
         column_config=_column_help(COMPARISON_SUMMARY_COLUMNS),
     )
-    totals = sorted(
-        metric_summary(*sides, scoped),
-        key=lambda row: _metric_sort_key({"metric_name": row["Check"]}),
-    )
+    totals = metric_summary(*sides, scoped)
     if totals:
         st.markdown("#### Results by check")
+        st.caption(NORMAL_VARIATION_RULE)
         st.dataframe(
             [change_counts(totals)],
             hide_index=True,
@@ -2001,7 +2217,7 @@ def main() -> None:
         return
     view = st.radio(
         "View",
-        ["Review questions", "Compare experiments", "Experiment info"],
+        ["Overview", "Review questions", "Compare experiments", "Experiment info"],
         horizontal=True,
         key="view",
     )
@@ -2014,6 +2230,9 @@ def main() -> None:
     # The comparison view chooses its own experiments and then its own
     # questions from what those two share, so the filters below, which narrow
     # the records first, do not apply to it.
+    if view == "Overview":
+        _overview(records, rows)
+        return
     if view == "Compare experiments":
         _compare_experiments(records, rows)
         return

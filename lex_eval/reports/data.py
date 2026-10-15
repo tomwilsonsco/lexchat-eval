@@ -51,6 +51,9 @@ def read_database(path: Path, metrics: list[tuple]) -> tuple[list[dict], list[di
         responses = _rows(conn, "responses")
         for rec in responses:
             rec["response_id"] = rec.pop("id")
+            if asked_instead_of_researching(rec):
+                rec["needs_clarification"] = True
+                rec["clarification_question"] = rec["actual_output"].strip()
         history = response_history(conn)
         experiments = (
             {r["id"]: r for r in _rows(conn, "experiments")}
@@ -94,6 +97,22 @@ def read_database(path: Path, metrics: list[tuple]) -> tuple[list[dict], list[di
                 )
                 results.append(row)
     return responses, results
+
+
+def asked_instead_of_researching(rec: dict) -> bool:
+    """A non deep research answer that called no tool and ends in a question.
+
+    The capture flags a clarification only when the deep research planner
+    asks one. Elsewhere the model asks in its answer text, so the dashboard
+    reads that as a clarification too. Nothing is written back to the database.
+    """
+    return (
+        rec.get("chat_mode") != "deep_research"
+        and not rec.get("is_error")
+        and not rec.get("tool_sequence")
+        and not rec.get("tools_called")
+        and (rec.get("actual_output") or "").strip().endswith("?")
+    )
 
 
 def _rows(conn, table: str) -> list[dict]:
