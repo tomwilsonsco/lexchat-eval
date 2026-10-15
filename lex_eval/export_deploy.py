@@ -226,8 +226,6 @@ def push(target: Path, branch: str) -> None:
     commit = capture("commit-tree", tree, "-m", f"deploy {date.today().isoformat()}")
     run("push", "--force", "origin", f"{commit}:refs/heads/{branch}")
     run("checkout", "-q", "-B", branch, commit)
-    # Left behind by a version of this script that used a temporary branch.
-    subprocess.run(["git", "branch", "-D", "_deploy_build"], cwd=target, check=False)
 
 
 def main() -> None:
