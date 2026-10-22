@@ -2204,8 +2204,8 @@ def _compare_experiments(records, rows):
 
 
 def main() -> None:
-    st.set_page_config(page_title="LexChat Eval", layout="wide")
-    st.title("LexChat evaluation")
+    st.set_page_config(page_title="AILA Eval", layout="wide")
+    st.title("AILA evaluation")
     # The database path and the scoring selection are set once a session and
     # then repeat on every screen, so they are folded away and summarised in
     # the caption below the filters instead of leading the page.
